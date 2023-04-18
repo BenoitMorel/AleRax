@@ -1,0 +1,3 @@
+[submodule "ext/GeneRaxCore"]
+	path = ext/GeneRaxCore
+	url = git@github.com:BenoitMorel/GeneRaxCore.git
