@@ -23,10 +23,10 @@ We are also working on the following features:
 ## Installation 
 
 
-To download GeneRax, please use git,  and clone with --recursive!!!
+To download AleRax, please use git,  and clone with --recursive!!!
 
 ```
-git clone --recursive https://github.com/BenoitMorel/GeneRax
+git clone --recursive https://github.com/BenoitMorel/AleRax
 ```
 
 To build the sources:
@@ -34,7 +34,9 @@ To build the sources:
 ./install.sh
 ```
 
-To update to the last stable version:
+## Updating to the last stable version
+
+
 ```
 ./gitpull.sh # does a bit more than git pull
 ./install.sh
