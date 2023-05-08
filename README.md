@@ -29,6 +29,15 @@ To download AleRax, please use git,  and clone with --recursive!!!
 git clone --recursive https://github.com/BenoitMorel/AleRax
 ```
 
+For some reason, cloning coraxlib (one of the dependencies) sometimes fails:
+```
+Cloning into '/home/benoit/github/AleRax/ext/GeneRaxCore/ext/coraxlib'...
+fatal: unable to access 'https://codeberg.org/Exelixis-Lab/coraxlib.git/': server certificate verification failed. CAfile: none CRLfile: none
+```
+
+Please have a look at this [post](https://forum.gitlab.com/t/gitlab-runner-server-certificate-verification-failed/59450/8) for a bypass
+
+
 To build the sources:
 ```
 ./install.sh
