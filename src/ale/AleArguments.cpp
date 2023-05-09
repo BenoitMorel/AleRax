@@ -22,7 +22,7 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
   highwayCandidatesStep1(100),
   highwayCandidatesStep2(25),
   minCoveredSpecies(4),
-  trimFamilyRatio(1.0),
+  trimFamilyRatio(0.0),
   maxCladeSplitRatio(-1.0),
   geneTreeSamples(0),
   output("GeneTegrator"),
@@ -38,12 +38,12 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       ParallelContext::abort(0);
     } else if (arg == "-f" || arg == "--families") {
       families = std::string(argv[++i]);
-    } else if (arg == "-s" || arg == "--species-tree") {
+    } else if (arg == "-s" || arg == "--species-tree-search") {
       speciesTree = std::string(argv[++i]);
       speciesTreeAlgorithm = Enums::strToSpeciesTree(speciesTree);
     } else if (arg == "--species-search") {
       speciesSearchStrategy = ArgumentsHelper::strToSpeciesSearchStrategy(std::string(argv[++i]));
-    } else if (arg == "--infer-speciation-orders") {
+    } else if (arg == "--infer-speciation-order") {
       inferSpeciationOrders = true;
     } else if (arg == "-r" || arg == "--rec-model") {
       reconciliationModelStr = std::string(argv[++i]);

@@ -335,7 +335,7 @@ void UndatedDTLMultiModel<REAL>::updateCLV(CID cid)
         }
       }
     }
-    if (_transferConstraint == TransferConstaint::SOFTDATED) {
+    if (_transferConstraint == TransferConstaint::RELDATED) {
       std::vector<REAL> softDatedSums(N * _gammaCatNumber, REAL());
       std::vector<REAL> softDatedSum(_gammaCatNumber, REAL());
       for (auto leaf: this->_speciesTree.getLeaves()) {
@@ -459,7 +459,7 @@ void UndatedDTLMultiModel<REAL>::sampleTransferEvent(unsigned int cid,
   case TransferConstaint::PARENTS:
     max = survivingTransferSum[c] - correctionSum[ec];
     break;
-  case TransferConstaint::SOFTDATED:
+  case TransferConstaint::RELDATED:
     max = correctionSum[ec];
     break;
   default:
@@ -490,7 +490,7 @@ void UndatedDTLMultiModel<REAL>::sampleTransferEvent(unsigned int cid,
           continue;
         }
     }
-    if (_transferConstraint == TransferConstaint::SOFTDATED) {
+    if (_transferConstraint == TransferConstaint::RELDATED) {
       if (originSpeciesNode->parent) {
         auto p = originSpeciesNode->parent->node_index;
         if (_datedTree.getRank(p) >= _datedTree.getRank(h)) {
@@ -622,7 +622,7 @@ REAL UndatedDTLMultiModel<REAL>::getTransferSum(unsigned int cid, unsigned int e
     return  _dtlclvs[cid]._survivingTransferSum[c];
   case TransferConstaint::PARENTS:
     return (_dtlclvs[cid]._survivingTransferSum[c] - _dtlclvs[cid]._correctionSum[ec]);
-  case TransferConstaint::SOFTDATED:
+  case TransferConstaint::RELDATED:
     return _dtlclvs[cid]._correctionSum[ec];
   default:
     assert(false);
@@ -926,7 +926,7 @@ size_t UndatedDTLMultiModel<REAL>::getHash()
   case TransferConstaint::NONE:
   case TransferConstaint::PARENTS:
     return hash;
-  case TransferConstaint::SOFTDATED:
+  case TransferConstaint::RELDATED:
     return this->_datedTree.getOrderingHash(hash);
   default:
     assert(false);

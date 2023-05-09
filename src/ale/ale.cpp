@@ -142,10 +142,10 @@ void trimFamilies(Families &families, int minSpecies, double trimRatio,
     TrimFamilies::trimMinSpeciesCoverage(families, minSpecies);
     Logger::timed << "Families: " << families.size() << std::endl;
   }
-  if (trimRatio < 1.0) {
+  if (trimRatio > 0.0) {
     Logger::timed << "Trimming families with too many clades (keeping " 
-      << trimRatio * 100.0 << "\% of the families) " << std::endl;
-    TrimFamilies::trimHighCladesNumber(families, trimRatio);
+      << (1.0 - trimRatio) * 100.0 << "\% of the families) " << std::endl;
+    TrimFamilies::trimHighCladesNumber(families, (1.0 - trimRatio));
   }
   if (maxCladeSplitRatio > 0) {
     Logger::timed << "Triming families with a ratio clades/nodes > " << maxCladeSplitRatio<< std::endl;
@@ -204,7 +204,7 @@ void run( AleArguments &args)
   FileSystem::mkdir(args.output + "/species_trees", true);
   std::string ccpDir = FileSystem::joinPaths(args.output, "ccps");
   FileSystem::mkdir(ccpDir, true);
-  Logger::initFileOutput(FileSystem::joinPaths(args.output, "genetegrator"));
+  Logger::initFileOutput(FileSystem::joinPaths(args.output, "alerax"));
   auto families = FamiliesFileParser::parseFamiliesFile(args.families);
   filterInvalidFamilies(families);
   auto ccpDimensionFile = FileSystem::joinPaths(args.output, "ccpdim.txt");

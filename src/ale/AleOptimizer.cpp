@@ -474,7 +474,7 @@ bool isHighwayCompatible(Highway &highway,
       to = to->parent;
     }
     return true;
-  case TransferConstaint::SOFTDATED:
+  case TransferConstaint::RELDATED:
     return tree.canTransferUnderRelDated(from->node_index,
         to->node_index);
   }
