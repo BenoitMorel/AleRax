@@ -336,6 +336,7 @@ void AleOptimizer::reconcile(unsigned int samples)
       summaryTransferFiles, 
       true, false);
   ParallelContext::makeRandConsistent();
+  Logger::timed << "Reconciliations output directory: " << recDir << std::endl;
 }
  
 
