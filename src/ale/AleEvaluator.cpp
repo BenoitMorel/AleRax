@@ -91,21 +91,20 @@ GTSpeciesTreeLikelihoodEvaluator::GTSpeciesTreeLikelihoodEvaluator(
     resetEvaluation(i, false);
   }
   ParallelContext::barrier();
-  unsigned int cladesNumber = 0;
+  unsigned int cladeNumber = 0;
   unsigned int worstFamily = 0;
   for (auto &evaluation: _evaluations) {
-    cladesNumber += evaluation->getCCP().getCladesNumber();
+    cladeNumber += evaluation->getCCP().getCladesNumber();
     worstFamily = std::max(worstFamily, evaluation->getCCP().getCladesNumber());
   }
-  unsigned int totalCladesNumber = cladesNumber;
-  unsigned int maxCladesNumber = cladesNumber;
+  unsigned int totalCladesNumber = cladeNumber;
   ParallelContext::maxUInt(worstFamily);
-  ParallelContext::maxUInt(maxCladesNumber);
   ParallelContext::sumUInt(totalCladesNumber);
   double averageCladesNumber = double(totalCladesNumber) / double(ParallelContext::getSize());
   Logger::timed << "Initializing ccps finished" << std::endl;
   Logger::timed << "Total number of clades: " << totalCladesNumber << std::endl;
-  Logger::timed << "Load balancing: " << averageCladesNumber / maxCladesNumber << std::endl;
+  Logger::timed << "Load balancing: " << std::min(1.0, double(averageCladesNumber) / double(worstFamily)) << std::endl;
+  Logger::timed << "Recommended maximum number of cores: " << totalCladesNumber / worstFamily << std::endl;
 }
 
 double GTSpeciesTreeLikelihoodEvaluator::computeLikelihood()
