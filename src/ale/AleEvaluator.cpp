@@ -283,7 +283,7 @@ double GTSpeciesTreeLikelihoodEvaluator::optimizeModelRates(bool thorough)
       Logger::info << "(light)" << std::endl;
     }
     if (!thorough) {
-      settings.lineSearchMinImprovement = std::max(3.0, ll / 10000.0);
+      settings.lineSearchMinImprovement = std::max(0.1, ll / 10000.0);
       settings.minAlpha = 0.01;
       settings.optimizationMinImprovement = settings.lineSearchMinImprovement;
     }
