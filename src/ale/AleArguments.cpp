@@ -2,7 +2,10 @@
 #include <IO/Logger.hpp>
 #include <climits>  
 
-
+const unsigned int DEFAULT_GENE_TREE_SAMPLES = 100;
+const unsigned int DEFAULT_MIN_COVERED_SPECIES = 4;
+const double DEFAULT_MAX_SPLIT_RATIO = -1.0;
+const double DEFAULT_TRIM_FAMILY_RATIO = 0.0;
 AleArguments::AleArguments(int iargc, char * iargv[]):
   argc(iargc),
   argv(iargv),
@@ -14,17 +17,17 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
   gammaCategories(1),
   ccpRooting(CCPRooting::UNIFORM),
   speciesTreeAlgorithm(SpeciesTreeAlgorithm::User),
-  speciesSearchStrategy(SpeciesSearchStrategy::EVAL),
+  speciesSearchStrategy(SpeciesSearchStrategy::SKIP),
   inferSpeciationOrders(false),
   fixRates(false),
   skipThoroughRates(false),
   highways(false),
   highwayCandidatesStep1(100),
   highwayCandidatesStep2(25),
-  minCoveredSpecies(4),
-  trimFamilyRatio(0.0),
-  maxCladeSplitRatio(-1.0),
-  geneTreeSamples(100),
+  minCoveredSpecies(DEFAULT_MIN_COVERED_SPECIES),
+  trimFamilyRatio(DEFAULT_TRIM_FAMILY_RATIO),
+  maxCladeSplitRatio(DEFAULT_MAX_SPLIT_RATIO),
+  geneTreeSamples(DEFAULT_GENE_TREE_SAMPLES),
   output("GeneTegrator"),
   cleanupCCP(true),
   seed(123),
@@ -45,6 +48,8 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
     } else if (arg == "-s" || arg == "--species-tree") {
       speciesTree = std::string(argv[++i]);
       speciesTreeAlgorithm = Enums::strToSpeciesTree(speciesTree);
+    } else if (arg == "--species-tree-search") {
+      speciesSearchStrategy = ArgumentsHelper::strToSpeciesSearchStrategy(std::string(argv[++i]));
     } else if (arg == "--infer-speciation-order") {
       inferSpeciationOrders = true;
     } else if (arg == "-r" || arg == "--rec-model") {
@@ -102,13 +107,100 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
 }
 
 void AleArguments::printCommand() {
-  Logger::info << "GeneRax was called as follow:" << std::endl;
+  Logger::timed << "GeneRax was called as follow:" << std::endl;
   for (int i = 0; i < argc; ++i) {
     Logger::info << argv[i] << " ";
   }
   Logger::info << std::endl << std::endl;
 }
 
+void AleArguments::printSummary() {
+  Logger::timed << "Run settings:" << std::endl;
+  Logger::info << "\tFamily file: " << families << std::endl;
+  switch(Enums::strToSpeciesTree(speciesTree)) {
+  case SpeciesTreeAlgorithm::User:
+    Logger::info << "\tStarting species tree: specified by user: " << speciesTree << std::endl;
+    break;
+  case SpeciesTreeAlgorithm::Random:
+    Logger::info << "\tStarting species tree: generated randomly " << std::endl;
+    break;
+  default:
+    Logger::info << "\tStarting species tree: will be generated with the method " << speciesTree << std::endl; 
+    break;
+  }
+  Logger::info << "\tOutput directory: " << output << std::endl;
+  Logger::info << "\tNumber of reconciled gene trees to sample: " << geneTreeSamples << std::endl;
+  Logger::info << "\tRandom seed: " << seed << std::endl;
+  Logger::info << "\tReconciliation model: " << reconciliationModelStr << std::endl;
+  switch (transferConstraint) {
+  case TransferConstaint::NONE:
+    Logger::info << "\tTransfer constraints: no constraint" << std::endl;
+    break;
+  case TransferConstaint::PARENTS:
+    Logger::info << "\tTransfer constraints: transfers to parents are forbidden" << std::endl;
+    break;
+  case TransferConstaint::RELDATED:
+    Logger::info << "\tTransfer constraints: transfers to the past are forbidden" << std::endl;
+    break;
+  }
+  Logger::info << "\tPrune species mode is " << (pruneSpeciesTree ? "enabled" : "disabled") << std::endl;
+  if (gammaCategories > 1) {
+    Logger::info << "\tSpeciation probability categories: " << gammaCategories << std::endl;
+  }
+  Logger::info << "\tGene tree rooting: ";
+  switch (ccpRooting) {
+  case CCPRooting::UNIFORM:
+    Logger::info << "all gene tree root positions are considered with the same probability" << std::endl;
+    break;
+  case CCPRooting::ROOTED:
+    Logger::info << "only the root of the input gene trees will be considered" << std::endl;
+    break;
+  case CCPRooting::MAD:
+    Logger::info << "all gene tree root positions are considered, with a weight depending on MAD scores" << std::endl;
+    break;
+  }
+  if (fractionMissingFile.size()) {
+    Logger::info << "\tFraction of missing gene file: " << fractionMissingFile << std::endl;
+  }
+  Logger::info << "\tOrigination strategy: ";
+  switch (originationStrategy) {
+  case OriginationStrategy::UNIFORM:
+    Logger::info << "gene families can originate from each species with the same probability" << std::endl;
+    break;
+  case OriginationStrategy::ROOT:
+    Logger::info << "gene families only originate at the root of the species tree" << std::endl;
+    break;
+  case OriginationStrategy::LCA:
+    Logger::info << "gene families only originate at the LCA of the species that they cover" << std::endl;
+    break;
+  }
+  Logger::info << "\tSpecies tree search: ";
+  switch(speciesSearchStrategy) {
+  case SpeciesSearchStrategy::SKIP:
+  case SpeciesSearchStrategy::EVAL:
+    Logger::info << "skipping species tree search" << std::endl;
+    break;
+  case SpeciesSearchStrategy::REROOT:
+    Logger::info << "the starting species tree will only be rerooted" << std::endl;
+    break;
+  case SpeciesSearchStrategy::HYBRID:
+  case SpeciesSearchStrategy::SPR:
+  case SpeciesSearchStrategy::TRANSFERS:
+    Logger::info << "enabled (the species tree will be inferred from the gene tree distributions)" << std::endl;
+    break;
+  }
+  if (inferSpeciationOrders) {
+    Logger::info << "AleRax will estimate the relative order of speciation events from the HGTs" << std::endl;
+  } 
+  Logger::info << "\tAleRax will exclude gene families covering less than " << minCoveredSpecies << " species" << std::endl;
+  if (trimFamilyRatio != DEFAULT_TRIM_FAMILY_RATIO) {
+    Logger::info << "\tAleRax will exclude a proportion of " << trimFamilyRatio << " of the largest gene families" << std::endl;
+  }
+  if (maxCladeSplitRatio != DEFAULT_MAX_SPLIT_RATIO) {
+    Logger::info << "\tAleRax will exclude the gene families for which the ratio between the conditional clade probability size and the number of nodes is greater than " << maxCladeSplitRatio << std::endl;
+  }
+  Logger::info << std::endl;
+}
 
 void AleArguments::printHelp()
 {
@@ -131,7 +223,7 @@ void AleArguments::printHelp()
   Logger::info << "\t--origination {UNIFORM, ROOT, LCA} "  << std::endl;
 
   Logger::info << "Search strategy options:" << std::endl; 
-  Logger::info << "\t--species-tree-search {HYBRID, REROOT, EVAL, SKIP}" << std::endl;
+  Logger::info << "\t--species-tree-search {HYBRID, REROOT, SKIP}" << std::endl;
   Logger::info << "\t--infer-speciation-order" << std::endl;
   
   

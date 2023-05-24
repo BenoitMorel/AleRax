@@ -140,20 +140,20 @@ void trimFamilies(Families &families, int minSpecies, double trimRatio,
   if (minSpecies != -1) {
     Logger::timed << "Triming families covering less than " << minSpecies << " species " << std::endl;
     TrimFamilies::trimMinSpeciesCoverage(families, minSpecies);
-    Logger::timed << "Families: " << families.size() << std::endl;
+    Logger::timed << "Remaining families: " << families.size() << std::endl;
   }
   if (trimRatio > 0.0) {
     Logger::timed << "Trimming families with too many clades (keeping " 
       << (1.0 - trimRatio) * 100.0 << "\% of the families) " << std::endl;
     TrimFamilies::trimHighCladesNumber(families, (1.0 - trimRatio));
+    Logger::timed << "Remaining families: " << families.size() << std::endl;
   }
   if (maxCladeSplitRatio > 0) {
     Logger::timed << "Triming families with a ratio clades/nodes > " << maxCladeSplitRatio<< std::endl;
     TrimFamilies::trimCladeSplitRatio(families, maxCladeSplitRatio);
-    Logger::timed << "Families: " << families.size() << std::endl;
+    Logger::timed << "Remaining families: " << families.size() << std::endl;
 
   }
-  Logger::timed << "Families: " << families.size() << std::endl;
 }
 
 void initStartingSpeciesTree(AleArguments &args,
@@ -242,9 +242,6 @@ void run( AleArguments &args)
   case SpeciesSearchStrategy::HYBRID:
     speciesTreeOptimizer.optimize();
     break;
-  case SpeciesSearchStrategy::EVAL:
-    speciesTreeOptimizer.optimizeModelRates(false);
-    break;
   case SpeciesSearchStrategy::REROOT:
     speciesTreeOptimizer.optimizeModelRates(true);
     Logger::timed << "First root search, non thorough" << std::endl;
@@ -258,6 +255,7 @@ void run( AleArguments &args)
     assert(false); // not implemented yet
     break;
   }
+  speciesTreeOptimizer.optimizeModelRates(false);
   if (args.inferSpeciationOrders) {
     speciesTreeOptimizer.optimizeDates(true);
     speciesTreeOptimizer.getEvaluator().computeLikelihood();
@@ -313,6 +311,7 @@ int genetegrator_main(int argc, char** argv, void* comm)
   Logger::timed << "AleRax v0.0.0" << std::endl; 
   AleArguments args(argc, argv); 
   args.printCommand();
+  args.printSummary();
   run(args);
   Logger::close();
   ParallelContext::finalize();

@@ -11,6 +11,7 @@ public:
   AleArguments(int argc, char * argv[]);
   void printHelp();
   void printCommand();
+  void printSummary();
 public:
   
   int argc;
