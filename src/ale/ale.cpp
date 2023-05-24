@@ -310,8 +310,9 @@ int genetegrator_main(int argc, char** argv, void* comm)
 {
   ParallelContext::init(comm); 
   Logger::init();
-  Logger::timed << "GeneTegrator v0.0.0" << std::endl; 
+  Logger::timed << "AleRax v0.0.0" << std::endl; 
   AleArguments args(argc, argv); 
+  args.printCommand();
   run(args);
   Logger::close();
   ParallelContext::finalize();

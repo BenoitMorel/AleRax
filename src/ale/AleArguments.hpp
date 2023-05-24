@@ -10,6 +10,7 @@ class AleArguments {
 public:
   AleArguments(int argc, char * argv[]);
   void printHelp();
+  void printCommand();
 public:
   
   int argc;
