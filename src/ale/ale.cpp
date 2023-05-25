@@ -231,6 +231,7 @@ void run( AleArguments &args)
       families,
       info,
       !args.fixRates,
+      args.verbose,
       args.verboseOptRates,
       args.speciesCategoryFile,
       args.output);

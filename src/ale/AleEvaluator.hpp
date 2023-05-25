@@ -26,6 +26,7 @@ public:
   GTSpeciesTreeLikelihoodEvaluator(SpeciesTree &speciesTree,
       AleModelParameters &modelRates, 
       bool optimizeRates,
+      bool verbose,
       bool optimizeVerbose,
       const Families &families,
       PerCoreGeneTrees &geneTrees,
@@ -74,6 +75,7 @@ private:
   std::vector<int> _highPrecisions;
   std::string _outputDir;
   std::vector<double> _snapshotPerFamilyLL;
+  bool _verbose;
   bool _optimizeVerbose;
 };
 

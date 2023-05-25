@@ -38,6 +38,7 @@ public:
       const Families &families, 
       const RecModelInfo &info,
       bool optimizeRates,
+      bool verbose,
       bool optimizeVerbose,
       const std::string &speciesCategoryFile,
       const std::string &outputDir);
@@ -74,6 +75,6 @@ private:
   std::string saveCurrentSpeciesTreeId(std::string str = "inferred_species_tree.newick", bool masterRankOnly = true);
   void saveCurrentSpeciesTreePath(const std::string &str, bool masterRankOnly = true);
 };
-
+ ADD VERBOSE VARIABLE HERE!
 
 
