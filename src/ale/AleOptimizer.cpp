@@ -113,7 +113,6 @@ AleOptimizer::AleOptimizer(
     const Families &families, 
     const RecModelInfo &info,
     bool optimizeRates,
-    bool verbose,
     bool optimizeVerbose,
     const std::string &speciesCategoryFile,
     const std::string &outputDir):
@@ -152,7 +151,6 @@ AleOptimizer::AleOptimizer(
       *_speciesTree, 
       _modelRates, 
       optimizeRates,
-      verbose,
       optimizeVerbose,
       families, 
       _geneTrees,

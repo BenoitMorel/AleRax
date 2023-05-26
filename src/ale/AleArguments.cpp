@@ -32,7 +32,6 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
   cleanupCCP(true),
   seed(123),
   randomSpeciesRoot(false),
-  verbose(false),
   verboseOptRates(false)
 {
   if (argc == 1) {
@@ -101,8 +100,6 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       randomSpeciesRoot = true;
     } else if (arg == "--verbose-opt-rates") {
       verboseOptRates = true;
-    } else if (arg == "--verbose") {
-      verbose = true;
     } else {
       std::cerr << "Unknown argument " << arg << std::endl;
     }

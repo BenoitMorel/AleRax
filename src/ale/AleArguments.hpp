@@ -60,7 +60,6 @@ public:
   
   // experimental
   bool randomSpeciesRoot;
-  bool verbose;
   bool verboseOptRates;
 };
 
