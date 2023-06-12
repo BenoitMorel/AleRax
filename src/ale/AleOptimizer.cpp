@@ -112,6 +112,7 @@ AleOptimizer::AleOptimizer(
     const std::string speciesTreeFile, 
     const Families &families, 
     const RecModelInfo &info,
+    unsigned int ufbootNumber,
     bool optimizeRates,
     bool optimizeVerbose,
     const std::string &speciesCategoryFile,
@@ -120,8 +121,9 @@ AleOptimizer::AleOptimizer(
   _geneTrees(families, false, true),
   _info(info),
   _outputDir(outputDir),
-  _searchState(*_speciesTree, 
-      Paths::getSpeciesTreeFile(_outputDir, "inferred_species_tree.newick"))
+  _searchState(*_speciesTree,
+      Paths::getSpeciesTreeFile(_outputDir, "inferred_species_tree.newick")),
+  _rootLikelihoods(_geneTrees.getTrees().size())
 {
   Parameters startingRates;
   switch (info.model) {
@@ -154,6 +156,7 @@ AleOptimizer::AleOptimizer(
       optimizeVerbose,
       families, 
       _geneTrees,
+      ufbootNumber,
       _outputDir);
   Logger::timed << "Initial ll=" << getEvaluator().computeLikelihood() 
     << std::endl;
@@ -223,12 +226,20 @@ std::string AleOptimizer::saveCurrentSpeciesTreeId(std::string name, bool master
     _speciesTree->getDatedTree().rescaleBranchLengths();
   }
   saveCurrentSpeciesTreePath(res, masterRankOnly);
-  if (_rootLikelihoods.idToLL.size()) {
+  if (!_rootLikelihoods.isEmpty()) {
     auto newick = _speciesTree->getTree().getNewickString();
     PLLRootedTree tree(newick, false); 
     _rootLikelihoods.fillTree(tree);
     auto out = Paths::getSpeciesTreeFile(_outputDir, 
         "species_tree_llr.newick");
+    tree.save(out);
+  }
+  if (!_rootLikelihoods.isEmpty()) {
+    auto newick = _speciesTree->getTree().getNewickString();
+    PLLRootedTree tree(newick, false); 
+    _rootLikelihoods.fillTreeBootstraps(tree);
+    auto out = Paths::getSpeciesTreeFile(_outputDir, 
+        "species_tree_support.newick");
     tree.save(out);
   }
   return res;

@@ -12,6 +12,7 @@
 #include <maths/ModelParameters.hpp>
 
 #include "AleModelParameters.hpp"
+#include <search/UFBoot.hpp>
 
 class RecModelInfo;
 using MultiEvaluation = MultiModel;
@@ -29,6 +30,7 @@ public:
       bool optimizeVerbose,
       const Families &families,
       PerCoreGeneTrees &geneTrees,
+      unsigned int ufbootNumber,
       const std::string &outputDir);
   virtual ~GTSpeciesTreeLikelihoodEvaluator() {}
   virtual double computeLikelihood();

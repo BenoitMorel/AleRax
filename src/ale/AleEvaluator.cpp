@@ -7,6 +7,7 @@
 #include <search/SpeciesSPRSearch.hpp>
 #include <search/SpeciesTransferSearch.hpp>
 #include <search/DatedSpeciesTreeSearch.hpp>
+  
 
 
 static std::shared_ptr<MultiModel> createModel(SpeciesTree &speciesTree,
@@ -75,6 +76,7 @@ GTSpeciesTreeLikelihoodEvaluator::GTSpeciesTreeLikelihoodEvaluator(
     bool optimizeVerbose,
     const Families &families,
     PerCoreGeneTrees &geneTrees,
+    unsigned int ufbootNumber,
     const std::string &outputDir):
   _speciesTree(speciesTree),
   _modelRates(modelRates),
