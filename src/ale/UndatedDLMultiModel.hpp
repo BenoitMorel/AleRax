@@ -190,6 +190,8 @@ bool UndatedDLMultiModel<REAL>::computeProbability(CID cid,
         recCell->event.type = ReconciliationEventType::EVENT_S;
         recCell->event.leftGeneIndex = cidLeft;
         recCell->event.rightGeneIndex = cidRight;
+        recCell->blLeft = cladeSplit.blLeft;
+        recCell->blRight = cladeSplit.blRight;
         return true;
       }
       temp = _dlclvs[cidRight][f] * _dlclvs[cidLeft][g] * (_PS[e] * freq); 
@@ -199,6 +201,8 @@ bool UndatedDLMultiModel<REAL>::computeProbability(CID cid,
         recCell->event.type = ReconciliationEventType::EVENT_S;
         recCell->event.leftGeneIndex = cidRight;
         recCell->event.rightGeneIndex = cidLeft;
+        recCell->blLeft = cladeSplit.blLeft;
+        recCell->blRight = cladeSplit.blRight;
         return true;
       }
     }
@@ -210,6 +214,8 @@ bool UndatedDLMultiModel<REAL>::computeProbability(CID cid,
       recCell->event.type = ReconciliationEventType::EVENT_D;
       recCell->event.leftGeneIndex = cidLeft;
       recCell->event.rightGeneIndex = cidRight;
+      recCell->blLeft = cladeSplit.blLeft;
+      recCell->blRight = cladeSplit.blRight;
       return true;
     }
   }

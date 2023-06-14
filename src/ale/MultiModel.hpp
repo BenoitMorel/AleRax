@@ -13,6 +13,8 @@ template<class REAL>
 struct ReconciliationCell {
   Scenario::Event event;
   REAL maxProba;
+  double blLeft;
+  double blRight;
 };
 
 
@@ -178,6 +180,8 @@ bool MultiModelTemplate<REAL>::backtrace(unsigned int cid,
     scenario.generateGeneChildren(geneNode, leftGeneNode, rightGeneNode);
     recCell.event.leftGeneIndex = leftGeneNode->node_index;
     recCell.event.rightGeneIndex = rightGeneNode->node_index;
+    leftGeneNode->length = recCell.blLeft;
+    rightGeneNode->length = recCell.blRight;
   }
   bool addEvent = true;
   if (recCell.event.type == ReconciliationEventType::EVENT_TL &&

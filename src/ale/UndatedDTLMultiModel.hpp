@@ -681,6 +681,8 @@ bool UndatedDTLMultiModel<REAL>::computeProbability(CID cid,
         recCell->event.type = ReconciliationEventType::EVENT_S;
         recCell->event.leftGeneIndex = cidLeft;
         recCell->event.rightGeneIndex = cidRight;
+        recCell->blLeft = cladeSplit.blLeft;
+        recCell->blRight = cladeSplit.blRight;
         return true;
       }
       temp = _dtlclvs[cidRight]._uq[fc] * _dtlclvs[cidLeft]._uq[gc] * (_PS[ec] * freq); 
@@ -690,6 +692,8 @@ bool UndatedDTLMultiModel<REAL>::computeProbability(CID cid,
         recCell->event.type = ReconciliationEventType::EVENT_S;
         recCell->event.leftGeneIndex = cidRight;
         recCell->event.rightGeneIndex = cidLeft;
+        recCell->blLeft = cladeSplit.blLeft;
+        recCell->blRight = cladeSplit.blRight;
         return true;
       }
     }
@@ -701,6 +705,8 @@ bool UndatedDTLMultiModel<REAL>::computeProbability(CID cid,
       recCell->event.type = ReconciliationEventType::EVENT_D;
       recCell->event.leftGeneIndex = cidLeft;
       recCell->event.rightGeneIndex = cidRight;
+      recCell->blLeft = cladeSplit.blLeft;
+      recCell->blRight = cladeSplit.blRight;
       return true;
     }
     // T event
@@ -718,6 +724,8 @@ bool UndatedDTLMultiModel<REAL>::computeProbability(CID cid,
         recCell->event.pllDestSpeciesNode->node_index;
       recCell->event.leftGeneIndex = cidRight; 
       recCell->event.rightGeneIndex = cidLeft; 
+      recCell->blLeft = cladeSplit.blLeft;
+      recCell->blRight = cladeSplit.blRight;
       return true;
     }
     temp = getTransferSum(cidRight, e, c) * (_PT[ec] * freq);
@@ -734,6 +742,8 @@ bool UndatedDTLMultiModel<REAL>::computeProbability(CID cid,
         recCell->event.pllDestSpeciesNode->node_index;
       recCell->event.leftGeneIndex = cidLeft; 
       recCell->event.rightGeneIndex = cidRight; 
+      recCell->blLeft = cladeSplit.blLeft;
+      recCell->blRight = cladeSplit.blRight;
       return true;
     }
     
@@ -754,6 +764,8 @@ bool UndatedDTLMultiModel<REAL>::computeProbability(CID cid,
         recCell->event.destSpeciesNode = d;
         recCell->event.leftGeneIndex = cidLeft;
         recCell->event.rightGeneIndex = cidRight; 
+        recCell->blLeft = cladeSplit.blLeft;
+        recCell->blRight = cladeSplit.blRight;
         return true;
       }
       temp = (_dtlclvs[cidRight]._uq[ec] * _dtlclvs[cidLeft]._uq[dc]) * (highway.proba * freq);
@@ -769,6 +781,8 @@ bool UndatedDTLMultiModel<REAL>::computeProbability(CID cid,
         recCell->event.destSpeciesNode = d;
         recCell->event.leftGeneIndex = cidRight;
         recCell->event.rightGeneIndex = cidLeft;
+        recCell->blLeft = cladeSplit.blLeft;
+        recCell->blRight = cladeSplit.blRight;
         return true;
       }
     }
