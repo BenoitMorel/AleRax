@@ -33,14 +33,13 @@ public:
       unsigned int ufbootNumber,
       const std::string &outputDir);
   virtual ~GTSpeciesTreeLikelihoodEvaluator() {}
-  virtual double computeLikelihood();
+  virtual double computeLikelihood(PerFamLL *perFamLL = nullptr); 
   virtual double computeLikelihoodFast();
   virtual bool providesFastLikelihoodImpl() const {return false;}
   virtual bool isDated() const {return _modelRates.getInfo().isDated();}
   virtual double optimizeModelRates(bool thorough);
   virtual void pushRollback() {}
   virtual void popAndApplyRollback() {}
-  virtual void fillPerFamilyLikelihoods(PerFamLL &perFamLL);
   virtual void getTransferInformation(SpeciesTree &speciesTree,
     TransferFrequencies &frequencies,
     PerSpeciesEvents &perSpeciesEvents,

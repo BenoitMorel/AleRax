@@ -122,7 +122,8 @@ AleOptimizer::AleOptimizer(
   _info(info),
   _outputDir(outputDir),
   _searchState(*_speciesTree,
-      Paths::getSpeciesTreeFile(_outputDir, "inferred_species_tree.newick")),
+      Paths::getSpeciesTreeFile(_outputDir, "inferred_species_tree.newick"),
+      _geneTrees.getTrees().size()),
   _rootLikelihoods(_geneTrees.getTrees().size())
 {
   Parameters startingRates;
@@ -204,6 +205,11 @@ double AleOptimizer::sprSearch(unsigned int radius)
       _searchState,
       radius);
   Logger::timed << "After normal search: LL=" << _searchState.bestLL << std::endl;
+  auto out = Paths::getSpeciesTreeFile(_outputDir, 
+        "species_tree_rell_support.newick");
+  _searchState.saveSpeciesTreeRell(out);
+  Logger::timed << "Saving species tree with RELL support values to " 
+    << out << std::endl;
   return _searchState.bestLL;
 }
 
@@ -239,7 +245,7 @@ std::string AleOptimizer::saveCurrentSpeciesTreeId(std::string name, bool master
     PLLRootedTree tree(newick, false); 
     _rootLikelihoods.fillTreeBootstraps(tree);
     auto out = Paths::getSpeciesTreeFile(_outputDir, 
-        "species_tree_support.newick");
+        "species_tree_root_rell.newick");
     tree.save(out);
   }
   return res;
@@ -584,4 +590,5 @@ void AleOptimizer::saveBestHighways(const std::vector<ScoredHighway> &scoredHigh
     os << scoredHighway.highway.dest->label << std::endl;
   }
 }
+  
 

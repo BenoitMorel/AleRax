@@ -109,11 +109,6 @@ GTSpeciesTreeLikelihoodEvaluator::GTSpeciesTreeLikelihoodEvaluator(
   Logger::timed << "Recommended maximum number of cores: " << totalCladesNumber / worstFamily << std::endl;
 }
 
-double GTSpeciesTreeLikelihoodEvaluator::computeLikelihood()
-{
-  return computeLikelihoodFast();
-}
-
 
 void GTSpeciesTreeLikelihoodEvaluator::resetEvaluation(unsigned int i, bool highPrecision)
 {
@@ -135,10 +130,18 @@ void GTSpeciesTreeLikelihoodEvaluator::resetEvaluation(unsigned int i, bool high
     }
   }
 }
-
 double GTSpeciesTreeLikelihoodEvaluator::computeLikelihoodFast()
 {
-  //Logger::timed << "computeLogLikelihoodFast...";
+  return computeLikelihood();
+}
+
+double GTSpeciesTreeLikelihoodEvaluator::computeLikelihood(
+    PerFamLL *perFamLL)
+{
+  std::vector<double> localLL;
+  if (perFamLL) {
+    perFamLL->clear();
+  }
   double sumLL = 0.0;
   for (unsigned int i = 0; i < _evaluations.size(); ++i) {
     auto famIndex = _geneTrees.getTrees()[i].familyIndex;
@@ -164,10 +167,12 @@ double GTSpeciesTreeLikelihoodEvaluator::computeLikelihoodFast()
       _highPrecisions[i]++;
     }
     sumLL += ll;
+    if (perFamLL) {
+      perFamLL->push_back(ll);
+    }
   }
-  printHightPrecisionCount();
+  //printHightPrecisionCount();
   ParallelContext::sumDouble(sumLL);
-  //Logger::info << " ll = " << sumLL << std::endl;
   return sumLL;
 }
 
@@ -388,18 +393,6 @@ void GTSpeciesTreeLikelihoodEvaluator::getTransferInformation(SpeciesTree &speci
   }
   perSpeciesEvents.parallelSum();
   assert(ParallelContext::isRandConsistent());
-}
-
-void GTSpeciesTreeLikelihoodEvaluator::fillPerFamilyLikelihoods(
-    PerFamLL &perFamLL)
-{
-  ParallelContext::barrier();
-  std::vector<double> localLL;
-  for (auto &evaluation: _evaluations) {
-    localLL.push_back(evaluation->computeLogLikelihood());
-  }
-  ParallelContext::concatenateHetherogeneousDoubleVectors(
-      localLL, perFamLL);
 }
 
 void GTSpeciesTreeLikelihoodEvaluator::sampleScenarios(unsigned int family, unsigned int samples,

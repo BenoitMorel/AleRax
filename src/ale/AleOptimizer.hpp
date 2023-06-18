@@ -54,7 +54,6 @@ public:
   SpeciesTree &getSpeciesTree() {return *_speciesTree;}
   void randomizeRoot();
   void saveSpeciesTree();
-  void saveSpeciesTreeRootLL();
   SpeciesTreeLikelihoodEvaluatorInterface &getEvaluator() {return *_evaluator;}
   void getCandidateHighways(std::vector<ScoredHighway> &highways, unsigned int toTest);
   void filterCandidateHighwaysFast(const std::vector<ScoredHighway> &highways, std::vector<ScoredHighway> &filteredHighways);
@@ -63,6 +62,7 @@ public:
       const std::string &output);
   void addHighways(const std::vector<ScoredHighway> &candidateHighways,
       std::vector<ScoredHighway> &acceptedHighways);
+  void saveRELLSupports();
 private:
   std::unique_ptr<SpeciesTree> _speciesTree;
   PerCoreGeneTrees _geneTrees;
