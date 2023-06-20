@@ -167,7 +167,11 @@ AleOptimizer::AleOptimizer(
   
 double AleOptimizer::optimizeModelRates(bool thorough)
 {
-  return getEvaluator().optimizeModelRates(thorough);
+  getEvaluator().optimizeModelRates(thorough);
+  PerFamLL perFamLL;
+  auto ll = getEvaluator().computeLikelihood(&perFamLL);
+  _searchState.betterLikelihoodCallback(ll, perFamLL);
+  return ll;
 }
 
 void AleOptimizer::optimize()
@@ -175,8 +179,10 @@ void AleOptimizer::optimize()
   size_t hash1 = 0;
   size_t hash2 = 0;
   unsigned int index = 0;
-  _searchState.bestLL = getEvaluator().computeLikelihood();
+  PerFamLL initialPerFamLL;
+  _searchState.bestLL = getEvaluator().computeLikelihood(&initialPerFamLL);
   _searchState.farFromPlausible = true;
+  _searchState.betterTreeCallback(_searchState.bestLL, initialPerFamLL);
   /**
    *  Alternate transfer search and normal
    *  SPR search, until one does not find
@@ -196,8 +202,8 @@ void AleOptimizer::optimize()
   }
   while(testAndSwap(hash1, hash2));
   rootSearch(-1);
-
 }
+
 double AleOptimizer::sprSearch(unsigned int radius)
 {
   SpeciesSPRSearch::SPRSearch(*_speciesTree,
@@ -205,14 +211,19 @@ double AleOptimizer::sprSearch(unsigned int radius)
       _searchState,
       radius);
   Logger::timed << "After normal search: LL=" << _searchState.bestLL << std::endl;
-  auto out = Paths::getSpeciesTreeFile(_outputDir, 
-        "species_tree_rell_support.newick");
-  _searchState.saveSpeciesTreeRell(out);
-  Logger::timed << "Saving species tree with RELL support values to " 
-    << out << std::endl;
+  saveSupportTree();
   return _searchState.bestLL;
 }
 
+void AleOptimizer::saveSupportTree()
+{
+  auto outKH = Paths::getSpeciesTreeFile(_outputDir, 
+        "species_tree_support_kh.newick");
+  _searchState.saveSpeciesTreeKH(outKH);
+  auto outBP = Paths::getSpeciesTreeFile(_outputDir, 
+        "species_tree_support_bp.newick");
+  _searchState.saveSpeciesTreeBP(outBP);
+}
 
 void AleOptimizer::onSpeciesTreeChange(const std::unordered_set<corax_rnode_t *> *nodesToInvalidate)
 {
@@ -283,6 +294,7 @@ double AleOptimizer::transferSearch()
     _searchState);
   Logger::timed << "After normal search: LL=" 
     << _searchState.bestLL << std::endl;
+  saveSupportTree();
   return _searchState.bestLL;
 }
   

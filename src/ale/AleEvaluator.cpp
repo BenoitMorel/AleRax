@@ -302,7 +302,6 @@ double GTSpeciesTreeLikelihoodEvaluator::optimizeModelRates(bool thorough)
     Logger::timed << "[Species search]   After model rate opt, ll=" << ll << " rates: " << _modelRates << std::endl;
   }
   ll = optimizeGammaRates();
-  ll = computeLikelihood();
   return ll;
 }
 

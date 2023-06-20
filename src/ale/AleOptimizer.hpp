@@ -54,6 +54,7 @@ public:
   SpeciesTree &getSpeciesTree() {return *_speciesTree;}
   void randomizeRoot();
   void saveSpeciesTree();
+  void saveSupportTree();
   SpeciesTreeLikelihoodEvaluatorInterface &getEvaluator() {return *_evaluator;}
   void getCandidateHighways(std::vector<ScoredHighway> &highways, unsigned int toTest);
   void filterCandidateHighwaysFast(const std::vector<ScoredHighway> &highways, std::vector<ScoredHighway> &filteredHighways);
