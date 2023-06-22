@@ -497,11 +497,11 @@ bool isHighwayCompatible(Highway &highway,
   case TransferConstaint::NONE:
     return true;
   case TransferConstaint::PARENTS:
-    while (to) {
+    while (from) {
       if (to == from) {
         return false;
       }
-      to = to->parent;
+      from = from->parent;
     }
     return true;
   case TransferConstaint::RELDATED:
