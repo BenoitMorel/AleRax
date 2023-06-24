@@ -297,7 +297,20 @@ double AleOptimizer::transferSearch()
   saveSupportTree();
   return _searchState.bestLL;
 }
-  
+ 
+
+std::vector<std::string> getLines(const std::string path)
+{
+  std::ifstream is(path);
+  std::string line;
+  std::vector<std::string> res;
+  while (std::getline(is, line)) {
+    if (line.size() > 2) {
+      res.push_back(line);
+    }
+  }
+  return res;
+}
 
 void AleOptimizer::reconcile(unsigned int samples)
 {
@@ -341,6 +354,16 @@ void AleOptimizer::reconcile(unsigned int samples)
       scenario.saveTransfers(transferFile, false);
       geneTreesOs <<  "\n";
     }
+    geneTreesOs.close();
+    auto newicks = getLines(geneTreesPath);
+    auto consensus51 = PLLUnrootedTree::buildConsensusTree(newicks, 0.51);
+    auto consensus75 = PLLUnrootedTree::buildConsensusTree(newicks, 0.75);
+    auto consensus95 = PLLUnrootedTree::buildConsensusTree(newicks, 0.95);
+    auto consensusPrefix = FileSystem::joinPaths(summariesDir, 
+        families[i].name + "_consensus_");
+    consensus51->save(consensusPrefix + "51.newick");
+    consensus75->save(consensusPrefix + "75.newick");
+    consensus95->save(consensusPrefix + "95.newick");
     auto perSpeciesEventCountsFile = FileSystem::joinPaths(summariesDir, families[i].name + 
         std::string("_perspecies_eventcount.txt"));
     Scenario::mergePerSpeciesEventCounts(_speciesTree->getTree(),
