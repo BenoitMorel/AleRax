@@ -228,6 +228,7 @@ bool UndatedDLMultiModel<REAL>::computeProbability(CID cid,
       recCell->event.type = ReconciliationEventType::EVENT_SL;
       recCell->event.destSpeciesNode = f;
       recCell->event.pllDestSpeciesNode = this->getSpeciesLeft(speciesNode);
+      recCell->event.pllLostSpeciesNode = this->getSpeciesRight(speciesNode);
       return true;
     }
     
@@ -238,6 +239,7 @@ bool UndatedDLMultiModel<REAL>::computeProbability(CID cid,
       recCell->event.type = ReconciliationEventType::EVENT_SL;
       recCell->event.destSpeciesNode = g;
       recCell->event.pllDestSpeciesNode = this->getSpeciesRight(speciesNode);
+      recCell->event.pllLostSpeciesNode = this->getSpeciesLeft(speciesNode);
       return true;
     }
   }

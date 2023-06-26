@@ -355,13 +355,16 @@ void AleOptimizer::reconcile(unsigned int samples)
       geneTreesOs <<  "\n";
     }
     geneTreesOs.close();
+    std::cerr << "Treating family " << families[i].name << std::endl;
     auto newicks = getLines(geneTreesPath);
-    auto consensus51 = PLLUnrootedTree::buildConsensusTree(newicks, 0.51);
+    auto consensus25 = PLLUnrootedTree::buildConsensusTree(newicks, 0.25);
+    auto consensus50 = PLLUnrootedTree::buildConsensusTree(newicks, 0.50);
     auto consensus75 = PLLUnrootedTree::buildConsensusTree(newicks, 0.75);
     auto consensus95 = PLLUnrootedTree::buildConsensusTree(newicks, 0.95);
     auto consensusPrefix = FileSystem::joinPaths(summariesDir, 
         families[i].name + "_consensus_");
-    consensus51->save(consensusPrefix + "51.newick");
+    consensus25->save(consensusPrefix + "25.newick");
+    consensus50->save(consensusPrefix + "50.newick");
     consensus75->save(consensusPrefix + "75.newick");
     consensus95->save(consensusPrefix + "95.newick");
     auto perSpeciesEventCountsFile = FileSystem::joinPaths(summariesDir, families[i].name + 
