@@ -76,5 +76,6 @@ endmacro()
 
 
 
+add_subdirectory(tools)
 add_subdirectory(ale)
 
