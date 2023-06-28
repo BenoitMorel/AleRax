@@ -312,6 +312,12 @@ std::vector<std::string> getLines(const std::string path)
   return res;
 }
 
+
+static void saveStr(const std::string &str, const std::string &path) {
+  std::ofstream os(path);
+  os << str;
+}
+
 void AleOptimizer::reconcile(unsigned int samples)
 {
   if (samples == 0) {
@@ -355,18 +361,11 @@ void AleOptimizer::reconcile(unsigned int samples)
       geneTreesOs <<  "\n";
     }
     geneTreesOs.close();
-    std::cerr << "Treating family " << families[i].name << std::endl;
     auto newicks = getLines(geneTreesPath);
-    auto consensus25 = PLLUnrootedTree::buildConsensusTree(newicks, 0.25);
-    auto consensus50 = PLLUnrootedTree::buildConsensusTree(newicks, 0.50);
-    auto consensus75 = PLLUnrootedTree::buildConsensusTree(newicks, 0.75);
-    auto consensus95 = PLLUnrootedTree::buildConsensusTree(newicks, 0.95);
     auto consensusPrefix = FileSystem::joinPaths(summariesDir, 
         families[i].name + "_consensus_");
-    consensus25->save(consensusPrefix + "25.newick");
-    consensus50->save(consensusPrefix + "50.newick");
-    consensus75->save(consensusPrefix + "75.newick");
-    consensus95->save(consensusPrefix + "95.newick");
+    saveStr(PLLUnrootedTree::buildConsensusTree(newicks, 0.0), consensusPrefix + "mre.newick");
+    saveStr(PLLUnrootedTree::buildConsensusTree(newicks, 50.0), consensusPrefix + "50.newick");
     auto perSpeciesEventCountsFile = FileSystem::joinPaths(summariesDir, families[i].name + 
         std::string("_perspecies_eventcount.txt"));
     Scenario::mergePerSpeciesEventCounts(_speciesTree->getTree(),
