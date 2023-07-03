@@ -31,6 +31,7 @@ public:
   CCPRooting ccpRooting;
   std::string fractionMissingFile;
   std::string speciesCategoryFile;
+  bool memorySavings;
 
   // search
   SpeciesTreeAlgorithm speciesTreeAlgorithm;

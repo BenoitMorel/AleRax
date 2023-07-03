@@ -71,12 +71,15 @@ public:
     updateSpeciesToPrunedNode();
   }
 
+protected:
+  virtual void updateCLVs();
+  virtual void allocateMemory();
+  virtual void deallocateMemory();
+
 
 private:
  
   REAL getTransferSum(unsigned int cid, unsigned int e, unsigned int c);
-  void allocateCLVs();
-  void deallocateCLVs();
 
   DatedTree &_datedTree;
   size_t _gammaCatNumber;
@@ -246,19 +249,19 @@ UndatedDTLMultiModel<REAL>::UndatedDTLMultiModel(DatedTree &speciesTree,
   setAlpha(1.0);
   this->onSpeciesTreeChange(nullptr);
   if (!this->_memorySavings) {
-    allocateCLVs();
+    allocateMemory();
   }
 }
 
 template<class REAL> 
-void UndatedDTLMultiModel<REAL>::allocateCLVs()
+void UndatedDTLMultiModel<REAL>::allocateMemory()
 {
   DTLCLV nullCLV(this->getPrunedSpeciesNodeNumber(), _gammaCatNumber);
   _dtlclvs = std::vector<DTLCLV>(2 * (this->_ccp.getCladesNumber()), nullCLV);
 }
 
 template<class REAL> 
-void UndatedDTLMultiModel<REAL>::deallocateCLVs()
+void UndatedDTLMultiModel<REAL>::deallocateMemory()
 {
   _dtlclvs.clear();
 }
@@ -382,6 +385,14 @@ void UndatedDTLMultiModel<REAL>::updateCLV(CID cid)
 
 
 template <class REAL>
+void UndatedDTLMultiModel<REAL>::updateCLVs()
+{
+  for (CID cid = 0; cid < this->_ccp.getCladesNumber(); ++cid) {
+    updateCLV(cid);
+  }
+}
+
+template <class REAL>
 double UndatedDTLMultiModel<REAL>::computeLogLikelihood()
 { 
   if (this->_ccp.skip()) {
@@ -395,11 +406,9 @@ double UndatedDTLMultiModel<REAL>::computeLogLikelihood()
 
   this->beforeComputeLogLikelihood();
   if (this->_memorySavings) {
-    allocateCLVs();
+    allocateMemory();
   }
-  for (CID cid = 0; cid < this->_ccp.getCladesNumber(); ++cid) {
-    updateCLV(cid);
-  }
+  updateCLVs();
   auto rootCID = this->_ccp.getCladesNumber() - 1;
   std::vector<REAL> categoryLikelihoods(_gammaCatNumber, REAL());
 
@@ -444,7 +453,7 @@ double UndatedDTLMultiModel<REAL>::computeLogLikelihood()
   auto ret = log(res);
   _llCache[hash] = ret; 
   if (this->_memorySavings) {
-    deallocateCLVs();
+    deallocateMemory();
   }
   return ret;
 }

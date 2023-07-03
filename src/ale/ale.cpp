@@ -218,14 +218,20 @@ void run( AleArguments &args)
   initStartingSpeciesTree(args, families);
   Logger::timed << "Checking that ccp and mappings are valid..." << std::endl;
   checkCCPAndSpeciesTree(families, args.speciesTree); 
-  RecModelInfo info;
-  info.pruneSpeciesTree = args.pruneSpeciesTree;
-  info.noTL = args.noTL;
-  info.model = ArgumentsHelper::strToRecModel(args.reconciliationModelStr); 
-  info.transferConstraint = args.transferConstraint;
-  info.gammaCategories = args.gammaCategories;
-  info.originationStrategy = args.originationStrategy;
-  info.fractionMissingFile = args.fractionMissingFile;
+  RecModelInfo info(ArgumentsHelper::strToRecModel(args.reconciliationModelStr),
+      false, // per family rates
+      args.gammaCategories,
+      args.originationStrategy,
+      args.pruneSpeciesTree,
+      false, // rooted gene tree
+      false, // force gene tree root
+      false, // mad rooting
+      -1.0, // branch length threshold
+      args.transferConstraint,
+      false, // no dup
+      args.noTL,
+      args.fractionMissingFile,
+      args.memorySavings);
   AleOptimizer speciesTreeOptimizer(
       args.speciesTree,
       families,

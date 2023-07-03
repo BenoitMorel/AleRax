@@ -16,6 +16,7 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
   noTL(false),
   gammaCategories(1),
   ccpRooting(CCPRooting::UNIFORM),
+  memorySavings(false),
   speciesTreeAlgorithm(SpeciesTreeAlgorithm::User),
   speciesSearchStrategy(SpeciesSearchStrategy::SKIP),
   inferSpeciationOrders(false),
@@ -90,6 +91,8 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       speciesCategoryFile = argv[++i];
     } else if (arg == "--gene-tree-samples") {
       geneTreeSamples = atoi(argv[++i]);
+    } else if (arg == "--memory-savings") {
+      memorySavings = true;
     } else if (arg == "-p" || arg == "--prefix") {
       output = std::string(argv[++i]);
     } else if (arg == "--skip-cleanup-ccp") {

@@ -32,7 +32,7 @@ public:
     BaseReconciliationModel(speciesTree,
         geneSpeciesMapping,
         info),
-      _memorySavings(false)
+      _memorySavings(info.memorySavings)
   {
     _ccp.unserialize(ccpFile);
     mapGenesToSpecies();
@@ -45,11 +45,14 @@ public:
 
   virtual void onSpeciesDatesChange() {}
 
-  virtual void enableMemorySavings(bool enable) {}
-
   virtual bool sampleReconciliations(unsigned int samples,
       std::vector< std::shared_ptr<Scenario> > &scenarios) = 0;
 protected:
+  // methods used to handle memory in memory saving mode
+  virtual void allocateMemory() {}
+  virtual void deallocateMemory() {}
+  virtual void updateCLVs() {}
+
   void mapGenesToSpecies() {
     const auto &cidToLeaves = _ccp.getCidToLeaves();
     this->_speciesNameToId.clear();
@@ -142,12 +145,16 @@ template <class REAL>
 bool MultiModelTemplate<REAL>::sampleReconciliations(unsigned int samples,
     std::vector< std::shared_ptr<Scenario> > &scenarios)
 {
+  allocateMemory();
+  updateCLVs();
   for (unsigned int i = 0; i < samples; ++i) {
     scenarios.push_back(std::make_shared<Scenario>());
     if (!_computeScenario(*scenarios.back(), true)) {
+      deallocateMemory();
       return false;
     }
   }
+  deallocateMemory();
   return true;
 }
 
