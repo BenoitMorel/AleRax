@@ -7,7 +7,7 @@
 #include <search/SpeciesSPRSearch.hpp>
 #include <search/SpeciesTransferSearch.hpp>
 #include <search/DatedSpeciesTreeSearch.hpp>
-  
+#include <memory>  
 
 
 static std::shared_ptr<MultiModel> createModel(SpeciesTree &speciesTree,
@@ -69,14 +69,13 @@ static std::shared_ptr<MultiModel> createModel(SpeciesTree &speciesTree,
   return model;
 }
 
-GTSpeciesTreeLikelihoodEvaluator::GTSpeciesTreeLikelihoodEvaluator(
+AleEvaluator::AleEvaluator(
     SpeciesTree &speciesTree,
     AleModelParameters &modelRates, 
     bool optimizeRates,
     bool optimizeVerbose,
     const Families &families,
     PerCoreGeneTrees &geneTrees,
-    unsigned int ufbootNumber,
     const std::string &outputDir):
   _speciesTree(speciesTree),
   _modelRates(modelRates),
@@ -110,7 +109,7 @@ GTSpeciesTreeLikelihoodEvaluator::GTSpeciesTreeLikelihoodEvaluator(
 }
 
 
-void GTSpeciesTreeLikelihoodEvaluator::resetEvaluation(unsigned int i, bool highPrecision)
+void AleEvaluator::resetEvaluation(unsigned int i, bool highPrecision)
 {
   auto famIndex = _geneTrees.getTrees()[i].familyIndex;
   auto &family = _families[famIndex];
@@ -130,12 +129,12 @@ void GTSpeciesTreeLikelihoodEvaluator::resetEvaluation(unsigned int i, bool high
     }
   }
 }
-double GTSpeciesTreeLikelihoodEvaluator::computeLikelihoodFast()
+double AleEvaluator::computeLikelihoodFast()
 {
   return computeLikelihood();
 }
 
-double GTSpeciesTreeLikelihoodEvaluator::computeLikelihood(
+double AleEvaluator::computeLikelihood(
     PerFamLL *perFamLL)
 {
   std::vector<double> localLL;
@@ -176,14 +175,14 @@ double GTSpeciesTreeLikelihoodEvaluator::computeLikelihood(
   return sumLL;
 }
 
-void GTSpeciesTreeLikelihoodEvaluator::setAlpha(double alpha)
+void AleEvaluator::setAlpha(double alpha)
 {
   for (auto evaluation: _evaluations) {
     evaluation->setAlpha(alpha);
   }
 }
   
-void GTSpeciesTreeLikelihoodEvaluator::printHightPrecisionCount()
+void AleEvaluator::printHightPrecisionCount()
 {
   unsigned int high = 0;
   unsigned int low = 0;
@@ -199,7 +198,7 @@ void GTSpeciesTreeLikelihoodEvaluator::printHightPrecisionCount()
   //Logger::info << " Double: " << low << " scaledvalue: " << high << std::endl;
 }
 
-void GTSpeciesTreeLikelihoodEvaluator::onSpeciesTreeChange(
+void AleEvaluator::onSpeciesTreeChange(
     const std::unordered_set<corax_rnode_t *> *nodesToInvalidate)
 {
   for (auto &evaluation: _evaluations) {
@@ -207,14 +206,14 @@ void GTSpeciesTreeLikelihoodEvaluator::onSpeciesTreeChange(
   }
 }
 
-void GTSpeciesTreeLikelihoodEvaluator::onSpeciesDatesChange()
+void AleEvaluator::onSpeciesDatesChange()
 {
   for (auto &evaluation: _evaluations) {
     evaluation->onSpeciesDatesChange();
   }
 }
 
-void GTSpeciesTreeLikelihoodEvaluator::addHighway(const Highway &highway)
+void AleEvaluator::addHighway(const Highway &highway)
 {
   _highways.push_back(highway);
    for (auto &evaluation: _evaluations) {
@@ -222,7 +221,7 @@ void GTSpeciesTreeLikelihoodEvaluator::addHighway(const Highway &highway)
   }
 }
 
-void GTSpeciesTreeLikelihoodEvaluator::removeHighway()
+void AleEvaluator::removeHighway()
 {
   _highways.pop_back();
   for (auto &evaluation: _evaluations) {
@@ -234,7 +233,7 @@ void GTSpeciesTreeLikelihoodEvaluator::removeHighway()
 class DTLParametersOptimizer: public FunctionToOptimize
 {
 public:
-  DTLParametersOptimizer(GTSpeciesTreeLikelihoodEvaluator &evaluator):
+  DTLParametersOptimizer(AleEvaluator &evaluator):
     _evaluator(evaluator)
   {}
 
@@ -247,11 +246,11 @@ public:
 
   }
 private:
-  GTSpeciesTreeLikelihoodEvaluator &_evaluator;
+  AleEvaluator &_evaluator;
 };
   
 
-void GTSpeciesTreeLikelihoodEvaluator::setParameters(Parameters &parameters)
+void AleEvaluator::setParameters(Parameters &parameters)
 {
   unsigned int freeParameters = Enums::freeParameters(_modelRates.getInfo().model);
   if (!freeParameters) {
@@ -275,7 +274,7 @@ void GTSpeciesTreeLikelihoodEvaluator::setParameters(Parameters &parameters)
    
 }
 
-double GTSpeciesTreeLikelihoodEvaluator::optimizeModelRates(bool thorough)
+double AleEvaluator::optimizeModelRates(bool thorough)
 {
   double ll = 0.0;
   if (_optimizeRates) {
@@ -307,13 +306,13 @@ double GTSpeciesTreeLikelihoodEvaluator::optimizeModelRates(bool thorough)
 
 static double callback(void *p, double x)
 {
-  auto *evaluator = (GTSpeciesTreeLikelihoodEvaluator *)p;
+  auto *evaluator = (AleEvaluator *)p;
   evaluator->setAlpha(x);
   auto ll = evaluator->computeLikelihood();
   return -ll;
 }
 
-double GTSpeciesTreeLikelihoodEvaluator::optimizeGammaRates()
+double AleEvaluator::optimizeGammaRates()
 {
   auto gammaCategories = _modelRates.getInfo().gammaCategories;
   auto ll = computeLikelihood();
@@ -347,7 +346,7 @@ double GTSpeciesTreeLikelihoodEvaluator::optimizeGammaRates()
   return ll;
 }
   
-void GTSpeciesTreeLikelihoodEvaluator::getTransferInformation(SpeciesTree &speciesTree,
+void AleEvaluator::getTransferInformation(SpeciesTree &speciesTree,
     TransferFrequencies &transferFrequencies,
     PerSpeciesEvents &perSpeciesEvents,
     PerCorePotentialTransfers &potentialTransfers)
@@ -378,9 +377,11 @@ void GTSpeciesTreeLikelihoodEvaluator::getTransferInformation(SpeciesTree &speci
     // inconsistent between the MPI ranks
     // ParallelContext::makeRandConsistent() needs to be called 
     // right after the loop
-    Scenario scenario;
-    bool ok = evaluation.inferMLScenario(scenario, true);
+    std::vector< std::shared_ptr<Scenario> >scenarios;    
+    bool ok = evaluation.sampleReconciliations(1, scenarios);
     assert(ok);
+    assert(scenarios.size() == 1);
+    auto &scenario = *scenarios[0];
     scenario.countTransfers(labelToId, 
         transferFrequencies.count);
     scenario.gatherReconciliationStatistics(perSpeciesEvents);
@@ -394,20 +395,18 @@ void GTSpeciesTreeLikelihoodEvaluator::getTransferInformation(SpeciesTree &speci
   assert(ParallelContext::isRandConsistent());
 }
 
-void GTSpeciesTreeLikelihoodEvaluator::sampleScenarios(unsigned int family, unsigned int samples,
-      std::vector<Scenario> &scenarios)
+void AleEvaluator::sampleScenarios(unsigned int family, unsigned int samples,
+      std::vector< std::shared_ptr<Scenario> > &scenarios)
 {
   assert(family < _evaluations.size());
-  scenarios = std::vector<Scenario>(samples);
+  scenarios.clear();
   getEvaluation(family).computeLogLikelihood();
-  for (unsigned int s = 0; s < samples; ++s) {
-    bool ok  = getEvaluation(family).inferMLScenario(scenarios[s], true);
-    if (!ok) {
-      assert(_highPrecisions[family] == -1);
-      resetEvaluation(family, true);
-      sampleScenarios(family, samples, scenarios);
-      return;
-    }
+  bool ok = getEvaluation(family).sampleReconciliations(samples, scenarios);
+  if (!ok) {
+    scenarios.clear();
+    resetEvaluation(family, true);
+    ok = getEvaluation(family).sampleReconciliations(samples, scenarios);
+    assert(ok);
   }
 }
  
@@ -426,7 +425,7 @@ struct ScoredString {
   double score;
 };
 
-void GTSpeciesTreeLikelihoodEvaluator::savePerFamilyLikelihoodDiff(const std::string &output) 
+void AleEvaluator::savePerFamilyLikelihoodDiff(const std::string &output) 
 {
   std::vector<unsigned int> indices;
   std::vector<double> likelihoods;
@@ -455,7 +454,7 @@ void GTSpeciesTreeLikelihoodEvaluator::savePerFamilyLikelihoodDiff(const std::st
   }
 }
 
-void GTSpeciesTreeLikelihoodEvaluator::saveSnapshotPerFamilyLL()
+void AleEvaluator::saveSnapshotPerFamilyLL()
 {
   std::vector<double> likelihoods;
   for (unsigned int i = 0; i < _evaluations.size(); ++i) {

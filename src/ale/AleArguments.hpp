@@ -61,6 +61,5 @@ public:
   // experimental
   bool randomSpeciesRoot;
   bool verboseOptRates;
-  unsigned int ufbootNumber;
 };
 

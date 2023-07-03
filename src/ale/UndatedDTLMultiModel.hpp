@@ -75,7 +75,8 @@ public:
 private:
  
   REAL getTransferSum(unsigned int cid, unsigned int e, unsigned int c);
-
+  void allocateCLVs();
+  void deallocateCLVs();
 
   DatedTree &_datedTree;
   size_t _gammaCatNumber;
@@ -181,15 +182,6 @@ void UndatedDTLMultiModel<REAL>::updateSpeciesToPrunedNode()
   if (!_speciesToPrunedNode.size()) {
     _speciesToPrunedNode.resize(this->getAllSpeciesNodeNumber());
   }
-  /*
-  if (!this->prunedMode()) {
-    for (auto speciesNode: this->getAllSpeciesNodes()) {
-      auto e = speciesNode->node_index;
-      _speciesToPrunedNode[e] = speciesNode;
-    }
-    return;
-  }
-  */
   std::fill(_speciesToPrunedNode.begin(), _speciesToPrunedNode.end(), nullptr);
   for (auto speciesNode: this->getAllSpeciesNodes()) {
     auto e = speciesNode->node_index;
@@ -245,9 +237,6 @@ UndatedDTLMultiModel<REAL>::UndatedDTLMultiModel(DatedTree &speciesTree,
   _transferConstraint(info.transferConstraint),
   _originationStrategy(info.originationStrategy)
 {
-  std::vector<REAL> zeros(this->_speciesTree.getNodeNumber());
-  DTLCLV nullCLV(this->getPrunedSpeciesNodeNumber(), _gammaCatNumber);
-  _dtlclvs = std::vector<DTLCLV>(2 * (this->_ccp.getCladesNumber()), nullCLV);
   auto N = this->_speciesTree.getNodeNumber();
   _highways.resize(N);
   _dtlRates.resize(3);
@@ -256,8 +245,24 @@ UndatedDTLMultiModel<REAL>::UndatedDTLMultiModel(DatedTree &speciesTree,
   }
   setAlpha(1.0);
   this->onSpeciesTreeChange(nullptr);
+  if (!this->_memorySavings) {
+    allocateCLVs();
+  }
 }
- 
+
+template<class REAL> 
+void UndatedDTLMultiModel<REAL>::allocateCLVs()
+{
+  DTLCLV nullCLV(this->getPrunedSpeciesNodeNumber(), _gammaCatNumber);
+  _dtlclvs = std::vector<DTLCLV>(2 * (this->_ccp.getCladesNumber()), nullCLV);
+}
+
+template<class REAL> 
+void UndatedDTLMultiModel<REAL>::deallocateCLVs()
+{
+  _dtlclvs.clear();
+}
+
 template <class REAL>
 void UndatedDTLMultiModel<REAL>::setRates(const RatesVector &rates) 
 {
@@ -389,6 +394,9 @@ double UndatedDTLMultiModel<REAL>::computeLogLikelihood()
   }
 
   this->beforeComputeLogLikelihood();
+  if (this->_memorySavings) {
+    allocateCLVs();
+  }
   for (CID cid = 0; cid < this->_ccp.getCladesNumber(); ++cid) {
     updateCLV(cid);
   }
@@ -435,6 +443,9 @@ double UndatedDTLMultiModel<REAL>::computeLogLikelihood()
   res *= rootCorrection; 
   auto ret = log(res);
   _llCache[hash] = ret; 
+  if (this->_memorySavings) {
+    deallocateCLVs();
+  }
   return ret;
 }
 

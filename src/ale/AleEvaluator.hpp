@@ -22,17 +22,16 @@ using PerCoreMultiEvaluation = std::vector<MultiEvaluationPtr>;
 
 
 
-class GTSpeciesTreeLikelihoodEvaluator: public SpeciesTreeLikelihoodEvaluatorInterface {
+class AleEvaluator: public SpeciesTreeLikelihoodEvaluatorInterface {
 public:
-  GTSpeciesTreeLikelihoodEvaluator(SpeciesTree &speciesTree,
+  AleEvaluator(SpeciesTree &speciesTree,
       AleModelParameters &modelRates, 
       bool optimizeRates,
       bool optimizeVerbose,
       const Families &families,
       PerCoreGeneTrees &geneTrees,
-      unsigned int ufbootNumber,
       const std::string &outputDir);
-  virtual ~GTSpeciesTreeLikelihoodEvaluator() {}
+  virtual ~AleEvaluator() {}
   virtual double computeLikelihood(PerFamLL *perFamLL = nullptr); 
   virtual double computeLikelihoodFast();
   virtual bool providesFastLikelihoodImpl() const {return false;}
@@ -56,7 +55,7 @@ public:
   void addHighway(const Highway &highway);
   void removeHighway();
   void sampleScenarios(unsigned int family, unsigned int samples,
-      std::vector<Scenario> &scenarios);
+      std::vector< std::shared_ptr<Scenario> > &scenarios);
   std::string getOutputDir() const {return _outputDir;}
   void savePerFamilyLikelihoodDiff(const std::string &output); 
   void saveSnapshotPerFamilyLL();

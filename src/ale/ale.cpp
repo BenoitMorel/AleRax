@@ -230,7 +230,6 @@ void run( AleArguments &args)
       args.speciesTree,
       families,
       info,
-      args.ufbootNumber,
       !args.fixRates,
       args.verboseOptRates,
       args.speciesCategoryFile,

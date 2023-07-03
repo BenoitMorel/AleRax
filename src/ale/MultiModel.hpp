@@ -4,7 +4,7 @@
 #include <likelihoods/reconciliation_models/BaseReconciliationModel.hpp>
 #include <IO/LibpllParsers.hpp>
 #include <IO/HighwayCandidateParser.hpp>
-
+#include <memory>
 
 class GeneSpeciesMapping;
 class PLLRootedTree;
@@ -31,7 +31,8 @@ public:
       const std::string &ccpFile):
     BaseReconciliationModel(speciesTree,
         geneSpeciesMapping,
-        info)
+        info),
+      _memorySavings(false)
   {
     _ccp.unserialize(ccpFile);
     mapGenesToSpecies();
@@ -43,6 +44,11 @@ public:
   virtual void setHighways(const std::vector<Highway> &highways) {(void)(highways);}
 
   virtual void onSpeciesDatesChange() {}
+
+  virtual void enableMemorySavings(bool enable) {}
+
+  virtual bool sampleReconciliations(unsigned int samples,
+      std::vector< std::shared_ptr<Scenario> > &scenarios) = 0;
 protected:
   void mapGenesToSpecies() {
     const auto &cidToLeaves = _ccp.getCidToLeaves();
@@ -65,6 +71,7 @@ protected:
 
   }
   ConditionalClades _ccp;
+  bool _memorySavings;
 };
 
 
@@ -88,8 +95,13 @@ public:
   * Samples a reconciled gene tree and stores it into 
   * scenario
   */
-  virtual bool inferMLScenario(Scenario &scenario, 
-    bool stochastic = false);
+  virtual bool inferMLScenario(Scenario &scenario);
+  
+  /**
+   *  Sample scenarios and add them to the scenarios vector
+   */
+  virtual bool sampleReconciliations(unsigned int samples,
+      std::vector< std::shared_ptr<Scenario> > &scenarios);
 protected:
   /**
   * Sample the species node from with the sampled gene tree
@@ -120,13 +132,34 @@ private:
       unsigned int category,
       Scenario &scenario,
       bool stochastic); 
+  bool _computeScenario(Scenario &scenario, 
+    bool stochastic);
 };
 
 
-
+  
+template <class REAL>
+bool MultiModelTemplate<REAL>::sampleReconciliations(unsigned int samples,
+    std::vector< std::shared_ptr<Scenario> > &scenarios)
+{
+  for (unsigned int i = 0; i < samples; ++i) {
+    scenarios.push_back(std::make_shared<Scenario>());
+    if (!_computeScenario(*scenarios.back(), true)) {
+      return false;
+    }
+  }
+  return true;
+}
 
 template <class REAL>
-bool MultiModelTemplate<REAL>::inferMLScenario(Scenario &scenario, 
+bool MultiModelTemplate<REAL>::inferMLScenario(Scenario &scenario) 
+{
+  assert(false); // not implemented for MultiModel
+  return _computeScenario(scenario, false);
+}
+
+template <class REAL>
+bool MultiModelTemplate<REAL>::_computeScenario(Scenario &scenario, 
     bool stochastic) {
   assert(stochastic); 
   unsigned int category = 0;

@@ -18,7 +18,7 @@ static bool testAndSwap(size_t &hash1, size_t &hash2) {
 
 class HighwayFunction: public FunctionToOptimize {
 public: 
-  HighwayFunction(GTSpeciesTreeLikelihoodEvaluator &evaluator,
+  HighwayFunction(AleEvaluator &evaluator,
     const std::vector<Highway*> &highways): _highways(highways), _evaluator(evaluator) {}
   
   virtual double evaluate(Parameters &parameters) {
@@ -51,7 +51,7 @@ public:
   }
 private:
   const std::vector<Highway *> &_highways;
-  GTSpeciesTreeLikelihoodEvaluator &_evaluator;
+  AleEvaluator &_evaluator;
 };
 
 
@@ -112,7 +112,6 @@ AleOptimizer::AleOptimizer(
     const std::string speciesTreeFile, 
     const Families &families, 
     const RecModelInfo &info,
-    unsigned int ufbootNumber,
     bool optimizeRates,
     bool optimizeVerbose,
     const std::string &speciesCategoryFile,
@@ -150,14 +149,13 @@ AleOptimizer::AleOptimizer(
       info);
   _speciesTree->addListener(this);
   ParallelContext::barrier();
-  _evaluator = std::make_unique<GTSpeciesTreeLikelihoodEvaluator>(
+  _evaluator = std::make_unique<AleEvaluator>(
       *_speciesTree, 
       _modelRates, 
       optimizeRates,
       optimizeVerbose,
       families, 
       _geneTrees,
-      ufbootNumber,
       _outputDir);
   Logger::timed << "Initial ll=" << getEvaluator().computeLikelihood() 
     << std::endl;
@@ -338,7 +336,7 @@ void AleOptimizer::reconcile(unsigned int samples)
     std::vector<std::string> transferFiles;
     std::string geneTreesPath = FileSystem::joinPaths(allRecDir, families[i].name + std::string(".newick"));
     ParallelOfstream geneTreesOs(geneTreesPath, false);
-    std::vector<Scenario> scenarios;
+    std::vector< std::shared_ptr<Scenario> > scenarios;
     _evaluator->sampleScenarios(i, samples, scenarios);
     assert(scenarios.size() == samples);
     for (unsigned int sample = 0; sample < samples; ++ sample) {
@@ -352,7 +350,7 @@ void AleOptimizer::reconcile(unsigned int samples)
           families[i].name + std::string("_transfers_") +  std::to_string(sample) + ".txt");
       perSpeciesEventCountsFiles.push_back(perSpeciesEventCountsFile);
       transferFiles.push_back(transferFile);
-      auto &scenario = scenarios[sample];
+      auto &scenario = *scenarios[sample];
       scenario.saveReconciliation(out, ReconciliationFormat::RecPhyloXML, false);
       scenario.saveReconciliation(geneTreesOs, ReconciliationFormat::NewickEvents);
       scenario.saveEventsCounts(eventCountsFile, false);
@@ -433,7 +431,7 @@ void AleOptimizer::randomizeRoot()
   }
 }
 
-static Parameters testHighwayFast(GTSpeciesTreeLikelihoodEvaluator &evaluator,
+static Parameters testHighwayFast(AleEvaluator &evaluator,
     const Highway &highway,
     double startingProbability = 0.1)
 {
@@ -446,7 +444,7 @@ static Parameters testHighwayFast(GTSpeciesTreeLikelihoodEvaluator &evaluator,
   f.evaluate(parameters);
   return parameters;
 }
-static Parameters testHighway(GTSpeciesTreeLikelihoodEvaluator &evaluator,
+static Parameters testHighway(AleEvaluator &evaluator,
     Highway &highway,
     double startingProbability = 0.01)
 {
@@ -466,7 +464,7 @@ static Parameters testHighway(GTSpeciesTreeLikelihoodEvaluator &evaluator,
   return parameters;
 }
 
-static Parameters testHighways(GTSpeciesTreeLikelihoodEvaluator &evaluator,
+static Parameters testHighways(AleEvaluator &evaluator,
     const std::vector<Highway *> &highways,
     const Parameters &startingProbabilities,
     bool optimize)

@@ -37,7 +37,6 @@ public:
   AleOptimizer(const std::string speciesTreeFile, 
       const Families &families, 
       const RecModelInfo &info,
-      unsigned int ufbootNumber,
       bool optimizeRates,
       bool optimizeVerbose,
       const std::string &speciesCategoryFile,
@@ -68,7 +67,7 @@ private:
   std::unique_ptr<SpeciesTree> _speciesTree;
   PerCoreGeneTrees _geneTrees;
   RecModelInfo _info;
-  std::unique_ptr<GTSpeciesTreeLikelihoodEvaluator> _evaluator;
+  std::unique_ptr<AleEvaluator> _evaluator;
   AleModelParameters _modelRates;
   std::string _outputDir;
   SpeciesSearchState _searchState;

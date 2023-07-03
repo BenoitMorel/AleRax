@@ -32,8 +32,7 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
   cleanupCCP(true),
   seed(123),
   randomSpeciesRoot(false),
-  verboseOptRates(false),
-  ufbootNumber(0)
+  verboseOptRates(false)
 {
   if (argc == 1) {
     printHelp();
@@ -101,8 +100,6 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       randomSpeciesRoot = true;
     } else if (arg == "--verbose-opt-rates") {
       verboseOptRates = true;
-    } else if (arg == "--ufboot-trees") {
-      ufbootNumber = atoi(argv[++i]);
     } else {
       std::cerr << "Unknown argument " << arg << std::endl;
     }
