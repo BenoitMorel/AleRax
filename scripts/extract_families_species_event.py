@@ -40,7 +40,11 @@ def extract(alerax_dir, species, event, min_value, output_file):
         family = f.replace("_perspecies_eventcount.txt", "")
         res.append((freq, family))
   res.sort(reverse = True)
+  total = 0.0
+  for item in res:
+    total += item[0]
   with open(output_file, "w") as writer:
+    writer.write(str(total) + "\n")
     for item in res:
       writer.write(str(item[0]) + " " + item[1] + "\n")
 
