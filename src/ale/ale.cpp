@@ -319,6 +319,7 @@ int genetegrator_main(int argc, char** argv, void* comm)
   AleArguments args(argc, argv); 
   args.printCommand();
   args.printSummary();
+  args.checkValid();
   run(args);
   Logger::close();
   ParallelContext::finalize();

@@ -145,6 +145,14 @@ void AleArguments::printSummary() {
   Logger::info << "\tNumber of reconciled gene trees to sample: " << geneTreeSamples << std::endl;
   Logger::info << "\tRandom seed: " << seed << std::endl;
   Logger::info << "\tReconciliation model: " << reconciliationModelStr << std::endl;
+  Logger::info << "\tModel parameters: ";
+  if (perFamilyRates) {
+    Logger::info << " per family" << std::endl;
+  } else if (speciesCategoryFile.size()) {
+    Logger::info << " per species subtree" << std::endl;
+  } else {
+    Logger::info << " global to all species and families" << std::endl;
+  }
   Logger::info << "\tMemory savings: " << getOnOff(memorySavings) << std::endl;
   switch (transferConstraint) {
   case TransferConstaint::NONE:
@@ -259,3 +267,20 @@ void AleArguments::printHelp()
 
   Logger::info << "For a more detailed description, please check the wiki on our github page" << std::endl;
 }
+
+void AleArguments::checkValid()
+{
+  bool ok = true;
+  if (perFamilyRates && speciesCategoryFile.size()) {
+    Logger::error << "Error: cannot per family rates and per species category rates are incompatible" << std::endl;
+    ok = false;
+  }
+  if (!ok) {
+    Logger::error << "Error occured, aborting" << std::endl;
+    ParallelContext::abort(1);
+  }
+}
+
+
+
+

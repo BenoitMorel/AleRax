@@ -12,6 +12,7 @@ public:
   void printHelp();
   void printCommand();
   void printSummary();
+  void checkValid();
 public:
   
   int argc;
