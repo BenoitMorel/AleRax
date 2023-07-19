@@ -31,6 +31,8 @@ struct ScoredHighway {
   }
 };
 
+bool cmpHighwayByProbability(const ScoredHighway &a, const ScoredHighway &b);
+
 
 class AleOptimizer: public SpeciesTree::Listener {
 public:

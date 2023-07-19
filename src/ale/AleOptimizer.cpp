@@ -464,7 +464,6 @@ static Parameters testHighway(AleEvaluator &evaluator,
   settings.lineSearchMinImprovement = 0.0;
   settings.minAlpha = 0.0001;
   settings.epsilon = 0.00001;
-  Logger::info << "Unoptimized ll=" << f.evaluatePrint(startingParameter, true) << std::endl;
   auto parameters = DTLOptimizer::optimizeParameters(
       f, 
       startingParameter, 
@@ -579,14 +578,13 @@ void AleOptimizer::selectBestHighways(const std::vector<ScoredHighway> &highways
   _evaluator->saveSnapshotPerFamilyLL();
   for (const auto &scoredHighway: highways) {
     Highway highway(scoredHighway.highway);
-    Logger::timed << "Optimizing candidate highway " << highway.src->label << "->" << highway.dest->label << std::endl;
     auto parameters = testHighway(*_evaluator, highway);
     highway.proba = parameters[0];
     bestHighways.push_back(ScoredHighway(highway, 
           parameters.getScore(),
           initialLL - parameters.getScore()));
     Logger::timed << "ph=" << parameters[0] 
-      << " lldiff=" << initialLL - parameters.getScore() << std::endl;
+      << " lldiff=" << initialLL - parameters.getScore() << " highway: " << highway.src->label << "->" << highway.dest->label << std::endl;
   }
   std::sort(bestHighways.rbegin(), bestHighways.rend());
 }
@@ -613,22 +611,29 @@ void AleOptimizer::addHighways(const std::vector<ScoredHighway> &candidateHighwa
     acceptedHighways.push_back(sh);
     _evaluator->addHighway(sh.highway);
   }
-  std::sort(acceptedHighways.rbegin(), acceptedHighways.rend());
+  std::sort(acceptedHighways.rbegin(), acceptedHighways.rend(), cmpHighwayByProbability);
 }
+
+
+
 
 void AleOptimizer::saveBestHighways(const std::vector<ScoredHighway> &scoredHighways,
       const std::string &output)
 {
   ParallelOfstream os(output, true);
-  Logger::info << "Outputing the " << scoredHighways.size() << 
-    " highays into " << output << std::endl;
+  Logger::info << "Outputing the highays into " << output << std::endl;
   for (const auto &scoredHighway: scoredHighways) {
-    os << scoredHighway.highway.proba << ", ";
-    os << scoredHighway.score << ", ";
-    os << scoredHighway.scoreDiff << ", ";
-    os << scoredHighway.highway.src->label << ",";
-    os << scoredHighway.highway.dest->label << std::endl;
+    if (scoredHighway.highway.proba >= 0.000001) {
+      os << scoredHighway.highway.proba << ", ";
+      os << scoredHighway.highway.src->label << ",";
+      os << scoredHighway.highway.dest->label << std::endl;
+      os << scoredHighway.scoreDiff << ", ";
+    }
   }
 }
   
+bool cmpHighwayByProbability(const ScoredHighway &a, const ScoredHighway &b)
+{
+  return a.highway.proba < b.highway.proba;
+}
 
