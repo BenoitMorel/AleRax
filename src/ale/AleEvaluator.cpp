@@ -14,7 +14,8 @@ static std::shared_ptr<MultiModel> createModel(SpeciesTree &speciesTree,
   const FamilyInfo &family,
   const AleModelParameters &modelParameters,
   const std::vector<Highway> &highways,
-  bool highPrecision)
+  bool highPrecision,
+  unsigned int index)
 {
   std::shared_ptr<MultiModel> model;
   GeneSpeciesMapping mapping;
@@ -56,7 +57,7 @@ static std::shared_ptr<MultiModel> createModel(SpeciesTree &speciesTree,
     break;
   }
   RatesVector rates;
-  modelParameters.getRatesForFamily(0, rates);
+  modelParameters.getRatesForFamily(index, rates);
   model->setRates(rates);
   model->setHighways(highways);
   return model;
@@ -110,7 +111,8 @@ void AleEvaluator::resetEvaluation(unsigned int i, bool highPrecision)
       family,
       _modelRates,
       _highways,
-      highPrecision);
+      highPrecision,
+      i);
   _highPrecisions[i] = highPrecision;
   auto ll = _evaluations[i]->computeLogLikelihood();
   if (highPrecision) {
@@ -279,10 +281,12 @@ void AleEvaluator::setParameters(Parameters &parameters)
   assert(parameters.dimensions());
   assert(0 == parameters.dimensions() % freeParameters);
   _modelRates.setParameters(parameters);
-  RatesVector rates;
-  _modelRates.getRatesForFamily(0, rates);
+  unsigned int index = 0;
   for (auto evaluation: _evaluations) { 
+    RatesVector rates;
+    _modelRates.getRatesForFamily(index, rates);
     evaluation->setRates(rates);
+    ++index;
   }
 }
 

@@ -78,6 +78,9 @@ public:
    */
   void getRatesForFamily(unsigned int family, RatesVector &rates) const
   {
+    if (_familyCatNumber == 1) {
+      family = 0;
+    }
     unsigned int N = getSpecesNumber();
     unsigned int F = perCategoryFreeParameters();
     rates.resize(F);
