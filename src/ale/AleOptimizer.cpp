@@ -39,8 +39,6 @@ public:
         std::string("transferll_") + std::string(_highways[0]->src->label) + 
         std::string("_") + std::string(_highways[0]->dest->label));
       _evaluator.savePerFamilyLikelihoodDiff(out);
-      Logger::info << "Saving diff with p=" << parameters[0] 
-        << " into " << out << std::endl;
     }
     for (auto highway: _highways) {
       (void)(highway);
@@ -66,6 +64,7 @@ static void getSpeciesToCatRec(corax_rnode_t *node,
     currentCat = it->second;
   }
   speciesToCat[node->node_index] = currentCat;
+    Logger::info << "cat " << currentCat << " " << node->label << std::endl; 
   if (node->left) {
     getSpeciesToCatRec(node->left, speciesToCat, currentCat, labelToCat);
     getSpeciesToCatRec(node->right, speciesToCat, currentCat, labelToCat);
@@ -146,6 +145,7 @@ AleOptimizer::AleOptimizer(
   _modelRates = AleModelParameters(startingRates, 
       speciesToCat, 
       catToLabel,
+      _geneTrees.getTrees().size(),
       info);
   _speciesTree->addListener(this);
   ParallelContext::barrier();
@@ -331,6 +331,8 @@ void AleOptimizer::reconcile(unsigned int samples)
   auto &families = _geneTrees.getTrees();
   std::vector<std::string> summaryPerSpeciesEventCountsFiles;
   std::vector<std::string> summaryTransferFiles;
+  std::vector< std::shared_ptr<Scenario> > allScenarios;
+
   for (unsigned int i = 0; i < families.size(); ++i) {
     std::vector<std::string> perSpeciesEventCountsFiles;
     std::vector<std::string> transferFiles;
@@ -338,7 +340,9 @@ void AleOptimizer::reconcile(unsigned int samples)
     ParallelOfstream geneTreesOs(geneTreesPath, false);
     std::vector< std::shared_ptr<Scenario> > scenarios;
     _evaluator->sampleScenarios(i, samples, scenarios);
+    allScenarios.insert(allScenarios.end(), scenarios.begin(), scenarios.end());
     assert(scenarios.size() == samples);
+
     for (unsigned int sample = 0; sample < samples; ++ sample) {
       auto out = FileSystem::joinPaths(allRecDir, 
           families[i].name + std::string("_") +  std::to_string(sample) + ".xml");
@@ -362,8 +366,8 @@ void AleOptimizer::reconcile(unsigned int samples)
     auto newicks = getLines(geneTreesPath);
     auto consensusPrefix = FileSystem::joinPaths(summariesDir, 
         families[i].name + "_consensus_");
-    saveStr(PLLUnrootedTree::buildConsensusTree(newicks, 0.1), consensusPrefix + "mre.newick");
-    //saveStr(PLLUnrootedTree::buildConsensusTree(newicks, 0.5), consensusPrefix + "50.newick");
+    //saveStr(PLLUnrootedTree::buildConsensusTree(newicks, 0.1), consensusPrefix + "mre.newick");
+    saveStr(PLLUnrootedTree::buildConsensusTree(newicks, 0.50001), consensusPrefix + "50.newick");
     auto perSpeciesEventCountsFile = FileSystem::joinPaths(summariesDir, families[i].name + 
         std::string("_perspecies_eventcount.txt"));
     Scenario::mergePerSpeciesEventCounts(_speciesTree->getTree(),
@@ -382,6 +386,9 @@ void AleOptimizer::reconcile(unsigned int samples)
       totalPerSpeciesEventCountsFile, 
       summaryPerSpeciesEventCountsFiles, 
       true, false);
+  auto originsDir = FileSystem::joinPaths(recDir, "origins");
+  FileSystem::mkdir(originsDir, true);
+  Scenario::saveOriginsGlobal(_speciesTree->getTree(), allScenarios, samples, originsDir);
   auto totalTransferFile = FileSystem::joinPaths(recDir, "transfers.txt");
   Scenario::mergeTransfers(_speciesTree->getTree(),
       totalTransferFile, 
@@ -397,7 +404,7 @@ void AleOptimizer::optimizeDates(bool thorough)
   if (!_info.isDated()) {
     return; 
   }
-  auto scoredBackups = DatedSpeciesTreeSearch::optimizeDatesFromReconciliation(*_speciesTree, getEvaluator(), 200);
+  auto scoredBackups = DatedSpeciesTreeSearch::optimizeDatesFromReconciliation(*_speciesTree, getEvaluator(), 500, 20);
   Logger::timed << "Sorted dating likelihoods from fast datings:" << std::endl;
   for (auto &sb: scoredBackups) {
     Logger::info << sb.score << " ";
@@ -433,7 +440,7 @@ void AleOptimizer::randomizeRoot()
 
 static Parameters testHighwayFast(AleEvaluator &evaluator,
     const Highway &highway,
-    double startingProbability = 0.1)
+    double startingProbability = 0.01)
 {
   std::vector<Highway *> highways;
   auto copy = highway;
@@ -446,7 +453,7 @@ static Parameters testHighwayFast(AleEvaluator &evaluator,
 }
 static Parameters testHighway(AleEvaluator &evaluator,
     Highway &highway,
-    double startingProbability = 0.01)
+    double startingProbability = 0.1)
 {
   std::vector<Highway *> highways;
   highways.push_back(&highway);
@@ -454,6 +461,7 @@ static Parameters testHighway(AleEvaluator &evaluator,
   Parameters startingParameter(1);
   startingParameter[0] = startingProbability;
   OptimizationSettings settings;
+  settings.lineSearchMinImprovement = 0.0;
   settings.minAlpha = 0.0001;
   settings.epsilon = 0.00001;
   Logger::info << "Unoptimized ll=" << f.evaluatePrint(startingParameter, true) << std::endl;
@@ -473,7 +481,6 @@ static Parameters testHighways(AleEvaluator &evaluator,
   HighwayFunction f(evaluator, highways);
   if (optimize) {
     OptimizationSettings settings;
-    settings.lineSearchMinImprovement = 1.0;
     settings.minAlpha = 0.001;
     settings.epsilon = 0.000001;
     settings.verbose = true;
@@ -488,7 +495,7 @@ static Parameters testHighways(AleEvaluator &evaluator,
   }
 }
 
-void AleOptimizer::getCandidateHighways(std::vector<ScoredHighway> &scoredHighways, unsigned int toTest)
+void AleOptimizer::getCandidateHighways(std::vector<ScoredHighway> &scoredHighways, unsigned int maxCandidates)
 {
   unsigned int minTransfers = 1;
   MovesBlackList blacklist;
@@ -504,7 +511,7 @@ void AleOptimizer::getCandidateHighways(std::vector<ScoredHighway> &scoredHighwa
     auto regraft = _speciesTree->getNode(transferMove.regraft);
     Highway highway(regraft, prune);
     scoredHighways.push_back(ScoredHighway(highway, 0.0));
-    if (scoredHighways.size() >= toTest) {
+    if (scoredHighways.size() >= maxCandidates) {
       break;
     }
   }
@@ -557,9 +564,7 @@ void AleOptimizer::filterCandidateHighwaysFast(const std::vector<ScoredHighway> 
     } else {
       Logger::timed << "Rejecting candidate: ";
     }
-    Logger::info << initialLL << " " << parameters.getScore() << std::endl;
-    Logger::info << highway.src->label << "->" << highway.dest->label << std::endl;
-    Logger::info << " ll diff = " << llDiff << std::endl; 
+    Logger::info << highway.src->label << "->" << highway.dest->label << " ll diff = " << llDiff << std::endl; 
   }
   std::sort(filteredHighways.begin(), filteredHighways.end());
 }

@@ -70,7 +70,8 @@ std::vector<unsigned int> getSortedIndices(const std::vector<unsigned int> &valu
 void generateCCPs(const std::string &ccpDir, 
     const std::string &ccpDimensionFile,
     Families &families, 
-    CCPRooting ccpRooting)
+    CCPRooting ccpRooting,
+    unsigned int sampleFrequency)
 {
   ParallelContext::barrier();
   Logger::timed << "Generating ccp files..." << std::endl;
@@ -83,7 +84,7 @@ void generateCCPs(const std::string &ccpDir,
   std::vector<unsigned int> treeSizes;
   std::vector<unsigned int> ccpSizes;
   for (auto i = ParallelContext::getBegin(N); i < ParallelContext::getEnd(N); i ++) {
-    ConditionalClades ccp(families[i].startingGeneTree, families[i].likelihoodFile, ccpRooting);
+    ConditionalClades ccp(families[i].startingGeneTree, families[i].likelihoodFile, ccpRooting, sampleFrequency);
     ccp.serialize(families[i].ccp);
     familyIndices.push_back(i);
     treeSizes.push_back(ccp.getLeafNumber());
@@ -208,7 +209,7 @@ void run( AleArguments &args)
   auto families = FamiliesFileParser::parseFamiliesFile(args.families);
   filterInvalidFamilies(families);
   auto ccpDimensionFile = FileSystem::joinPaths(args.output, "ccpdim.txt");
-  generateCCPs(ccpDir, ccpDimensionFile, families, args.ccpRooting);
+  generateCCPs(ccpDir, ccpDimensionFile, families, args.ccpRooting, args.sampleFrequency);
   trimFamilies(families, args.minCoveredSpecies, args.trimFamilyRatio,
       args.maxCladeSplitRatio);
   if (families.size() == 0) {
@@ -219,7 +220,7 @@ void run( AleArguments &args)
   Logger::timed << "Checking that ccp and mappings are valid..." << std::endl;
   checkCCPAndSpeciesTree(families, args.speciesTree); 
   RecModelInfo info(ArgumentsHelper::strToRecModel(args.reconciliationModelStr),
-      false, // per family rates
+      args.perFamilyRates, // per family rates
       args.gammaCategories,
       args.originationStrategy,
       args.pruneSpeciesTree,

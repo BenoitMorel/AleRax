@@ -16,6 +16,7 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
   noTL(false),
   gammaCategories(1),
   ccpRooting(CCPRooting::UNIFORM),
+  perFamilyRates(false),
   memorySavings(false),
   speciesTreeAlgorithm(SpeciesTreeAlgorithm::User),
   speciesSearchStrategy(SpeciesSearchStrategy::SKIP),
@@ -24,10 +25,11 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
   skipThoroughRates(false),
   highways(false),
   highwayCandidatesStep1(100),
-  highwayCandidatesStep2(25),
+  highwayCandidatesStep2(50),
   minCoveredSpecies(DEFAULT_MIN_COVERED_SPECIES),
   trimFamilyRatio(DEFAULT_TRIM_FAMILY_RATIO),
   maxCladeSplitRatio(DEFAULT_MAX_SPLIT_RATIO),
+  sampleFrequency(1),
   geneTreeSamples(DEFAULT_GENE_TREE_SAMPLES),
   output("GeneTegrator"),
   cleanupCCP(true),
@@ -81,6 +83,8 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       minCoveredSpecies = atof(argv[++i]);
     } else if (arg == "--max-clade-split-ratio") {
       maxCladeSplitRatio = atof(argv[++i]);
+    } else if (arg == "--gene-tree-sample-frequency") {
+      sampleFrequency = atoi(argv[++i]);
     } else if (arg == "--speciation-probability-categories") {
       gammaCategories = atoi(argv[++i]);
     } else if (arg == "--gene-tree-rooting") {
@@ -91,6 +95,8 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       speciesCategoryFile = argv[++i];
     } else if (arg == "--gene-tree-samples") {
       geneTreeSamples = atoi(argv[++i]);
+    } else if (arg == "--per-family-rates") {
+      perFamilyRates = true;
     } else if (arg == "--memory-savings") {
       memorySavings = true;
     } else if (arg == "-p" || arg == "--prefix") {
@@ -117,6 +123,10 @@ void AleArguments::printCommand() {
   Logger::info << std::endl << std::endl;
 }
 
+static std::string getOnOff(bool onOff) {
+  return onOff ? "ON" : "OFF";
+}
+
 void AleArguments::printSummary() {
   Logger::timed << "Run settings:" << std::endl;
   Logger::info << "\tFamily file: " << families << std::endl;
@@ -135,6 +145,7 @@ void AleArguments::printSummary() {
   Logger::info << "\tNumber of reconciled gene trees to sample: " << geneTreeSamples << std::endl;
   Logger::info << "\tRandom seed: " << seed << std::endl;
   Logger::info << "\tReconciliation model: " << reconciliationModelStr << std::endl;
+  Logger::info << "\tMemory savings: " << getOnOff(memorySavings) << std::endl;
   switch (transferConstraint) {
   case TransferConstaint::NONE:
     Logger::info << "\tTransfer constraints: no constraint" << std::endl;
@@ -220,10 +231,14 @@ void AleArguments::printHelp()
   Logger::info << "\t-r --rec-model <reconciliationModel>  {UndatedDL, UndatedDTL}" << std::endl;
   Logger::info << "\t--transfer-constraint {NONE, PARENTS, RELDATED}" << std::endl;
   Logger::info << "\t--prune-species-tree" << std::endl;
+  Logger::info << "\t--speciies-categories filepath" << std::endl; 
   Logger::info << "\t--speciation-probability-categories <VALUE>" << std::endl; 
   Logger::info << "\t--gene-tree-rooting {UNIFORM, ROOTED}" << std::endl;
   Logger::info << "\t--fraction-missing-file <filepath>" << std::endl;
   Logger::info << "\t--origination {UNIFORM, ROOT, LCA} "  << std::endl;
+  Logger::info << "\t--fix-rates"  << std::endl;
+  Logger::info << "\t--per-family-rates"  << std::endl;
+  Logger::info << "\t--memory-savings"  << std::endl;
 
   Logger::info << "Search strategy options:" << std::endl; 
   Logger::info << "\t--species-tree-search {HYBRID, REROOT, SKIP}" << std::endl;
@@ -233,7 +248,8 @@ void AleArguments::printHelp()
   Logger::info << "Trimming options" << std::endl;
   Logger::info << "\t--min-covered-species <value>" << std::endl;
   Logger::info << "\t--max-clade-split-ratio <value>" << std::endl;
-  Logger::info << "\t--trim-family-ratio <proportion>" << std::endl;
+  Logger::info << "\t--trim-ratio <proportion>" << std::endl;
+  Logger::info << "\t--gene-tree-sample-frequency <int>" << std::endl;
 
   Logger::info << "Transfer highway options" << std::endl;
   Logger::info << "\t--highways" << std::endl;

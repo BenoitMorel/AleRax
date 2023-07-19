@@ -55,15 +55,8 @@ static std::shared_ptr<MultiModel> createModel(SpeciesTree &speciesTree,
     assert(false);
     break;
   }
-  std::vector<std::vector<double> > rates;
-  unsigned int N = speciesTree.getTree().getNodeNumber();
-  for (unsigned int d = 0; d < modelParameters.perCategoryFreeParameters(); ++d) { 
-    std::vector<double> subrates;
-    for (unsigned int s = 0; s < N; ++s) {
-      subrates.push_back(modelParameters.getRateFromSpecies(s, d));
-    }
-    rates.push_back(subrates);
-  }
+  RatesVector rates;
+  modelParameters.getRatesForFamily(0, rates);
   model->setRates(rates);
   model->setHighways(highways);
   return model;
@@ -143,28 +136,7 @@ double AleEvaluator::computeLikelihood(
   }
   double sumLL = 0.0;
   for (unsigned int i = 0; i < _evaluations.size(); ++i) {
-    auto famIndex = _geneTrees.getTrees()[i].familyIndex;
-    auto ll = _evaluations[i]->computeLogLikelihood();
-    auto &family = _families[famIndex];
-    if (_highPrecisions[i] == -1 && !std::isnormal(ll)) {
-      // we are in low precision mode (we use double)
-      // and it's not accurate enough, switch to
-      // high precision mode
-      resetEvaluation(i, true);
-      ll = _evaluations[i]->computeLogLikelihood();
-    }
-    if (!std::isnormal(ll)) {
-      std::cerr << "Error: ll=" << ll << " for family " << family.name << std::endl;
-    }
-    assert(std::isnormal(ll));
-    if (_highPrecisions[i] >= 0 && _highPrecisions[i] % 20 == 0) {
-      // we are in high precision mode, we now check if we can
-      // switch to low precision mode to make computations faster
-        resetEvaluation(i, false);
-    }
-    if (_highPrecisions[i] >= 0) { 
-      _highPrecisions[i]++;
-    }
+    auto ll = computeFamilyLikelihood(i);
     sumLL += ll;
     if (perFamLL) {
       perFamLL->push_back(ll);
@@ -173,6 +145,33 @@ double AleEvaluator::computeLikelihood(
   //printHightPrecisionCount();
   ParallelContext::sumDouble(sumLL);
   return sumLL;
+}
+  
+double AleEvaluator::computeFamilyLikelihood(unsigned int i)
+{
+  auto famIndex = _geneTrees.getTrees()[i].familyIndex;
+  auto ll = _evaluations[i]->computeLogLikelihood();
+  auto &family = _families[famIndex];
+  if (_highPrecisions[i] == -1 && !std::isnormal(ll)) {
+    // we are in low precision mode (we use double)
+    // and it's not accurate enough, switch to
+    // high precision mode
+    resetEvaluation(i, true);
+    ll = _evaluations[i]->computeLogLikelihood();
+  }
+  if (!std::isnormal(ll)) {
+    std::cerr << "Error: ll=" << ll << " for family " << family.name << std::endl;
+  }
+  assert(std::isnormal(ll));
+  if (_highPrecisions[i] >= 0 && _highPrecisions[i] % 20 == 0) {
+    // we are in high precision mode, we now check if we can
+    // switch to low precision mode to make computations faster
+      resetEvaluation(i, false);
+  }
+  if (_highPrecisions[i] >= 0) { 
+    _highPrecisions[i]++;
+  }
+  return ll; 
 }
 
 void AleEvaluator::setAlpha(double alpha)
@@ -249,6 +248,27 @@ private:
   AleEvaluator &_evaluator;
 };
   
+class DTLFamilyParametersOptimizer: public FunctionToOptimize
+{
+public:
+  DTLFamilyParametersOptimizer(AleEvaluator &evaluator, unsigned int family):
+    _evaluator(evaluator),
+    _family(family)
+  {}
+
+  virtual double evaluate(Parameters &parameters) {
+    parameters.ensurePositivity();
+    _evaluator.setFamilyParameters(_family, parameters);
+    auto res = _evaluator.computeFamilyLikelihood(_family);
+    parameters.setScore(res);
+    return res;
+  }
+
+private:
+  AleEvaluator &_evaluator;
+  unsigned int _family;
+};
+  
 
 void AleEvaluator::setParameters(Parameters &parameters)
 {
@@ -258,20 +278,23 @@ void AleEvaluator::setParameters(Parameters &parameters)
   }
   assert(parameters.dimensions());
   assert(0 == parameters.dimensions() % freeParameters);
-  _modelRates.setRates(parameters);
-  std::vector<std::vector<double> > rates;
-  unsigned int N = _speciesTree.getTree().getNodeNumber();
-  for (unsigned int d = 0; d < _modelRates.perCategoryFreeParameters(); ++d) { 
-    std::vector<double> subrates;
-    for (unsigned int s = 0; s < N; ++s) {
-      subrates.push_back(_modelRates.getRateFromSpecies(s, d));
-    }
-    rates.push_back(subrates);
-  }
+  _modelRates.setParameters(parameters);
+  RatesVector rates;
+  _modelRates.getRatesForFamily(0, rates);
   for (auto evaluation: _evaluations) { 
     evaluation->setRates(rates);
   }
-   
+}
+
+void AleEvaluator::setFamilyParameters(unsigned int family, Parameters &parameters)
+{
+  unsigned int freeParameters = Enums::freeParameters(_modelRates.getInfo().model);
+  assert(parameters.dimensions());
+  assert(0 == parameters.dimensions() % freeParameters);
+  _modelRates.setParametersForFamily(family, parameters);
+  RatesVector rates;
+  _modelRates.getRatesForFamily(family, rates);
+  _evaluations[family]->setRates(rates);
 }
 
 double AleEvaluator::optimizeModelRates(bool thorough)
@@ -292,13 +315,26 @@ double AleEvaluator::optimizeModelRates(bool thorough)
       settings.minAlpha = 0.01;
       settings.optimizationMinImprovement = settings.lineSearchMinImprovement;
     }
-    DTLParametersOptimizer function(*this);
-    _modelRates.setRates(DTLOptimizer::optimizeParameters(
-        function, 
-        _modelRates.getRates(), 
-        settings));
-    ll = computeLikelihood();
-    Logger::timed << "[Species search]   After model rate opt, ll=" << ll << " rates: " << _modelRates << std::endl;
+    if (_modelRates.getInfo().perFamilyRates) {
+      for (unsigned int family = 0; family < _evaluations.size(); ++family) {
+        DTLFamilyParametersOptimizer function(*this, family);
+        _modelRates.setParametersForFamily(family, DTLOptimizer::optimizeParameters(
+              function,
+              _modelRates.getParametersForFamily(family),
+              settings));
+
+      }
+      ll = computeLikelihood();
+      Logger::timed << "[Species search]   After model rate opt, ll=" << ll << std::endl;
+    } else {
+      DTLParametersOptimizer function(*this);
+      _modelRates.setParameters(DTLOptimizer::optimizeParameters(
+          function, 
+          _modelRates.getParameters(),
+          settings));
+      ll = computeLikelihood();
+      Logger::timed << "[Species search]   After model rate opt, ll=" << ll << " rates: " << _modelRates << std::endl;
+    }
   }
   ll = optimizeGammaRates();
   return ll;

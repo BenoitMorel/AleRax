@@ -31,6 +31,7 @@ public:
   CCPRooting ccpRooting;
   std::string fractionMissingFile;
   std::string speciesCategoryFile;
+  bool perFamilyRates;
   bool memorySavings;
 
   // search
@@ -50,6 +51,7 @@ public:
   int minCoveredSpecies;
   double trimFamilyRatio;
   double maxCladeSplitRatio;
+  unsigned int sampleFrequency;
 
   // output
   unsigned int geneTreeSamples;

@@ -34,6 +34,7 @@ public:
   virtual ~AleEvaluator() {}
   virtual double computeLikelihood(PerFamLL *perFamLL = nullptr); 
   virtual double computeLikelihoodFast();
+  double computeFamilyLikelihood(unsigned int i);
   virtual bool providesFastLikelihoodImpl() const {return false;}
   virtual bool isDated() const {return _modelRates.getInfo().isDated();}
   virtual double optimizeModelRates(bool thorough);
@@ -46,6 +47,7 @@ public:
   virtual bool pruneSpeciesTree() const {return _modelRates.getInfo().pruneSpeciesTree;}
   virtual void setAlpha(double alpha);
   virtual void setParameters(Parameters &parameters);
+  virtual void setFamilyParameters(unsigned int family, Parameters &parameters);
   virtual void onSpeciesDatesChange();  
   virtual void onSpeciesTreeChange(
       const std::unordered_set<corax_rnode_t *> *nodesToInvalidate);
