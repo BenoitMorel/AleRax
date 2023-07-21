@@ -367,7 +367,7 @@ void AleOptimizer::reconcile(unsigned int samples)
     auto consensusPrefix = FileSystem::joinPaths(summariesDir, 
         families[i].name + "_consensus_");
     //saveStr(PLLUnrootedTree::buildConsensusTree(newicks, 0.1), consensusPrefix + "mre.newick");
-    saveStr(PLLUnrootedTree::buildConsensusTree(newicks, 0.50001), consensusPrefix + "50.newick");
+    saveStr(PLLRootedTree::buildConsensusTree(newicks, 0.50001), consensusPrefix + "50.newick");
     auto perSpeciesEventCountsFile = FileSystem::joinPaths(summariesDir, families[i].name + 
         std::string("_perspecies_eventcount.txt"));
     Scenario::mergePerSpeciesEventCounts(_speciesTree->getTree(),
