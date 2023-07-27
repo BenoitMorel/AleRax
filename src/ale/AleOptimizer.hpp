@@ -92,6 +92,11 @@ public:
   void saveSupportTree();
 
   /**
+   *  Save the DTL rates and the per-family likelihoods
+   */
+  void saveRatesAndLL();
+
+  /**
    *  Accessor
    */
   SpeciesTreeLikelihoodEvaluatorInterface &getEvaluator() {return *_evaluator;}
@@ -122,6 +127,7 @@ public:
   void saveRELLSupports();
 private:
   std::unique_ptr<SpeciesTree> _speciesTree;
+  const Families &_families;
   PerCoreGeneTrees _geneTrees;
   RecModelInfo _info;
   std::unique_ptr<AleEvaluator> _evaluator;

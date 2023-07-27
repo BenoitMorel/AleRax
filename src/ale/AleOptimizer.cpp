@@ -64,7 +64,6 @@ static void getSpeciesToCatRec(corax_rnode_t *node,
     currentCat = it->second;
   }
   speciesToCat[node->node_index] = currentCat;
-    Logger::info << "cat " << currentCat << " " << node->label << std::endl; 
   if (node->left) {
     getSpeciesToCatRec(node->left, speciesToCat, currentCat, labelToCat);
     getSpeciesToCatRec(node->right, speciesToCat, currentCat, labelToCat);
@@ -116,6 +115,7 @@ AleOptimizer::AleOptimizer(
     const std::string &speciesCategoryFile,
     const std::string &outputDir):
   _speciesTree(std::make_unique<SpeciesTree>(speciesTreeFile)),
+  _families(families),
   _geneTrees(families, false, true),
   _info(info),
   _outputDir(outputDir),
@@ -169,6 +169,7 @@ double AleOptimizer::optimizeModelRates(bool thorough)
   PerFamLL perFamLL;
   auto ll = getEvaluator().computeLikelihood(&perFamLL);
   _searchState.betterLikelihoodCallback(ll, perFamLL);
+  saveRatesAndLL();
   return ll;
 }
 
@@ -315,6 +316,63 @@ static void saveStr(const std::string &str, const std::string &path) {
   std::ofstream os(path);
   os << str;
 }
+  
+
+void AleOptimizer::saveRatesAndLL()
+{
+  
+  // save per-family likelihood
+  auto perFamilyLikelihoodPath = FileSystem::joinPaths(_outputDir, "per_fam_likelihoods.txt");
+  std::vector<unsigned int> indices;
+  std::vector<double> likelihoods;
+  for (unsigned int i = 0; i < _geneTrees.getTrees().size(); ++i) {
+    auto famIndex = _geneTrees.getTrees()[i].familyIndex;
+    auto ll = _evaluator->computeFamilyLikelihood(i);
+    indices.push_back(famIndex);
+    likelihoods.push_back(ll);
+  }
+  std::vector<unsigned int> allIndices;
+  std::vector<double> allLikelihoods;
+  ParallelContext::concatenateHetherogeneousDoubleVectors(likelihoods,
+  allLikelihoods);
+  ParallelContext::concatenateHetherogeneousUIntVectors(indices, allIndices);
+  assert(allLikelihoods.size() == allIndices.size());
+  std::vector<std::pair<double, std::string> > likelihoodAndFamilies;
+  for (unsigned int i = 0; i < allLikelihoods.size(); ++i) {
+    likelihoodAndFamilies.push_back({allLikelihoods[i], _families[allIndices[i]].name});
+  }
+  std::sort(likelihoodAndFamilies.begin(), likelihoodAndFamilies.end());
+  ParallelOfstream llOs(perFamilyLikelihoodPath);
+  for (auto p: likelihoodAndFamilies) {
+    llOs << p.second << " " << p.first << std::endl; 
+  }
+  // save the DTL rates
+  auto parameterNames = Enums::parameterNames(_info.model); 
+  auto ratesDir = FileSystem::joinPaths(_outputDir, "model_parameters");
+  FileSystem::mkdir(ratesDir, true);
+  if (_info.perFamilyRates) {
+    for (unsigned int i = 0; i < _geneTrees.getTrees().size(); ++i) {
+      auto &geneTree = _geneTrees.getTrees()[i];
+      auto family = geneTree.name;
+      auto ratesPath = FileSystem::joinPaths(ratesDir, family + "_rates.txt");
+      std::ofstream ratesOs(ratesPath);
+      ratesOs << "# ";
+      for (auto names: parameterNames) {
+        ratesOs << names << " ";
+      }
+      ratesOs << std::endl;
+      auto parameters = _modelRates.getParametersForFamily(i);
+      assert(parameters.dimensions() == parameterNames.size());
+      for (unsigned int j = 0; j < parameters.dimensions(); ++j) {
+        ratesOs << parameters[j] << " ";
+      }
+    }
+
+  } else {
+    auto globalRatesPath = FileSystem::joinPaths(ratesDir, "model_parameters.txt");
+
+  }
+}
 
 void AleOptimizer::reconcile(unsigned int samples)
 {
@@ -399,7 +457,7 @@ void AleOptimizer::reconcile(unsigned int samples)
 }
  
 
-void AleOptimizer::optimizeDates(bool thorough)
+void AleOptimizer::optimizeDates(bool )
 {
   if (!_info.isDated()) {
     return; 

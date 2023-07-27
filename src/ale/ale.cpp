@@ -305,6 +305,7 @@ void run( AleArguments &args)
   Logger::timed <<"Sampling reconciled gene trees... (" << args.geneTreeSamples  << " samples)" << std::endl;
   speciesTreeOptimizer.reconcile(args.geneTreeSamples);
   speciesTreeOptimizer.saveSpeciesTree(); 
+  speciesTreeOptimizer.saveRatesAndLL();
   if (args.cleanupCCP) {
     cleanupCCPs(families);
   }

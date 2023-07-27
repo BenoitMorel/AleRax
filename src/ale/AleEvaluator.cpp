@@ -317,6 +317,16 @@ double AleEvaluator::optimizeModelRates(bool thorough)
     if (!thorough) {
       settings.lineSearchMinImprovement = std::max(0.1, ll / 10000.0);
       settings.minAlpha = 0.01;
+      settings.startingAlpha = 0.5;
+      settings.optimizationMinImprovement = settings.lineSearchMinImprovement;
+    } else {
+      settings.lineSearchMinImprovement = std::max(0.1, ll / 10000.0);
+      if (ll < 100.0) {
+        settings.lineSearchMinImprovement = 0.01;
+        settings.optimizationMinImprovement = settings.lineSearchMinImprovement;
+      }
+      settings.startingAlpha = 0.01;
+      settings.minAlpha = 0.005;
       settings.optimizationMinImprovement = settings.lineSearchMinImprovement;
     }
     if (_modelRates.getInfo().perFamilyRates) {
