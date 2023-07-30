@@ -456,7 +456,11 @@ void AleEvaluator::sampleScenarios(unsigned int family, unsigned int samples,
     scenarios.clear();
     resetEvaluation(family, true);
     ok = getEvaluation(family).sampleReconciliations(samples, scenarios);
-    assert(ok);
+    if (!ok) {
+      std::cerr << "Error: cannot sample reconciliations for family " << 
+        _families[_geneTrees.getTrees()[family].familyIndex].name << std::endl;
+      assert(ok);
+    }
   }
 }
  

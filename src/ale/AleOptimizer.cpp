@@ -390,7 +390,6 @@ void AleOptimizer::reconcile(unsigned int samples)
   std::vector<std::string> summaryPerSpeciesEventCountsFiles;
   std::vector<std::string> summaryTransferFiles;
   std::vector< std::shared_ptr<Scenario> > allScenarios;
-
   for (unsigned int i = 0; i < families.size(); ++i) {
     std::vector<std::string> perSpeciesEventCountsFiles;
     std::vector<std::string> transferFiles;
@@ -424,7 +423,8 @@ void AleOptimizer::reconcile(unsigned int samples)
     auto newicks = getLines(geneTreesPath);
     auto consensusPrefix = FileSystem::joinPaths(summariesDir, 
         families[i].name + "_consensus_");
-    //saveStr(PLLUnrootedTree::buildConsensusTree(newicks, 0.1), consensusPrefix + "mre.newick");
+   
+
     saveStr(PLLRootedTree::buildConsensusTree(newicks, 0.50001), consensusPrefix + "50.newick");
     auto perSpeciesEventCountsFile = FileSystem::joinPaths(summariesDir, families[i].name + 
         std::string("_perspecies_eventcount.txt"));
@@ -440,13 +440,16 @@ void AleOptimizer::reconcile(unsigned int samples)
     summaryTransferFiles.push_back(transferFile);
   }
   auto totalPerSpeciesEventCountsFile = FileSystem::joinPaths(recDir, "perspecies_eventcount.txt");
+  Logger::timed << "Saving global per species event counts..." << std::endl;
   Scenario::mergePerSpeciesEventCounts(_speciesTree->getTree(),
       totalPerSpeciesEventCountsFile, 
       summaryPerSpeciesEventCountsFiles, 
       true, false);
   auto originsDir = FileSystem::joinPaths(recDir, "origins");
   FileSystem::mkdir(originsDir, true);
+  Logger::timed << "Saving origins" << std::endl;
   Scenario::saveOriginsGlobal(_speciesTree->getTree(), allScenarios, samples, originsDir);
+  Logger::timed << "Saving global transfers..." << std::endl;
   auto totalTransferFile = FileSystem::joinPaths(recDir, "transfers.txt");
   Scenario::mergeTransfers(_speciesTree->getTree(),
       totalTransferFile, 

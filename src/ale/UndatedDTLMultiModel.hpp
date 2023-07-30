@@ -133,7 +133,7 @@ private:
     size_t category,
     REAL &proba,
     ReconciliationCell<REAL> *recCell = nullptr);
-  void sampleTransferEvent(unsigned int cid,
+  bool sampleTransferEvent(unsigned int cid,
     corax_rnode_t *originSpeciesNode,
     size_t category,
     Scenario::Event &event);
@@ -459,7 +459,7 @@ double UndatedDTLMultiModel<REAL>::computeLogLikelihood()
 }
 
 template <class REAL>
-void UndatedDTLMultiModel<REAL>::sampleTransferEvent(unsigned int cid,
+bool UndatedDTLMultiModel<REAL>::sampleTransferEvent(unsigned int cid,
     corax_rnode_t *originSpeciesNode,
     size_t category,
     Scenario::Event &event)
@@ -523,10 +523,10 @@ void UndatedDTLMultiModel<REAL>::sampleTransferEvent(unsigned int cid,
     if (sum > max) {
       event.pllDestSpeciesNode = speciesNode;;
       event.destSpeciesNode = h;
-      return;
+      return true;
     }
   }
-  assert(false);
+  return false;
 }
 
 template <class REAL>
@@ -736,10 +736,13 @@ bool UndatedDTLMultiModel<REAL>::computeProbability(CID cid,
     proba += temp;
     if (recCell && proba > maxProba) {
       recCell->event.type = ReconciliationEventType::EVENT_T;
-      sampleTransferEvent(cidLeft, 
+      
+      if (!sampleTransferEvent(cidLeft, 
           speciesNode,
           c,
-          recCell->event);
+          recCell->event)) {
+        return false;
+      }
       recCell->event.destSpeciesNode = 
         recCell->event.pllDestSpeciesNode->node_index;
       recCell->event.leftGeneIndex = cidRight; 
@@ -754,10 +757,12 @@ bool UndatedDTLMultiModel<REAL>::computeProbability(CID cid,
     proba += temp;
     if (recCell && proba > maxProba) {
       recCell->event.type = ReconciliationEventType::EVENT_T;
-      sampleTransferEvent(cidRight, 
+      if (!sampleTransferEvent(cidRight, 
           speciesNode,
           c,
-          recCell->event);
+          recCell->event)) {
+        return false;
+      }
       recCell->event.destSpeciesNode = 
         recCell->event.pllDestSpeciesNode->node_index;
       recCell->event.leftGeneIndex = cidLeft; 
@@ -841,10 +846,12 @@ bool UndatedDTLMultiModel<REAL>::computeProbability(CID cid,
     proba += temp;
     if (recCell && proba > maxProba) {
       recCell->event.type = ReconciliationEventType::EVENT_TL;
-      sampleTransferEvent(cid, 
+      if (!sampleTransferEvent(cid, 
           speciesNode,
           c,
-          recCell->event);
+          recCell->event)) {
+        return false;
+      }
       recCell->event.destSpeciesNode = 
         recCell->event.pllDestSpeciesNode->node_index;
       return true;
@@ -875,9 +882,12 @@ bool UndatedDTLMultiModel<REAL>::computeProbability(CID cid,
       }
     }
   }
-  assert(proba < REAL(1.0));
+  
   if (recCell) {
     std::cerr << "boum " << proba << " " << maxProba << std::endl;
+    return false;
+  }
+  if (proba > REAL(1.0)) {
     return false;
   }
   return true;
