@@ -158,6 +158,7 @@ double AleEvaluator::computeFamilyLikelihood(unsigned int i)
     // we are in low precision mode (we use double)
     // and it's not accurate enough, switch to
     // high precision mode
+    
     resetEvaluation(i, true);
     ll = _evaluations[i]->computeLogLikelihood();
   }

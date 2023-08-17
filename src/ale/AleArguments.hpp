@@ -34,6 +34,10 @@ public:
   std::string speciesCategoryFile;
   bool perFamilyRates;
   bool memorySavings;
+  double d;
+  double l;
+  double t;
+
 
   // search
   SpeciesTreeAlgorithm speciesTreeAlgorithm;

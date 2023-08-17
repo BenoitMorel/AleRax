@@ -18,6 +18,9 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
   ccpRooting(CCPRooting::UNIFORM),
   perFamilyRates(false),
   memorySavings(false),
+  d(0.1),
+  l(0.1),
+  t(0.1),
   speciesTreeAlgorithm(SpeciesTreeAlgorithm::User),
   speciesSearchStrategy(SpeciesSearchStrategy::SKIP),
   inferSpeciationOrders(false),
@@ -99,6 +102,12 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       perFamilyRates = true;
     } else if (arg == "--memory-savings") {
       memorySavings = true;
+    } else if (arg == "--d") {
+      d = atof(argv[++i]);
+    } else if (arg == "--l") {
+      l = atof(argv[++i]);
+    } else if (arg == "--t") {
+      t = atof(argv[++i]);
     } else if (arg == "-p" || arg == "--prefix") {
       output = std::string(argv[++i]);
     } else if (arg == "--skip-cleanup-ccp") {

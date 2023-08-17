@@ -233,10 +233,23 @@ void run( AleArguments &args)
       args.noTL,
       args.fractionMissingFile,
       args.memorySavings);
+  Parameters startingRates;
+  switch (info.model) {
+  case RecModel::UndatedDL:
+    startingRates = Parameters(args.d, args.l);
+    break;
+  case RecModel::UndatedDTL:
+    startingRates = Parameters(args.d, args.l, args.t);
+    break;
+  default:
+    assert(false);
+    break;
+  }
   AleOptimizer speciesTreeOptimizer(
       args.speciesTree,
       families,
       info,
+      startingRates,
       !args.fixRates,
       args.verboseOptRates,
       args.speciesCategoryFile,
