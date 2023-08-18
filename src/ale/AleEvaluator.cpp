@@ -124,6 +124,23 @@ void AleEvaluator::resetEvaluation(unsigned int i, bool highPrecision)
     }
   }
 }
+
+void AleEvaluator::resetAllPrecisions()
+{
+  auto llBefore = computeLikelihoodFast();
+  for (unsigned int i = 0; i < _geneTrees.getTrees().size(); ++i) {
+    if (_highPrecisions[i] != -1) {
+      resetEvaluation(i, false);
+    }
+  }
+  auto llAfter = computeLikelihoodFast();
+  if (fabs(llBefore - llAfter) > 0.1) {
+    Logger::info << "Likelihood changed after a reset of the precision: " << std::endl;
+    Logger::info << "Before: ll=" << llBefore << std::endl;
+    Logger::info << "After:  ll=" << llAfter << std::endl;
+  }
+}
+
 double AleEvaluator::computeLikelihoodFast()
 {
   return computeLikelihood();
@@ -166,11 +183,13 @@ double AleEvaluator::computeFamilyLikelihood(unsigned int i)
     std::cerr << "Error: ll=" << ll << " for family " << family.name << std::endl;
   }
   assert(std::isnormal(ll));
+  /*
   if (_highPrecisions[i] >= 0 && _highPrecisions[i] % 20 == 0) {
     // we are in high precision mode, we now check if we can
     // switch to low precision mode to make computations faster
       resetEvaluation(i, false);
   }
+  */
   if (_highPrecisions[i] >= 0) { 
     _highPrecisions[i]++;
   }
@@ -352,6 +371,8 @@ double AleEvaluator::optimizeModelRates(bool thorough)
     }
   }
   ll = optimizeGammaRates();
+  resetAllPrecisions();
+  ll = computeLikelihood();
   return ll;
 }
 

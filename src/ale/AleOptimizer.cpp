@@ -598,7 +598,7 @@ void AleOptimizer::filterCandidateHighwaysFast(const std::vector<ScoredHighway> 
   double proba = 0.01;
   Logger::timed << "Filering " << highways.size() << " candidate highways using p=" << proba << std::endl;
   double initialLL = getEvaluator().computeLikelihood(); 
-  Logger::timed << "initial ll=" << std::setprecision(18) << initialLL << std::setprecision(18) << std::endl;
+  Logger::timed << "initial ll=" << initialLL << std::endl;
   _evaluator->saveSnapshotPerFamilyLL();
   for (const auto &scoredHighway: highways) {
     auto highway = scoredHighway.highway;

@@ -64,6 +64,10 @@ public:
 protected:
   virtual double optimizeGammaRates();
   void resetEvaluation(unsigned int i, bool highPrecision);
+  /**
+   *  Tries to set all precisions to low precision
+   */
+  void resetAllPrecisions();
 private:
   SpeciesTree &_speciesTree;
   AleModelParameters &_modelRates;
