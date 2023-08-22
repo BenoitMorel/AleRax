@@ -23,7 +23,9 @@ public:
     const std::vector<Highway*> &highways): _highways(highways), _evaluator(evaluator) {}
   
   virtual double evaluate(Parameters &parameters) {
-    return evaluatePrint(parameters, false); 
+    double v = evaluatePrint(parameters, false); 
+    //Logger::timed << "Evaluate transfer " << std::setprecision(17) << parameters << std::endl;
+    return v;
   }
   
   virtual double evaluatePrint(Parameters &parameters, bool print) {
