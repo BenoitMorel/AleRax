@@ -207,7 +207,9 @@ void run( AleArguments &args)
   FileSystem::mkdir(ccpDir, true);
   Logger::initFileOutput(FileSystem::joinPaths(args.output, "alerax"));
   auto families = FamiliesFileParser::parseFamiliesFile(args.families);
-  filterInvalidFamilies(families);
+  if (!args.skipFamilyFiltering) {
+    filterInvalidFamilies(families);
+  }
   auto ccpDimensionFile = FileSystem::joinPaths(args.output, "ccpdim.txt");
   generateCCPs(ccpDir, ccpDimensionFile, families, args.ccpRooting, args.sampleFrequency);
   trimFamilies(families, args.minCoveredSpecies, args.trimFamilyRatio,
@@ -302,9 +304,13 @@ void run( AleArguments &args)
     speciesTreeOptimizer.filterCandidateHighwaysFast(candidateHighways, filteredHighways);
     filteredHighways.resize(std::min(filteredHighways.size(), size_t(args.highwayCandidatesStep2)));
     std::vector<ScoredHighway> bestHighways;
-    speciesTreeOptimizer.selectBestHighways(filteredHighways, bestHighways);
-    speciesTreeOptimizer.saveBestHighways(bestHighways,
-        highwayOutput);
+    if (!args.highwaysSkipIndividualOptimization) {
+      speciesTreeOptimizer.selectBestHighways(filteredHighways, bestHighways);
+      speciesTreeOptimizer.saveBestHighways(bestHighways,
+          highwayOutput);
+    } else {
+      bestHighways = filteredHighways;
+    }
     auto acceptedHighwayOutput = FileSystem::joinPaths(args.output,
       "highway_accepted_highways.txt");
     std::vector<ScoredHighway> acceptedHighways;

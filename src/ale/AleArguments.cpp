@@ -29,6 +29,8 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
   highways(false),
   highwayCandidatesStep1(100),
   highwayCandidatesStep2(50),
+  highwaysSkipIndividualOptimization(false),
+  skipFamilyFiltering(false),
   minCoveredSpecies(DEFAULT_MIN_COVERED_SPECIES),
   trimFamilyRatio(DEFAULT_TRIM_FAMILY_RATIO),
   maxCladeSplitRatio(DEFAULT_MAX_SPLIT_RATIO),
@@ -72,6 +74,8 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       highwayCandidatesStep1 = atoi(argv[++i]);
     } else if (arg == "--highway-candidates-step2") {
       highwayCandidatesStep2 = atoi(argv[++i]);
+    } else if (arg == "--highways-skip-individual-opt") {
+      highwaysSkipIndividualOptimization = true;
     } else if (arg == "--transfer-constraint") {
       transferConstraint = ArgumentsHelper::strToTransferConstraint(std::string(argv[++i]));
     } else if (arg == "--origination") {
@@ -82,6 +86,8 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       noTL = true;
     } else if (arg == "--trim-ratio") {
       trimFamilyRatio = atof(argv[++i]);
+    } else if (arg == "--skip-family-filtering") {
+      skipFamilyFiltering = true;
     } else if (arg == "--min-covered-species") {
       minCoveredSpecies = atof(argv[++i]);
     } else if (arg == "--max-clade-split-ratio") {
