@@ -28,7 +28,7 @@ public:
     return v;
   }
   
-  virtual double evaluatePrint(Parameters &parameters, bool print) {
+  virtual double evaluatePrint(Parameters &parameters, bool print, const std::string outputDir = "") {
     assert(parameters.dimensions() == _highways.size());
     parameters.ensurePositivity();
     for (unsigned int i = 0; i < _highways.size(); ++i)  {
@@ -38,7 +38,8 @@ public:
     }
     auto ll = _evaluator.computeLikelihood();
     if (print) {
-      std::string out = FileSystem::joinPaths(_evaluator.getOutputDir(),
+      assert(outputDir.size());
+      std::string out = FileSystem::joinPaths(outputDir,
         std::string("transferll_") + std::string(_highways[0]->src->label) + 
         std::string("_") + std::string(_highways[0]->dest->label));
       _evaluator.savePerFamilyLikelihoodDiff(out);
@@ -494,6 +495,7 @@ void AleOptimizer::randomizeRoot()
 
 static Parameters testHighwayFast(AleEvaluator &evaluator,
     const Highway &highway,
+    const std::string &highwaysOutputDir,
     double startingProbability = 0.01)
 {
   std::vector<Highway *> highways;
@@ -502,9 +504,10 @@ static Parameters testHighwayFast(AleEvaluator &evaluator,
   HighwayFunction f(evaluator, highways);
   Parameters parameters(1);
   parameters[0] = startingProbability;
-  f.evaluatePrint(parameters, true);
+  f.evaluatePrint(parameters, true, highwaysOutputDir);
   return parameters;
 }
+
 static Parameters testHighway(AleEvaluator &evaluator,
     Highway &highway,
     double startingProbability = 0.1)
@@ -608,7 +611,7 @@ void AleOptimizer::filterCandidateHighwaysFast(const std::vector<ScoredHighway> 
       Logger::info << "Incompatible highway " << highway.src->label << "->" << highway.dest->label << std::endl;
       continue;
     }
-    auto parameters = testHighwayFast(*_evaluator, highway, proba);
+    auto parameters = testHighwayFast(*_evaluator, highway, getHighwaysOutputDir(),proba);
     auto llDiff = parameters.getScore() - initialLL;
     if (llDiff > 0.01) {
       Logger::timed << "Accepting candidate: ";
@@ -690,5 +693,10 @@ void AleOptimizer::saveBestHighways(const std::vector<ScoredHighway> &scoredHigh
 bool cmpHighwayByProbability(const ScoredHighway &a, const ScoredHighway &b)
 {
   return a.highway.proba < b.highway.proba;
+}
+  
+std::string AleOptimizer::getHighwaysOutputDir() const
+{
+  return FileSystem::joinPaths(_outputDir, "highways");
 }
 

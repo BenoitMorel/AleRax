@@ -283,8 +283,10 @@ void run( AleArguments &args)
     speciesTreeOptimizer.getEvaluator().computeLikelihood();
   }
   if (args.highways) {
+    auto highwaysOutputDir =  FileSystem::joinPaths(args.output, "highways");
+  FileSystem::mkdir(highwaysOutputDir, true);
     // let's infer highways of transfers!
-    auto highwayOutput = FileSystem::joinPaths(args.output,
+    auto highwayOutput = FileSystem::joinPaths(highwaysOutputDir,
       "highway_best_candidates.txt");
     std::vector<ScoredHighway> candidateHighways;
     // initial candidates
@@ -311,7 +313,7 @@ void run( AleArguments &args)
     } else {
       bestHighways = filteredHighways;
     }
-    auto acceptedHighwayOutput = FileSystem::joinPaths(args.output,
+    auto acceptedHighwayOutput = FileSystem::joinPaths(highwaysOutputDir,
       "highway_accepted_highways.txt");
     std::vector<ScoredHighway> acceptedHighways;
     speciesTreeOptimizer.addHighways(bestHighways, acceptedHighways);
