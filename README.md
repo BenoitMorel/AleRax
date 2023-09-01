@@ -46,13 +46,21 @@ To build the sources:
 ./install.sh
 ```
 
+The generated executable is located here:
+```
+build/bin/alerax
+```
+
 ## Updating to the last stable version
 
+In case we've made some changes since the last time you updated your repository, you can get and install the most recent version of generax with:
 
 ```
 ./gitpull.sh # does a bit more than git pull
 ./install.sh
 ```
+
+Note that `git pull` does not update the submodules used by AleRax, hence the need for `./gitpull.sh`
 
 ## Running
 
@@ -60,7 +68,8 @@ See the wiki (https://github.com/BenoitMorel/AleRax/wiki)
 
 ## Issues and questions
 
-If you encounter any issue, please report it!!
-For questions, issues or feedback, please post on the GeneRax google group: https://groups.google.com/g/generaxusers.
-When reporting an issue, please send us at least the command line you ran, the logs file and the families file. The more information we get, the quicker we can solve the problems :-)
+If you encounter any issue, please report it!! We are always happy to help.
+For questions, issues or feedback, please post on the GeneRax (even if it's AleRax) google group: https://groups.google.com/g/generaxusers.
+When reporting an issue, please send us at least the command line you ran, the logs file, and any file that might be relevant (e.g. the species tree file if AleRax failed to read the species tree... 
+
 
