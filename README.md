@@ -1,5 +1,4 @@
 
-DISCLAIMER: AleRax is still under development and not published! Some features are already implemented, but the code is not stable. Please contact me if you want to start to work with AleRax.
 
 # AleRax  
 
@@ -11,7 +10,9 @@ AleRax is a parallel tool for species tree - gene tree reconciliation under gene
 
 We are also working on the following features:
 * Relative order of speciation event (relative dating) from HGT constraints
-* Highway of transfer inference
+* Inference of highways of transfers (pairs of species that exchanged many genes via HGT)
+
+We will publish a manuscript on bioarxiv very soon!
 
 ## Requirement
 
