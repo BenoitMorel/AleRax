@@ -55,6 +55,7 @@ public:
   MultiModel &getEvaluation(unsigned int i) {return *_evaluations[i];}
 
   void addHighway(const Highway &highway);
+  const std::vector<Highway> &getHighways() const {return _highways;}
   void removeHighway();
   void sampleScenarios(unsigned int family, unsigned int samples,
       std::vector< std::shared_ptr<Scenario> > &scenarios);

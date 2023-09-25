@@ -316,7 +316,7 @@ void run( AleArguments &args)
     auto acceptedHighwayOutput = FileSystem::joinPaths(highwaysOutputDir,
       "highway_accepted_highways.txt");
     std::vector<ScoredHighway> acceptedHighways;
-    speciesTreeOptimizer.addHighways(bestHighways, acceptedHighways);
+    speciesTreeOptimizer.optimizeAllHighways(bestHighways, acceptedHighways, true);
     speciesTreeOptimizer.saveBestHighways(acceptedHighways,
         acceptedHighwayOutput);
   }

@@ -123,8 +123,9 @@ public:
   void selectBestHighways(const std::vector<ScoredHighway> &highways, std::vector<ScoredHighway> &bestHighways);
   void saveBestHighways(const std::vector<ScoredHighway> &highways,
       const std::string &output);
-  void addHighways(const std::vector<ScoredHighway> &candidateHighways,
-      std::vector<ScoredHighway> &acceptedHighways);
+  void optimizeAllHighways(const std::vector<ScoredHighway> &candidateHighways,
+      std::vector<ScoredHighway> &acceptedHighways,
+      bool thorough);
   void saveRELLSupports();
 private:
   std::unique_ptr<SpeciesTree> _speciesTree;
