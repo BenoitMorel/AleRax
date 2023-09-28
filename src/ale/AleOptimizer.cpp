@@ -402,7 +402,7 @@ static void saveFamiliesTakingHighway(const Highway &highway,
     }
     std::sort(scoredFamilies.rbegin(), scoredFamilies.rend());
     std::string outputFileName = FileSystem::joinPaths(directory, 
-        std::string("families_highway_") + highway.src->label + " " + highway.dest->label + ".txt");
+        std::string("families_highway_") + highway.src->label + "_to_" + highway.dest->label + ".txt");
     std::ofstream os(outputFileName);
     for (auto sf: scoredFamilies) {
       if (sf.score == 0.0) {
@@ -613,10 +613,12 @@ static Parameters testHighways(AleEvaluator &evaluator,
       settings.individualParamOpt = true;
       settings.individualParamOptMinImprovement = 10.0;
     }
-    return DTLOptimizer::optimizeParameters(
+    auto res = DTLOptimizer::optimizeParameters(
         f, 
         startingProbabilities, 
         settings);
+    res.ensurePositivity();
+    return res;
   } else {
     auto parameters = startingProbabilities;
     f.evaluate(parameters);

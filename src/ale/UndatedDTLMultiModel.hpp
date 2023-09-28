@@ -559,6 +559,7 @@ void UndatedDTLMultiModel<REAL>::recomputeSpeciesProbabilities()
       _PT[ec] /= sum;
       _PS[ec] /= sum;
       for (auto &highway: _highways[e]) {
+        assert(highway.highway.proba >= 0.0);
         highway.proba = highway.highway.proba / sum;
         assert(highway.proba < 1.0);
       }
