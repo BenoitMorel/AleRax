@@ -4,9 +4,9 @@
 
 AleRax is a parallel tool for species tree - gene tree reconciliation under gene duplication, loss, and HGT. For each gene family, it takes as input a gene family tree distribution (typically inferred with Bayesian inference tools such as MrBayes, PhyloBayes, etc.). AleRax can perform the following operations:
 * Maximum likelihood species tree inference
-* Species tree rooting (using the DTL events)
-* Model parameter (e.g. DTL event probabilities) inference
-* Reconciled gene tree sampling (we reimplemented [`ALE`](https://github.com/ssolo/ALE)) 
+* Species tree rooting 
+* Model parameter estimation (e.g. DTL event probabilities) 
+* Reconciled gene tree sampling (with the same algorithm as [`ALE`](https://github.com/ssolo/ALE)) 
 
 We are also working on the following features:
 * Relative order of speciation event (relative dating) from HGT constraints
@@ -19,7 +19,7 @@ We will publish a manuscript on bioarxiv very soon!
 * A Linux or MacOS environnement
 * gcc 5.0 or > 
 * CMake 3.6 or >
-* MPI (optional, but required if you want to use parallelization)
+* MPI (required if you want to use parallelization)
 
 ## Installation 
 
