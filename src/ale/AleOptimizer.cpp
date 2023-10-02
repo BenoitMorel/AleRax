@@ -11,6 +11,9 @@
 #include <search/DatedSpeciesTreeSearch.hpp>
 
 
+#define MIN_PH 0.00000001
+#define MAX_PH 0.25
+
 
 static bool testAndSwap(size_t &hash1, size_t &hash2) {
   std::swap(hash1, hash2);
@@ -30,7 +33,7 @@ public:
   
   virtual double evaluatePrint(Parameters &parameters, bool print, const std::string outputDir = "") {
     assert(parameters.dimensions() == _highways.size());
-    parameters.ensurePositivity();
+    parameters.constrain(MIN_PH, MAX_PH);
     for (unsigned int i = 0; i < _highways.size(); ++i)  {
       Highway highwayCopy = *_highways[i];
       highwayCopy.proba = parameters[i];
@@ -611,13 +614,13 @@ static Parameters testHighways(AleEvaluator &evaluator,
     settings.verbose = true;
     if (thorough) {
       settings.individualParamOpt = true;
-      settings.individualParamOptMinImprovement = 10.0;
+      settings.individualParamOptMinImprovement = 10000.0;
     }
     auto res = DTLOptimizer::optimizeParameters(
         f, 
         startingProbabilities, 
         settings);
-    res.ensurePositivity();
+    res.constrain(MIN_PH, MAX_PH);
     return res;
   } else {
     auto parameters = startingProbabilities;
