@@ -17,6 +17,7 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
   gammaCategories(1),
   ccpRooting(CCPRooting::UNIFORM),
   perFamilyRates(false),
+  perSpeciesRates(false),
   memorySavings(false),
   d(0.1),
   l(0.1),
@@ -106,6 +107,8 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       geneTreeSamples = atoi(argv[++i]);
     } else if (arg == "--per-family-rates") {
       perFamilyRates = true;
+    } else if (arg == "--per-species-rates") {
+      perSpeciesRates = true;
     } else if (arg == "--memory-savings") {
       memorySavings = true;
     } else if (arg == "--d") {
@@ -163,6 +166,8 @@ void AleArguments::printSummary() {
   Logger::info << "\tModel parameters: ";
   if (perFamilyRates) {
     Logger::info << " per family" << std::endl;
+  } else if (perSpeciesRates) {
+    Logger::info << " per species" << std::endl;
   } else if (speciesCategoryFile.size()) {
     Logger::info << " per species subtree" << std::endl;
   } else {

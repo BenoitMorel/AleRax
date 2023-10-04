@@ -198,6 +198,18 @@ void initStartingSpeciesTree(AleArguments &args,
   Logger::timed << "Finished starting species tree initialization" << std::endl;
 }
 
+void generatePerSpeciesRateFile(const std::string &perSpeciesRatesFile,
+    const std::string &speciesTreePath)
+{
+  PLLRootedTree speciesTree(speciesTreePath);
+  ParallelOfstream os(perSpeciesRatesFile);
+  for (auto label: speciesTree.getLabels(false)) {
+    os << label << std::endl;
+  }
+  os.close();
+  ParallelContext::barrier();
+}
+
 void run( AleArguments &args)
 {
   Random::setSeed(static_cast<unsigned int>(args.seed));
@@ -246,6 +258,11 @@ void run( AleArguments &args)
   default:
     assert(false);
     break;
+  }
+  if (args.perSpeciesRates) {
+    assert(args.speciesCategoryFile.size() == 0);
+    args.speciesCategoryFile = FileSystem::joinPaths(args.output, "speciesRateCategories.txt");
+    generatePerSpeciesRateFile(args.speciesCategoryFile, args.speciesTree);
   }
   AleOptimizer speciesTreeOptimizer(
       args.speciesTree,

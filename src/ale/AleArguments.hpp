@@ -34,6 +34,7 @@ public:
   std::string speciesCategoryFile;
   bool perFamilyRates;
   bool memorySavings;
+  bool perSpeciesRates;
   double d;
   double l;
   double t;
