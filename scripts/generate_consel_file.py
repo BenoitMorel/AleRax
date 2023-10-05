@@ -12,7 +12,7 @@ def generate_consel_file(output, rundirs):
   families = []
   trees = []
   for rundir in rundirs:
-    tree = "tree" + str(index)
+    tree = "item " + str(index + 1)
     trees.append(tree)
     if (index == 0):
       first_tree = tree
