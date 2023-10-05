@@ -13,6 +13,8 @@
 #include <routines/SlavesMain.hpp>
 #include <IO/HighwayCandidateParser.hpp>
 
+const char *version = "AleRax v1.0.0";
+
 void filterInvalidFamilies(Families &families)
 {
   Logger::timed << "Filtering families" << std::endl;
@@ -218,6 +220,11 @@ void run( AleArguments &args)
   std::string ccpDir = FileSystem::joinPaths(args.output, "ccps");
   FileSystem::mkdir(ccpDir, true);
   Logger::initFileOutput(FileSystem::joinPaths(args.output, "alerax"));
+  
+  Logger::timed << version << std::endl; 
+  args.printCommand();
+  args.printSummary();
+  
   auto families = FamiliesFileParser::parseFamiliesFile(args.families);
   if (!args.skipFamilyFiltering) {
     filterInvalidFamilies(families);
@@ -354,10 +361,8 @@ int genetegrator_main(int argc, char** argv, void* comm)
 {
   ParallelContext::init(comm); 
   Logger::init();
-  Logger::timed << "AleRax v1.0.0" << std::endl; 
+  Logger::timed << version << std::endl; 
   AleArguments args(argc, argv); 
-  args.printCommand();
-  args.printSummary();
   args.checkValid();
   run(args);
   Logger::close();

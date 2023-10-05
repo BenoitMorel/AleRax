@@ -33,8 +33,8 @@ public:
   std::string fractionMissingFile;
   std::string speciesCategoryFile;
   bool perFamilyRates;
-  bool memorySavings;
   bool perSpeciesRates;
+  bool memorySavings;
   double d;
   double l;
   double t;

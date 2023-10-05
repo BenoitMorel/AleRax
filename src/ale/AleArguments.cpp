@@ -37,7 +37,7 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
   maxCladeSplitRatio(DEFAULT_MAX_SPLIT_RATIO),
   sampleFrequency(1),
   geneTreeSamples(DEFAULT_GENE_TREE_SAMPLES),
-  output("GeneTegrator"),
+  output("alerax_output"),
   cleanupCCP(true),
   seed(123),
   randomSpeciesRoot(false),
