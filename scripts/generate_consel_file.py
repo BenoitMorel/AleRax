@@ -63,7 +63,8 @@ def generate_consel_file(output, rundirs):
 
 if (__name__ == "__main__"): 
   if (len(sys.argv) < 4): 
-     print(" Usage: python " + os.path.basename(__file__) + " output_consel_file aleraxrundir1 aleraleraxrundir2 [aleraxrundir3 ...]")
+    print(" Usage: python " + os.path.basename(__file__) + " output_consel_file aleraxrundir1 aleraleraxrundir2 [aleraxrundir3 ...]")
+    sys.exit(1)
   output = sys.argv[1]
   rundirs = sys.argv[2:]
   generate_consel_file(output, rundirs)
