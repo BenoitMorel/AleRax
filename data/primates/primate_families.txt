@@ -1,0 +1,26 @@
+[FAMILIES]
+- family_10725
+gene_tree = data/primates/family_10725/gene_trees/mrbayes.newick
+mapping = data/primates/family_10725/mappings/treerecs_mapping.link
+- family_12270
+gene_tree = data/primates/family_12270/gene_trees/mrbayes.newick
+mapping = data/primates/family_12270/mappings/treerecs_mapping.link
+- family_14916
+gene_tree = data/primates/family_14916/gene_trees/mrbayes.newick
+mapping = data/primates/family_14916/mappings/treerecs_mapping.link
+- family_16338
+gene_tree = data/primates/family_16338/gene_trees/mrbayes.newick
+mapping = data/primates/family_16338/mappings/treerecs_mapping.link
+- family_2855
+gene_tree = data/primates/family_2855/gene_trees/mrbayes.newick
+mapping = data/primates/family_2855/mappings/treerecs_mapping.link
+- family_497
+gene_tree = data/primates/family_497/gene_trees/mrbayes.newick
+mapping = data/primates/family_794/mappings/treerecs_mapping.link
+- family_5579
+gene_tree = data/primates/family_5579/gene_trees/mrbayes.newick
+mapping = data/primates/family_5579/mappings/treerecs_mapping.link
+- family_381
+gene_tree = data/primates/family_381/gene_trees/mrbayes.newick
+mapping = data/primates/family_381/mappings/treerecs_mapping.link
+
