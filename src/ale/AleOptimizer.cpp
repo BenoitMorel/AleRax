@@ -215,6 +215,7 @@ void AleOptimizer::saveSupportTree()
   auto outKH = Paths::getSpeciesTreeFile(_outputDir, 
         "species_tree_support_kh.newick");
   _searchState.saveSpeciesTreeKH(outKH);
+  Logger::info << "save support tree " << outKH << std::endl;
   auto outBP = Paths::getSpeciesTreeFile(_outputDir, 
         "species_tree_support_bp.newick");
   _searchState.saveSpeciesTreeBP(outBP);
