@@ -3,11 +3,11 @@
 # AleRax  
 
 AleRax is a parallel tool for species tree - gene tree inference and reconciliation under gene duplication, loss, and HGT. For each gene family, it takes as input a gene tree distribution (typically inferred with Bayesian inference tools such as MrBayes, PhyloBayes, etc.). AleRax can perform the following operations:
-* Maximum likelihood species tree inference
+* Species tree inference
 * Species tree rooting 
-* Model parameter estimation (e.g. DTL event probabilities) 
 * Reconciled gene tree sampling 
-* Statistical test of different species tree hypotheses (using Consel)
+* Model parameter estimation (e.g. DTL event probabilities) 
+* Statistical test of different species tree hypotheses (you'll need to instal consel)
   
 We are also working on the following features:
 * Relative order of speciation event (relative dating) from HGT constraints
@@ -55,7 +55,7 @@ build/bin/alerax
 
 ## Updating to the last stable version
 
-In case we've made some changes since the last time you updated your repository, you can get and install the most recent version of generax with:
+In case we've made some changes since the last time you updated your repository, you can get and install the most recent version of AleRax with:
 
 ```
 ./gitpull.sh # does a bit more than git pull
@@ -70,8 +70,8 @@ See the wiki (https://github.com/BenoitMorel/AleRax/wiki)
 
 ## Issues and questions
 
-If you encounter any issue, please report it!! We are always happy to help.
+If you encounter any issue, please report it!! I'm always happy to help.
 For questions, issues or feedback, please post on the GeneRax (even if it's AleRax) google group: https://groups.google.com/g/generaxusers.
-When reporting an issue, please send us at least the command line you ran, the logs file, and any file that might be relevant (e.g. the species tree file if AleRax failed to read the species tree... 
+When reporting an issue, please send me at least the command line you ran, the logs file, and any file that might be relevant (e.g. the species tree file if AleRax failed to read the species tree...)
 
 
