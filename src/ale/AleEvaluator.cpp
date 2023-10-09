@@ -8,7 +8,7 @@
 #include <search/SpeciesTransferSearch.hpp>
 #include <search/DatedSpeciesTreeSearch.hpp>
 #include <memory>  
-
+#include <algorithm>
 
 static std::shared_ptr<MultiModel> createModel(SpeciesTree &speciesTree,
   const FamilyInfo &family,
@@ -491,7 +491,7 @@ struct ScoredString {
     str(str), score(score)
   {}
 
-  bool operator < (const ScoredString &other) {
+  bool operator < (const ScoredString &other) const {
     if (score == other.score) {
       return str < other.str;
     }

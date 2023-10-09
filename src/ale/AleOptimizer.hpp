@@ -26,7 +26,7 @@ struct ScoredHighway {
   Highway highway;
   double score;
   double scoreDiff;
-  bool operator < (const ScoredHighway &other) {
+  bool operator < (const ScoredHighway &other) const {
     return score < other.score;
   }
 };

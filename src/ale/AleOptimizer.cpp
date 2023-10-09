@@ -383,7 +383,7 @@ static void saveFamiliesTakingHighway(const Highway &highway,
     ScoredFamily(double score, const std::string &familyName): score(score), familyName(familyName) {}
     double score;
     std::string familyName;
-    bool operator < (const ScoredFamily &other) {
+    bool operator < (const ScoredFamily &other) const {
       return score < other.score;
     }
   };
