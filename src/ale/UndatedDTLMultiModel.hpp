@@ -284,6 +284,10 @@ void UndatedDTLMultiModel<REAL>::setAlpha(double alpha)
 }
 
 
+/*
+ *  We fill the intermediate likelihood table (P_{e,u} in the paper) for a given
+ *  gene CCP
+ */
 template <class REAL>
 void UndatedDTLMultiModel<REAL>::updateCLV(CID cid)
 {
@@ -299,8 +303,8 @@ void UndatedDTLMultiModel<REAL>::updateCLV(CID cid)
   std::fill(clv._survivingTransferSum.begin(), 
       clv._survivingTransferSum.end(), 
       REAL());
-  // if we want to account for TL events, we have to 
-  // reiterate several times
+  // iterate several times to resolve the TL term with 
+  // fixed point optimizaiton
   for (unsigned int it = 0; it < maxIt; ++it) {
     std::vector<REAL> sums(_gammaCatNumber, REAL());
     for (auto speciesNode: this->getPrunedSpeciesNodes()) {
@@ -323,6 +327,8 @@ void UndatedDTLMultiModel<REAL>::updateCLV(CID cid)
     std::fill(clv._survivingTransferSum.begin(), 
         clv._survivingTransferSum.end(), 
         REAL());
+    // precompute ancestral correction sum 
+    // (to forbid transfers to parents) 
     if (_transferConstraint == TransferConstaint::PARENTS) {
       auto postOrder = this->_speciesTree.getPostOrderNodes();
       for (auto it = postOrder.rbegin();
@@ -343,6 +349,8 @@ void UndatedDTLMultiModel<REAL>::updateCLV(CID cid)
         }
       }
     }
+    // precompute the related correction sum
+    // (to forbit transfers to older lineages)
     if (_transferConstraint == TransferConstaint::RELDATED) {
       std::vector<REAL> softDatedSums(N * _gammaCatNumber, REAL());
       std::vector<REAL> softDatedSum(_gammaCatNumber, REAL());
@@ -688,7 +696,7 @@ bool UndatedDTLMultiModel<REAL>::computeProbability(CID cid,
     gc = g * _gammaCatNumber + c;
   }
  
-  // for internal gene nodes
+  // iterate over all gene CCPs
   for (const auto &cladeSplit: this->_ccp.getCladeSplits(cid)) {
     auto cidLeft = cladeSplit.left; 
     auto cidRight = cladeSplit.right;
@@ -812,7 +820,7 @@ bool UndatedDTLMultiModel<REAL>::computeProbability(CID cid,
         return true;
       }
     }
-  } // iteration of cids
+  } // end of the iteraiton over the gene CCPs
 
   if (not isSpeciesLeaf) {
     // SL event
@@ -893,7 +901,10 @@ bool UndatedDTLMultiModel<REAL>::computeProbability(CID cid,
   }
   return true;
 }
-  
+
+/**
+ *  Correction factor because we condition on survival
+ */
 template <class REAL>
 double UndatedDTLMultiModel<REAL>::getLikelihoodFactor(unsigned int category) 
 {

@@ -231,8 +231,8 @@ void run( AleArguments &args)
   }
   auto ccpDimensionFile = FileSystem::joinPaths(args.output, "ccpdim.txt");
   generateCCPs(ccpDir, ccpDimensionFile, families, args.ccpRooting, args.sampleFrequency);
-  trimFamilies(families, args.minCoveredSpecies, args.trimFamilyRatio,
-      args.maxCladeSplitRatio);
+  //trimFamilies(families, args.minCoveredSpecies, args.trimFamilyRatio,
+   //   args.maxCladeSplitRatio);
   if (families.size() == 0) {
     Logger::info << "No valid family, aborting" << std::endl;
     ParallelContext::abort(0);
@@ -271,6 +271,7 @@ void run( AleArguments &args)
     args.speciesCategoryFile = FileSystem::joinPaths(args.output, "speciesRateCategories.txt");
     generatePerSpeciesRateFile(args.speciesCategoryFile, args.speciesTree);
   }
+  // init the optimizer
   AleOptimizer speciesTreeOptimizer(
       args.speciesTree,
       families,
@@ -284,6 +285,7 @@ void run( AleArguments &args)
     Logger::timed << "Random root position!" << std::endl;
     speciesTreeOptimizer.randomizeRoot();
   }
+  // Species tree search or root search
   switch (args.speciesSearchStrategy) {
   case SpeciesSearchStrategy::HYBRID:
     speciesTreeOptimizer.optimize();
@@ -291,7 +293,7 @@ void run( AleArguments &args)
   case SpeciesSearchStrategy::REROOT:
     speciesTreeOptimizer.optimizeModelRates(true);
     Logger::timed << "First root search, non thorough" << std::endl;
-    speciesTreeOptimizer.rootSearch(2, false);
+    speciesTreeOptimizer.rootSearch(5, false);
     Logger::timed << "Second root search, thorough" << std::endl;
     speciesTreeOptimizer.rootSearch(2, true);
     break;
@@ -302,10 +304,12 @@ void run( AleArguments &args)
     break;
   }
   speciesTreeOptimizer.optimizeModelRates(false);
+  // Relative dating of the species tree
   if (args.inferSpeciationOrders) {
     speciesTreeOptimizer.optimizeDates(true);
     speciesTreeOptimizer.getEvaluator().computeLikelihood();
   }
+  // Infer the highways
   if (args.highways) {
     auto highwaysOutputDir =  FileSystem::joinPaths(args.output, "highways");
   FileSystem::mkdir(highwaysOutputDir, true);
@@ -325,11 +329,15 @@ void run( AleArguments &args)
       // automatically search for candidates
       speciesTreeOptimizer.getCandidateHighways(candidateHighways, args.highwayCandidatesStep1);
     }
-    // first filtering step
+    // first filtering step: we add each highway candidate individually, set a small highway
+    // probability, and keep the highway if the likelihood improves. We also sort the
+    // highways per likelihood
     std::vector<ScoredHighway> filteredHighways;
     speciesTreeOptimizer.filterCandidateHighwaysFast(candidateHighways, filteredHighways);
     filteredHighways.resize(std::min(filteredHighways.size(), size_t(args.highwayCandidatesStep2)));
     std::vector<ScoredHighway> bestHighways;
+    // optimize each highway probability individually. 
+    // TODO: remove this step
     if (!args.highwaysSkipIndividualOptimization) {
       speciesTreeOptimizer.selectBestHighways(filteredHighways, bestHighways);
       speciesTreeOptimizer.saveBestHighways(bestHighways,
@@ -337,6 +345,7 @@ void run( AleArguments &args)
     } else {
       bestHighways = filteredHighways;
     }
+    // now optimize all highways together
     auto acceptedHighwayOutput = FileSystem::joinPaths(highwaysOutputDir,
       "highway_accepted_highways.txt");
     std::vector<ScoredHighway> acceptedHighways;
@@ -344,9 +353,11 @@ void run( AleArguments &args)
     speciesTreeOptimizer.saveBestHighways(acceptedHighways,
         acceptedHighwayOutput);
   }
+  // one last round of DTL rate optimization
   if (!args.skipThoroughRates) {
     speciesTreeOptimizer.optimizeModelRates(true);
   }
+  // sample reconciled gene trees
   Logger::timed <<"Sampling reconciled gene trees... (" << args.geneTreeSamples  << " samples)" << std::endl;
   speciesTreeOptimizer.reconcile(args.geneTreeSamples);
   speciesTreeOptimizer.saveSpeciesTree(); 
