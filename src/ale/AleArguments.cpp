@@ -99,7 +99,7 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       gammaCategories = atoi(argv[++i]);
     } else if (arg == "--gene-tree-rooting") {
       ccpRooting = ArgumentsHelper::strToCCPRooting(std::string(argv[++i]));
-    } else if (arg == "--fraction-missing") {
+    } else if (arg == "--fraction-missing-file") {
       fractionMissingFile = argv[++i];
     } else if (arg == "--species-categories") {
       speciesCategoryFile = argv[++i];
@@ -259,7 +259,7 @@ void AleArguments::printHelp()
   Logger::info << "\t-r --rec-model <reconciliationModel>  {UndatedDL, UndatedDTL}" << std::endl;
   Logger::info << "\t--transfer-constraint {NONE, PARENTS, RELDATED}" << std::endl;
   Logger::info << "\t--prune-species-tree" << std::endl;
-  Logger::info << "\t--speciies-categories filepath" << std::endl; 
+  Logger::info << "\t--species-categories filepath" << std::endl; 
   Logger::info << "\t--speciation-probability-categories <VALUE>" << std::endl; 
   Logger::info << "\t--gene-tree-rooting {UNIFORM, ROOTED}" << std::endl;
   Logger::info << "\t--fraction-missing-file <filepath>" << std::endl;
