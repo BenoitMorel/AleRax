@@ -30,7 +30,7 @@ void filterInvalidFamilies(Families &families)
       Logger::error << "Can't open input gene trees for family " << family.name << std::endl;
       continue;
     }
-    if (families.mappingFile.size()) {
+    if (family.mappingFile.size()) {
       // check that the mapping file exists if it is set
       std::ifstream isMap(family.mappingFile);
       if (!isMap || isMap.peek() == std::ifstream::traits_type::eof()) {
