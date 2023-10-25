@@ -15,15 +15,28 @@
 
 const char *version = "AleRax v1.0.0";
 
+
+/**
+ *  Check the validity of each gene family 
+ */
 void filterInvalidFamilies(Families &families)
 {
   Logger::timed << "Filtering families" << std::endl;
   Families validFamilies;
   for (const auto &family: families) {
+    // check that the gene tree distribution file exists
     std::ifstream is(family.startingGeneTree);
     if (!is || is.peek() == std::ifstream::traits_type::eof()) {
       Logger::error << "Can't open input gene trees for family " << family.name << std::endl;
       continue;
+    }
+    if (families.mappingFile.size()) {
+      // check that the mapping file exists if it is set
+      std::ifstream isMap(family.mappingFile);
+      if (!isMap || isMap.peek() == std::ifstream::traits_type::eof()) {
+        Logger::error << "Can't open the mapping file for family " << family.name << std::endl;
+        continue;
+      }
     }
     validFamilies.push_back(family);  
   }
@@ -31,6 +44,9 @@ void filterInvalidFamilies(Families &families)
 }
 
 
+/**
+ *
+ */
 bool checkCCP(FamilyInfo &family,
     ConditionalClades &ccp, 
     std::unordered_set<std::string> &allSpecies)

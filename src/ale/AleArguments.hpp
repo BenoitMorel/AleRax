@@ -5,16 +5,40 @@
 #include "IO/ArgumentsHelper.hpp"
 
   
-
+/**
+ *  Parse and store the program arguments
+ */
 class AleArguments {
 public:
+  /**
+   *  Parse the arguments from main()
+   */
   AleArguments(int argc, char * argv[]);
+
+  /**
+   *  Print AleRax' help message
+   */
   void printHelp();
+  
+  /**
+   *  Print the command line used to call the AleRax' executable
+   */
   void printCommand();
+
+  /**
+   *  Write a user-friendly summary of the most important 
+   *  parameters set by the user
+   */
   void printSummary();
+
+  /**
+   *  Check that the arguments are compatible with each other
+   *  If not, terminates the program with an explicit error message
+   */
   void checkValid();
 public:
-  
+ 
+  // the parameters of the main() function
   int argc;
   char ** argv;
 
@@ -38,7 +62,6 @@ public:
   double d;
   double l;
   double t;
-
 
   // search
   SpeciesTreeAlgorithm speciesTreeAlgorithm;
