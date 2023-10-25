@@ -20,9 +20,10 @@ except:
 def is_mpi_installed():
   return find_executable("mpiexec") is not None
 
-def get_test_name(dataset, model, cores):
+def get_test_name(dataset, model, heterogeneity, cores):
   test_name = dataset
   test_name += "_" + model
+  test_name += "_" + heterogeneity
   test_name += "_" + str(cores)
   return test_name
 
@@ -93,7 +94,7 @@ def check_reconciliation(test_output, model):
       return False;
   return True
 
-def run_alerax(test_data, test_output, families_file, model, cores):
+def run_alerax(test_data, test_output, families_file, model, heterogeneity, cores):
   command = []
   if (cores > 1):
     command.append("mpiexec")
@@ -106,6 +107,10 @@ def run_alerax(test_data, test_output, families_file, model, cores):
   command.append(os.path.join(test_data, "speciesTree.newick"))
   command.append("--rec-model")
   command.append(model)
+  if (heterogeneity == "species"):
+      command.append("--per-species-rates")
+  if (heterogeneity == "families"):
+      command.append("--per-family-rates")
   command.append("-p")
   command.append(os.path.join(test_output, "alerax"))
   logs_file_path = os.path.join(test_output, "tests_logs.txt")
@@ -118,15 +123,15 @@ def run_alerax(test_data, test_output, families_file, model, cores):
       raise inst
 
 
-def run_test(dataset, model, cores):
-  test_name = get_test_name(dataset, model, cores)
+def run_test(dataset, model, heterogeneity, cores):
+  test_name = get_test_name(dataset, model, heterogeneity, cores)
   test_output = os.path.join(OUTPUT, test_name)
   reset_dir(test_output)
   test_data = os.path.join(DATA_DIR, dataset)
   #ok = check_reconciliation(test_output, model)
   try:
     families_file = generate_families_file_data(test_data, test_output)
-    run_alerax(test_data, test_output, families_file, model, cores)
+    run_alerax(test_data, test_output, families_file, model, heterogeneity, cores)
     print("Test " + test_name + ": ok") 
   except Exception as inst:
     print(inst)
@@ -136,6 +141,7 @@ def run_test(dataset, model, cores):
 
 
 dataset_set = ["simulated_2"]
+heterogeneity_set = ["global", "families", "species"]
 model_set = ["UndatedDL", "UndatedDTL"]
 cores_set = [1]
 if (is_mpi_installed()):
@@ -144,8 +150,9 @@ if (is_mpi_installed()):
 all_ok = True
 for dataset in dataset_set:
   for model in model_set:
-    for cores in cores_set:
-      all_ok = all_ok and run_test(dataset, model, cores)
+    for heterogeneity in heterogeneity_set:
+      for cores in cores_set:
+        all_ok = all_ok and run_test(dataset, model, heterogeneity, cores)
 
 if (not all_ok):
   print("[Error] Some tests failed, please fix them!")
