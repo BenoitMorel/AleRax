@@ -21,9 +21,23 @@ using MultiEvaluationPtr =
 using PerCoreMultiEvaluation = std::vector<MultiEvaluationPtr>;
 
 
-
+/**
+ *  Implement the main functions to evaluate the species tree likelihood 
+ *  and to sample reconciliations
+ */
 class AleEvaluator: public SpeciesTreeLikelihoodEvaluatorInterface {
 public:
+  /**
+   *  Constructor
+   *
+   *  @param speciesTree The instance of the species tree 
+   *  @param modelRates The instance of the model parameters
+   *  @param optimizeRates If set to false, model parameter optimization will be skipped
+   *  @param optimizeVerbose If set to true, the optimization routines will print more logs
+   *  @param families The gene family descriptions
+   *  @param geneTrees List of the gene families assigned to the MPI rank
+   *  @param outputDir AleRax' output directory
+   */
   AleEvaluator(SpeciesTree &speciesTree,
       AleModelParameters &modelRates, 
       bool optimizeRates,
@@ -31,26 +45,75 @@ public:
       const Families &families,
       PerCoreGeneTrees &geneTrees,
       const std::string &outputDir);
+  /**
+   *  Destructor
+   */
   virtual ~AleEvaluator() {}
+
+  /**
+   *  Compute the species tree likelihood
+   *  
+   *  @brief perFamLL Structure to store the per-family likelihoods (if set)
+   *  @return The log likelihood
+   */
   virtual double computeLikelihood(PerFamLL *perFamLL = nullptr); 
+
+  /**
+   *  Fast approximated version of computeLikelihood, used by some
+   *  of the optimization heuristics to speedup the search, unless
+   *  providesFastLikelihoodImpl return false (and so far it returns false)
+   */
   virtual double computeLikelihoodFast();
-  double computeFamilyLikelihood(unsigned int i);
   virtual bool providesFastLikelihoodImpl() const {return false;}
-  virtual bool isDated() const {return _modelRates.getInfo().isDated();}
+  
+  /**
+   * Compute the likelihood of family i (using the _geneTrees indexing)
+   */
+  double computeFamilyLikelihood(unsigned int i);
+  
+  /**
+   *  Optimize the model rates
+   *
+   *  TODO: move it to AleOptimizer
+   */
   virtual double optimizeModelRates(bool thorough);
-  virtual void pushRollback() {}
-  virtual void popAndApplyRollback() {}
+  
+  /**
+   *  Return true if the reconciliation model is dated
+   */ 
+  virtual bool isDated() const {return _modelRates.getInfo().isDated();}
+  
+  /**
+   *  Sample reconciliations and returns the HGT frequencies and 
+   *  per-species events (see 
+   *
+   *  See description in the parent class
+   */ 
   virtual void getTransferInformation(SpeciesTree &speciesTree,
     TransferFrequencies &frequencies,
     PerSpeciesEvents &perSpeciesEvents,
     PerCorePotentialTransfers &potentialTransfers);
+  
+  /**
+   *  Are we in prune species tree mode?
+   */
   virtual bool pruneSpeciesTree() const {return _modelRates.getInfo().pruneSpeciesTree;}
+  
+  /**
+   * Set the alpha parameter of the gamma function for the family rate categories
+   */
   virtual void setAlpha(double alpha);
   virtual void setParameters(Parameters &parameters);
   virtual void setFamilyParameters(unsigned int family, Parameters &parameters);
   virtual void onSpeciesDatesChange();  
   virtual void onSpeciesTreeChange(
       const std::unordered_set<corax_rnode_t *> *nodesToInvalidate);
+  /**
+   *  See description in the parent class
+   *  We don't need to implement those functions in AleRax
+   */
+  virtual void pushRollback() {}
+  virtual void popAndApplyRollback() {}
   void printHightPrecisionCount();
   MultiModel &getEvaluation(unsigned int i) {return *_evaluations[i];}
 

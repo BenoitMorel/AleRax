@@ -160,6 +160,11 @@ void AleArguments::printSummary() {
     break;
   }
   Logger::info << "\tOutput directory: " << output << std::endl;
+#ifdef WITH_MPI
+  Logger::info << "\tMPI Ranks: " << ParallelContext::getSize() << std::endl;
+#else
+  Logger::info << "\tYou are running GeneRax without MPI (no parallelization)" << std::endl;
+#endif
   Logger::info << "\tNumber of reconciled gene trees to sample: " << geneTreeSamples << std::endl;
   Logger::info << "\tRandom seed: " << seed << std::endl;
   Logger::info << "\tReconciliation model: " << reconciliationModelStr << std::endl;

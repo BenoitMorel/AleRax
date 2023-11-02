@@ -5,6 +5,7 @@
 #include <IO/Logger.hpp>
 #include <IO/FileSystem.hpp>
 #include <IO/FamiliesFileParser.hpp>
+#include <IO/Families.hpp>
 #include "AleOptimizer.hpp"
 #include "TrimFamilies.hpp"
 #include <util/Paths.hpp>
@@ -17,7 +18,9 @@ const char *version = "AleRax v1.0.0";
 
 
 /**
- *  Check the validity of each gene family 
+ *  Check the validity of each gene family: 
+ *  - check that the gene tree files exist
+ *  - if set, check that the mapping files exist
  */
 void filterInvalidFamilies(Families &families)
 {
@@ -45,7 +48,97 @@ void filterInvalidFamilies(Families &families)
 
 
 /**
+ * Callback for getSortedIndices 
+ */
+bool compare(unsigned int a, unsigned int b, const std::vector<unsigned int> &data)
+{
+      return data[a]<data[b];
+}
+
+/**
+ *  Return the indices of the input vector, sorted in descending order
+ */
+std::vector<unsigned int> getSortedIndices(const std::vector<unsigned int> &values)
+{
+  std::vector<unsigned int> indices(values.size());
+  std::iota(std::begin(indices), std::end(indices), 0);
+  std::sort(std::rbegin(indices), std::rend(indices), std::bind(compare,  std::placeholders::_1, std::placeholders::_2, values)); 
+  return indices;
+}
+
+/**
+ *  Read the gene tree distribution files (or the .ale files), compute
+ *  the corresponding CCP objects, and serialize them to a binary file
+ *  Each MPI rank will run this function on a subset of the families
  *
+ *  @param ccpDir Output directory to store the seralized files
+ *  @param ccpDimensionFile Output file with the per-family ccp sizes
+ *  @param families The gene families to process
+ *  @param ccpRooting Mode to decide how to deal with rooted gene trees
+ *  @param sampleFrequency Number used to subsample the gene trees (if set to 2, we only use half)
+ *
+ *
+ */
+void generateCCPs(const std::string &ccpDir, 
+    const std::string &ccpDimensionFile,
+    Families &families, 
+    CCPRooting ccpRooting,
+    unsigned int sampleFrequency)
+{
+  ParallelContext::barrier();
+  Logger::timed << "Generating ccp files..." << std::endl;
+  for (auto &family: families) {
+    family.ccp = FileSystem::joinPaths(ccpDir, family.name + ".ccp");
+  } 
+  auto N = families.size();
+  
+  std::vector<unsigned int> familyIndices;
+  std::vector<unsigned int> treeSizes;
+  std::vector<unsigned int> ccpSizes;
+  for (auto i = ParallelContext::getBegin(N); i < ParallelContext::getEnd(N); i ++) {
+    // Read and seralize the ccps
+    ConditionalClades ccp(families[i].startingGeneTree, families[i].likelihoodFile, ccpRooting, sampleFrequency);
+    ccp.serialize(families[i].ccp);
+    // record the dimensions for subsequent sorting
+    familyIndices.push_back(i);
+    treeSizes.push_back(ccp.getLeafNumber());
+    ccpSizes.push_back(ccp.getCladesNumber());
+  }
+  ParallelContext::barrier();
+  // Gather the family ccp dimensions from all MPI ranks
+  ParallelContext::concatenateHetherogeneousUIntVectors(familyIndices, familyIndices);
+  ParallelContext::concatenateHetherogeneousUIntVectors(treeSizes, treeSizes);
+  ParallelContext::concatenateHetherogeneousUIntVectors(ccpSizes, ccpSizes);
+  // Output the families and there cpp sizes, from the largest to the smallest
+  ParallelOfstream os(ccpDimensionFile);
+  assert(familyIndices.size() == families.size());
+  auto sortedIndices = getSortedIndices(ccpSizes);
+  for (unsigned int i = 0; i < familyIndices.size(); ++i) {
+    auto j = sortedIndices[i];
+    os << families[familyIndices[j]].name << ",";
+    os << treeSizes[j] << "," << ccpSizes[j] << std::endl;
+  }
+
+  ParallelContext::barrier();
+}
+
+/**
+ *  Remove the serialized CCP files to free some disk space
+ */
+void cleanupCCPs(Families &families) 
+{
+  ParallelContext::barrier();
+  Logger::timed << "Cleaning up ccp files..." << std::endl;
+  for (const auto &family: families) {
+    std::remove(family.ccp.c_str());
+  }
+  ParallelContext::barrier();
+}
+
+
+/**
+ *  Check that a family conditional clade probability object
+ *  is valid: check that the mapping gene <-> species is bijective
  */
 bool checkCCP(FamilyInfo &family,
     ConditionalClades &ccp, 
@@ -71,69 +164,9 @@ bool checkCCP(FamilyInfo &family,
   return true;
 }
 
-
-bool compare(unsigned int a, unsigned int b, const std::vector<unsigned int> &data)
-{
-      return data[a]<data[b];
-}
-
-std::vector<unsigned int> getSortedIndices(const std::vector<unsigned int> &values)
-{
-  std::vector<unsigned int> indices(values.size());
-  std::iota(std::begin(indices), std::end(indices), 0);
-  std::sort(std::rbegin(indices), std::rend(indices), std::bind(compare,  std::placeholders::_1, std::placeholders::_2, values)); 
-  return indices;
-}
-
-void generateCCPs(const std::string &ccpDir, 
-    const std::string &ccpDimensionFile,
-    Families &families, 
-    CCPRooting ccpRooting,
-    unsigned int sampleFrequency)
-{
-  ParallelContext::barrier();
-  Logger::timed << "Generating ccp files..." << std::endl;
-  for (auto &family: families) {
-    family.ccp = FileSystem::joinPaths(ccpDir, family.name + ".ccp");
-  } 
-  auto N = families.size();
-  
-  std::vector<unsigned int> familyIndices;
-  std::vector<unsigned int> treeSizes;
-  std::vector<unsigned int> ccpSizes;
-  for (auto i = ParallelContext::getBegin(N); i < ParallelContext::getEnd(N); i ++) {
-    ConditionalClades ccp(families[i].startingGeneTree, families[i].likelihoodFile, ccpRooting, sampleFrequency);
-    ccp.serialize(families[i].ccp);
-    familyIndices.push_back(i);
-    treeSizes.push_back(ccp.getLeafNumber());
-    ccpSizes.push_back(ccp.getCladesNumber());
-  }
-  ParallelContext::barrier();
-  ParallelContext::concatenateHetherogeneousUIntVectors(familyIndices, familyIndices);
-  ParallelContext::concatenateHetherogeneousUIntVectors(treeSizes, treeSizes);
-  ParallelContext::concatenateHetherogeneousUIntVectors(ccpSizes, ccpSizes);
-  ParallelOfstream os(ccpDimensionFile);
-  assert(familyIndices.size() == families.size());
-  auto sortedIndices = getSortedIndices(ccpSizes);
-  for (unsigned int i = 0; i < familyIndices.size(); ++i) {
-    auto j = sortedIndices[i];
-    os << families[familyIndices[j]].name << ",";
-    os << treeSizes[j] << "," << ccpSizes[j] << std::endl;
-  }
-
-  ParallelContext::barrier();
-}
-
-void cleanupCCPs(Families &families) 
-{
-  ParallelContext::barrier();
-  Logger::timed << "Cleaning up ccp files..." << std::endl;
-  for (const auto &family: families) {
-    std::remove(family.ccp.c_str());
-  }
-  ParallelContext::barrier();
-}
-
+/**
+ *  Run checkCCP on all gene families
+ */
 void checkCCPAndSpeciesTree(Families &families,
     const std::string &speciesTreePath)
 {
@@ -152,6 +185,14 @@ void checkCCPAndSpeciesTree(Families &families,
   }
 }
 
+/**
+ *  Exclude families that are too large or with too much uncertainty
+ *  
+ *  @param families The set of families to trim
+ *  @param minSpecies Species that cover less than minSpecies species will be trimmed
+ *  @param trimRatio Proportion of families to trim, starting from the largest ones
+ *  @param maxCladeSplitRatio Trim families with (ccp size) / (gene tree size) < maxCladeSplitRatio 
+ */
 void trimFamilies(Families &families, int minSpecies, double trimRatio,
     double maxCladeSplitRatio) 
 {
@@ -175,6 +216,17 @@ void trimFamilies(Families &families, int minSpecies, double trimRatio,
   }
 }
 
+/**
+ *  @brief Generate or read the initial species tree
+ *
+ *  Can be either:
+ *  - random
+ *  - use-defined
+ *  - computed with MiniNJ
+ *
+ *  @brief args The program arguments
+ *  @brief families The gene family descriptions
+ */
 void initStartingSpeciesTree(AleArguments &args,
     Families &families)
 {
@@ -216,6 +268,11 @@ void initStartingSpeciesTree(AleArguments &args,
   Logger::timed << "Finished starting species tree initialization" << std::endl;
 }
 
+/**
+ *  If --per-species-rate is set, we generate the file that lists
+ *  the species categories (here, each species has its own category)
+ *  that share the same DTL parameters
+ */
 void generatePerSpeciesRateFile(const std::string &perSpeciesRatesFile,
     const std::string &speciesTreePath)
 {
@@ -228,6 +285,12 @@ void generatePerSpeciesRateFile(const std::string &perSpeciesRatesFile,
   ParallelContext::barrier();
 }
 
+
+/**
+ * Main function of AleRax once the arguments have been parsed
+ *
+ * @param args The program arguments
+ */
 void run( AleArguments &args)
 {
   Random::setSeed(static_cast<unsigned int>(args.seed));
@@ -287,6 +350,10 @@ void run( AleArguments &args)
     args.speciesCategoryFile = FileSystem::joinPaths(args.output, "speciesRateCategories.txt");
     generatePerSpeciesRateFile(args.speciesCategoryFile, args.speciesTree);
   }
+ 
+  std::string coverageFile(FileSystem::joinPaths(args.output, "fractionMissing.txt"));
+  std::string fractionMissingFile(FileSystem::joinPaths(args.output, "perSpeciesCoverage.txt"));
+  Family::printStats(families, args.speciesTree, coverageFile, fractionMissingFile);
   // init the optimizer
   AleOptimizer speciesTreeOptimizer(
       args.speciesTree,
@@ -384,7 +451,7 @@ void run( AleArguments &args)
   Logger::timed <<"End of the execution" << std::endl;
 }
 
-int genetegrator_main(int argc, char** argv, void* comm)
+int alerax_main(int argc, char** argv, void* comm)
 {
   ParallelContext::init(comm); 
   Logger::init();
@@ -403,7 +470,7 @@ int internal_main(int argc, char** argv, void* comm)
     int slaveComm = -1; 
     return static_scheduled_main(argc, argv, &slaveComm);
   } else {
-    return genetegrator_main(argc, argv, comm);
+    return alerax_main(argc, argv, comm);
   }
 }
 
