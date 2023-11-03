@@ -310,8 +310,8 @@ void run( AleArguments &args)
   }
   auto ccpDimensionFile = FileSystem::joinPaths(args.output, "ccpdim.txt");
   generateCCPs(ccpDir, ccpDimensionFile, families, args.ccpRooting, args.sampleFrequency);
-  //trimFamilies(families, args.minCoveredSpecies, args.trimFamilyRatio,
-   //   args.maxCladeSplitRatio);
+  trimFamilies(families, args.minCoveredSpecies, args.trimFamilyRatio,
+     args.maxCladeSplitRatio);
   if (families.size() == 0) {
     Logger::info << "No valid family, aborting" << std::endl;
     ParallelContext::abort(0);
