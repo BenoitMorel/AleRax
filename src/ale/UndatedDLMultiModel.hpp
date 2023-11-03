@@ -61,7 +61,7 @@ UndatedDLMultiModel<REAL>::UndatedDLMultiModel(PLLRootedTree &speciesTree,
   std::vector<REAL> zeros(this->getAllSpeciesNodeNumber(), REAL());
   _dlclvs = std::vector<std::vector<REAL> >(
       this->_ccp.getCladesNumber(), zeros);
-  for (unsigned int e = 0; e < this->getPrunedSpeciesNodeNumber(); ++e) {
+  for (unsigned int e = 0; e < this->_speciesTree.getNodeNumber(); ++e) {
     double sum = _PD[e] + _PL[e] + _PS[e];
     _PD[e] /= sum;
     _PL[e] /= sum;

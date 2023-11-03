@@ -256,7 +256,7 @@ UndatedDTLMultiModel<REAL>::UndatedDTLMultiModel(DatedTree &speciesTree,
 template<class REAL> 
 void UndatedDTLMultiModel<REAL>::allocateMemory()
 {
-  DTLCLV nullCLV(this->getPrunedSpeciesNodeNumber(), _gammaCatNumber);
+  DTLCLV nullCLV(this->_speciesTree.getNodeNumber(), _gammaCatNumber);
   _dtlclvs = std::vector<DTLCLV>(2 * (this->_ccp.getCladesNumber()), nullCLV);
 }
 
