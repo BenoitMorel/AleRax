@@ -98,6 +98,11 @@ void generateCCPs(const std::string &ccpDir,
   for (auto i = ParallelContext::getBegin(N); i < ParallelContext::getEnd(N); i ++) {
     // Read and seralize the ccps
     ConditionalClades ccp(families[i].startingGeneTree, families[i].likelihoodFile, ccpRooting, sampleFrequency);
+    if (!ccp.isValid()) {
+      Logger::error << "Invalid CCP for family " << families[i].name << std::endl;
+      Logger::error << "Aborting" << std::endl;
+      ParallelContext::abort(1);
+    }
     ccp.serialize(families[i].ccp);
     // record the dimensions for subsequent sorting
     familyIndices.push_back(i);
