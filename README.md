@@ -53,6 +53,12 @@ The generated executable is located here:
 build/bin/alerax
 ```
 
+To copy the executable to your PATH, such that you can call alerax from anywhere:
+```
+cd build
+sudo make install
+```
+
 ## Updating to the last stable version
 
 In case we've made some changes since the last time you updated your repository, you can get and install the most recent version of AleRax with:
