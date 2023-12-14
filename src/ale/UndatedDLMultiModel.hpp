@@ -32,6 +32,7 @@ private:
   std::vector<double> _uE; // Extinction probability, per species branch
   using DLCLV = std::vector<REAL>;
   std::vector<DLCLV> _dlclvs;
+  RatesVector _dlRates;
 
   REAL getLikelihoodFactor();
   virtual void recomputeSpeciesProbabilities();
@@ -74,23 +75,7 @@ template <class REAL>
 void UndatedDLMultiModel<REAL>::setRates(const RatesVector &rates) 
 {
   assert(rates.size() == 2);
-  auto &dupRates = rates[0];
-  auto &lossRates = rates[1];
-  assert(this->getAllSpeciesNodeNumber() == dupRates.size());
-  assert(this->getAllSpeciesNodeNumber() == lossRates.size());
-  _PD = dupRates;
-  _PL = lossRates;
-  _PS.resize(this->getAllSpeciesNodeNumber());
-  for (auto node: this->getPrunedSpeciesNodes()) {
-    auto e = node->node_index;
-    if (this->_info.noDup) {
-      _PD[e] = 0.0;
-    }
-    auto sum = _PD[e] + _PL[e] + 1.0;
-    _PD[e] /= sum;
-    _PL[e] /= sum;
-    _PS[e] = 1.0 / sum;
-  } 
+  _dlRates = rates;
   recomputeSpeciesProbabilities();
 }
 
@@ -130,6 +115,23 @@ double UndatedDLMultiModel<REAL>::computeLogLikelihood()
 template <class REAL>
 void UndatedDLMultiModel<REAL>::recomputeSpeciesProbabilities()
 {
+  auto &dupRates = _dlRates[0];
+  auto &lossRates = _dlRates[1];
+  assert(this->getAllSpeciesNodeNumber() == dupRates.size());
+  assert(this->getAllSpeciesNodeNumber() == lossRates.size());
+  _PD = dupRates;
+  _PL = lossRates;
+  _PS.resize(this->getAllSpeciesNodeNumber());
+  for (auto node: this->getPrunedSpeciesNodes()) {
+    auto e = node->node_index;
+    if (this->_info.noDup) {
+      _PD[e] = 0.0;
+    }
+    auto sum = _PD[e] + _PL[e] + 1.0;
+    _PD[e] /= sum;
+    _PL[e] /= sum;
+    _PS[e] = 1.0 / sum;
+  } 
   for (auto speciesNode: this->getPrunedSpeciesNodes()) {
     auto e = speciesNode->node_index;
     double a = _PD[e];
@@ -140,6 +142,7 @@ void UndatedDLMultiModel<REAL>::recomputeSpeciesProbabilities()
         _uE[this->getSpeciesRight(speciesNode)->node_index];
     }
     double proba = solveSecondDegreePolynome(a, b, c);
+    assert(proba >= 0.0 && proba <= 1.0);
     _uE[speciesNode->node_index] = proba;
   }
 }
