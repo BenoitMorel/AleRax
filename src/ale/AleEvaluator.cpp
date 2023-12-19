@@ -328,7 +328,7 @@ double AleEvaluator::optimizeModelRates(bool thorough)
     OptimizationSettings settings;
     settings.verbose = _optimizeVerbose;
     ll = computeLikelihood();
-    Logger::timed << "[SpeciesSearch] Optimizing model rates ";
+    Logger::timed << "[Species search] Optimizing model rates ";
     if (thorough) {
       Logger::info << "(thorough)" << std::endl;
     } else {
