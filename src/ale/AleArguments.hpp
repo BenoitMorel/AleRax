@@ -23,13 +23,13 @@ public:
   /**
    *  Print the command line used to call the AleRax' executable
    */
-  void printCommand();
+  void printCommand() const;
 
   /**
    *  Write a user-friendly summary of the most important 
    *  parameters set by the user
    */
-  void printSummary();
+  void printSummary() const;
 
   /**
    *  Check that the arguments are compatible with each other

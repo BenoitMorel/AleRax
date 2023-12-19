@@ -1,11 +1,14 @@
 #include "AleArguments.hpp"
 #include <IO/Logger.hpp>
 #include <climits>  
+#include <IO/FileSystem.hpp>
 
 const unsigned int DEFAULT_GENE_TREE_SAMPLES = 100;
 const unsigned int DEFAULT_MIN_COVERED_SPECIES = 4;
 const double DEFAULT_MAX_SPLIT_RATIO = -1.0;
 const double DEFAULT_TRIM_FAMILY_RATIO = 0.0;
+const double DEFAULT_DTL_RATES = 0.1;
+
 AleArguments::AleArguments(int iargc, char * iargv[]):
   argc(iargc),
   argv(iargv),
@@ -19,9 +22,9 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
   perFamilyRates(false),
   perSpeciesRates(false),
   memorySavings(false),
-  d(0.1),
-  l(0.1),
-  t(0.1),
+  d(DEFAULT_DTL_RATES),
+  l(DEFAULT_DTL_RATES),
+  t(DEFAULT_DTL_RATES),
   speciesTreeAlgorithm(SpeciesTreeAlgorithm::User),
   speciesSearchStrategy(SpeciesSearchStrategy::SKIP),
   inferSpeciationOrders(false),
@@ -131,9 +134,16 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       std::cerr << "Unknown argument " << arg << std::endl;
     }
   }
+  if (perSpeciesRates) {
+    if (speciesCategoryFile.size() > 0) {
+      Logger::error << "Error: --per-species-rates and --species-categories are not compatible" << std::endl;
+      ParallelContext::abort(0);
+    }
+    speciesCategoryFile = FileSystem::joinPaths(output, "speciesRateCategories.txt");
+  }
 }
 
-void AleArguments::printCommand() {
+void AleArguments::printCommand() const {
   Logger::timed << "GeneRax was called as follow:" << std::endl;
   for (int i = 0; i < argc; ++i) {
     Logger::info << argv[i] << " ";
@@ -145,7 +155,7 @@ static std::string getOnOff(bool onOff) {
   return onOff ? "ON" : "OFF";
 }
 
-void AleArguments::printSummary() {
+void AleArguments::printSummary() const {
   Logger::timed << "Run settings:" << std::endl;
   Logger::info << "\tFamily file: " << families << std::endl;
   switch(Enums::strToSpeciesTree(speciesTree)) {

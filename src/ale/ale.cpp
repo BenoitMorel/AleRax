@@ -80,12 +80,13 @@ std::vector<unsigned int> getSortedIndices(const std::vector<unsigned int> &valu
  *
  */
 void generateCCPs(const std::string &ccpDir, 
-    const std::string &ccpDimensionFile,
+    std::string &outputDir, 
     Families &families, 
     CCPRooting ccpRooting,
     unsigned int sampleFrequency)
 {
   ParallelContext::barrier();
+  auto ccpDimensionFile = FileSystem::joinPaths(outputDir, "ccpdim.txt");
   Logger::timed << "Generating ccp files..." << std::endl;
   for (auto &family: families) {
     family.ccp = FileSystem::joinPaths(ccpDir, family.name + ".ccp");
@@ -175,6 +176,7 @@ bool checkCCP(FamilyInfo &family,
 void checkCCPAndSpeciesTree(Families &families,
     const std::string &speciesTreePath)
 {
+  Logger::timed << "Checking that ccp and mappings are valid..." << std::endl;
   PLLRootedTree speciesTree(speciesTreePath);
   auto labels = speciesTree.getLabels(true);
   auto N = families.size();
@@ -292,39 +294,52 @@ void generatePerSpeciesRateFile(const std::string &perSpeciesRatesFile,
 
 
 /**
- * Main function of AleRax once the arguments have been parsed
- *
- * @param args The program arguments
+ *  Create AleRax top directories and set ccpDir
  */
-void run( AleArguments &args)
+void initAleRaxDirectories(const AleArguments &args, 
+    std::string &ccpDir) 
 {
-  Random::setSeed(static_cast<unsigned int>(args.seed));
   FileSystem::mkdir(args.output, true);
   FileSystem::mkdir(args.output + "/species_trees", true);
-  std::string ccpDir = FileSystem::joinPaths(args.output, "ccps");
+  ccpDir = FileSystem::joinPaths(args.output, "ccps");
   FileSystem::mkdir(ccpDir, true);
   Logger::initFileOutput(FileSystem::joinPaths(args.output, "alerax"));
-  
+}
+
+/**
+ *  Print AleRax version, the command line, and a summary of 
+ *  the parameters
+ */
+void printInitialMessage(const AleArguments &args) 
+{
   Logger::timed << version << std::endl; 
   args.printCommand();
   args.printSummary();
-  
+}
+
+/**
+ *  Compute all information about the different gene families
+ *  Filter the families according to the different filtering 
+ *  and trimming options
+ */
+Families initAndFilterFamilies(const AleArguments &args)
+{
   auto families = FamiliesFileParser::parseFamiliesFile(args.families);
   if (!args.skipFamilyFiltering) {
     filterInvalidFamilies(families);
   }
-  auto ccpDimensionFile = FileSystem::joinPaths(args.output, "ccpdim.txt");
-  generateCCPs(ccpDir, ccpDimensionFile, families, args.ccpRooting, args.sampleFrequency);
   trimFamilies(families, args.minCoveredSpecies, args.trimFamilyRatio,
      args.maxCladeSplitRatio);
   if (families.size() == 0) {
     Logger::info << "No valid family, aborting" << std::endl;
     ParallelContext::abort(0);
   }
-  initStartingSpeciesTree(args, families);
-  Logger::timed << "Checking that ccp and mappings are valid..." << std::endl;
-  checkCCPAndSpeciesTree(families, args.speciesTree); 
-  RecModelInfo info(ArgumentsHelper::strToRecModel(args.reconciliationModelStr),
+  return families;
+}
+
+RecModelInfo buildRecModelInfo(const AleArguments &args) 
+{
+  return RecModelInfo(ArgumentsHelper::strToRecModel(args.reconciliationModelStr),
       args.perFamilyRates, // per family rates
       args.gammaCategories,
       args.originationStrategy,
@@ -338,37 +353,25 @@ void run( AleArguments &args)
       args.noTL,
       args.fractionMissingFile,
       args.memorySavings);
-  Parameters startingRates;
+}
+
+Parameters buildStartingRates(const AleArguments &args,
+    const RecModelInfo &info)
+{
   switch (info.model) {
   case RecModel::UndatedDL:
-    startingRates = Parameters(args.d, args.l);
-    break;
+    return Parameters(args.d, args.l);
   case RecModel::UndatedDTL:
-    startingRates = Parameters(args.d, args.l, args.t);
-    break;
+    return Parameters(args.d, args.l, args.t);
   default:
     assert(false);
-    break;
+    return Parameters();
   }
-  if (args.perSpeciesRates) {
-    assert(args.speciesCategoryFile.size() == 0);
-    args.speciesCategoryFile = FileSystem::joinPaths(args.output, "speciesRateCategories.txt");
-    generatePerSpeciesRateFile(args.speciesCategoryFile, args.speciesTree);
-  }
- 
-  std::string coverageFile(FileSystem::joinPaths(args.output, "fractionMissing.txt"));
-  std::string fractionMissingFile(FileSystem::joinPaths(args.output, "perSpeciesCoverage.txt"));
-  Family::printStats(families, args.speciesTree, coverageFile, fractionMissingFile);
-  // init the optimizer
-  AleOptimizer speciesTreeOptimizer(
-      args.speciesTree,
-      families,
-      info,
-      startingRates,
-      !args.fixRates,
-      args.verboseOptRates,
-      args.speciesCategoryFile,
-      args.output);
+}
+
+void runSpeciesTreeSearch(const AleArguments &args,
+    AleOptimizer &speciesTreeOptimizer)
+{
   if (args.randomSpeciesRoot) {
     Logger::timed << "Random root position!" << std::endl;
     speciesTreeOptimizer.randomizeRoot();
@@ -391,61 +394,107 @@ void run( AleArguments &args)
     assert(false); // not implemented yet
     break;
   }
-  speciesTreeOptimizer.optimizeModelRates(false);
-  // Relative dating of the species tree
-  if (args.inferSpeciationOrders) {
-    speciesTreeOptimizer.optimizeDates(true);
-    speciesTreeOptimizer.getEvaluator().computeLikelihood();
+}
+
+void runDateOptimization(const AleArguments &args,
+    AleOptimizer &speciesTreeOptimizer)
+{
+  if (!args.inferSpeciationOrders) {
+    return;
   }
-  // Infer the highways
-  if (args.highways) {
-    auto highwaysOutputDir =  FileSystem::joinPaths(args.output, "highways");
+  speciesTreeOptimizer.optimizeDates(true);
+  speciesTreeOptimizer.getEvaluator().computeLikelihood();
+}
+
+void runTransferHighwayInference(const AleArguments &args,
+    AleOptimizer &speciesTreeOptimizer)
+{
+  if (!args.highways) {
+    return;
+  }
+  auto highwaysOutputDir =  FileSystem::joinPaths(args.output, "highways");
   FileSystem::mkdir(highwaysOutputDir, true);
-    // let's infer highways of transfers!
-    auto highwayOutput = FileSystem::joinPaths(highwaysOutputDir,
-      "highway_best_candidates.txt");
-    std::vector<ScoredHighway> candidateHighways;
-    // initial candidates
-    if (args.highwayCandidateFile.size()) {
-      // the user sets the candidates
-      auto highways = HighwayCandidateParser::parse(args.highwayCandidateFile,
-          speciesTreeOptimizer.getSpeciesTree().getTree());
-      for (const auto &highway: highways) {
-        candidateHighways.push_back(ScoredHighway(highway));
-      }
-    } else {
-      // automatically search for candidates
-      speciesTreeOptimizer.getCandidateHighways(candidateHighways, args.highwayCandidatesStep1);
+  // let's infer highways of transfers!
+  auto highwayOutput = FileSystem::joinPaths(highwaysOutputDir,
+    "highway_best_candidates.txt");
+  std::vector<ScoredHighway> candidateHighways;
+  // initial candidates
+  if (args.highwayCandidateFile.size()) {
+    // the user sets the candidates
+    auto highways = HighwayCandidateParser::parse(args.highwayCandidateFile,
+        speciesTreeOptimizer.getSpeciesTree().getTree());
+    for (const auto &highway: highways) {
+      candidateHighways.push_back(ScoredHighway(highway));
     }
-    // first filtering step: we add each highway candidate individually, set a small highway
-    // probability, and keep the highway if the likelihood improves. We also sort the
-    // highways per likelihood
-    std::vector<ScoredHighway> filteredHighways;
-    speciesTreeOptimizer.filterCandidateHighwaysFast(candidateHighways, filteredHighways);
-    filteredHighways.resize(std::min(filteredHighways.size(), size_t(args.highwayCandidatesStep2)));
-    std::vector<ScoredHighway> bestHighways;
-    // optimize each highway probability individually. 
-    // TODO: remove this step
-    if (!args.highwaysSkipIndividualOptimization) {
-      speciesTreeOptimizer.selectBestHighways(filteredHighways, bestHighways);
-      speciesTreeOptimizer.saveBestHighways(bestHighways,
-          highwayOutput);
-    } else {
-      bestHighways = filteredHighways;
-    }
-    // now optimize all highways together
-    auto acceptedHighwayOutput = FileSystem::joinPaths(highwaysOutputDir,
-      "highway_accepted_highways.txt");
-    std::vector<ScoredHighway> acceptedHighways;
-    speciesTreeOptimizer.optimizeAllHighways(bestHighways, acceptedHighways, true);
-    speciesTreeOptimizer.saveBestHighways(acceptedHighways,
-        acceptedHighwayOutput);
+  } else {
+    // automatically search for candidates
+    speciesTreeOptimizer.getCandidateHighways(candidateHighways, args.highwayCandidatesStep1);
   }
-  // one last round of DTL rate optimization
+  // first filtering step: we add each highway candidate individually, set a small highway
+  // probability, and keep the highway if the likelihood improves. We also sort the
+  // highways per likelihood
+  std::vector<ScoredHighway> filteredHighways;
+  speciesTreeOptimizer.filterCandidateHighwaysFast(candidateHighways, filteredHighways);
+  filteredHighways.resize(std::min(filteredHighways.size(), size_t(args.highwayCandidatesStep2)));
+  std::vector<ScoredHighway> bestHighways;
+  // optimize each highway probability individually. 
+  // TODO: remove this step
+  if (!args.highwaysSkipIndividualOptimization) {
+    speciesTreeOptimizer.selectBestHighways(filteredHighways, bestHighways);
+    speciesTreeOptimizer.saveBestHighways(bestHighways,
+        highwayOutput);
+  } else {
+    bestHighways = filteredHighways;
+  }
+  // now optimize all highways together
+  auto acceptedHighwayOutput = FileSystem::joinPaths(highwaysOutputDir,
+    "highway_accepted_highways.txt");
+  std::vector<ScoredHighway> acceptedHighways;
+  speciesTreeOptimizer.optimizeAllHighways(bestHighways, acceptedHighways, true);
+  speciesTreeOptimizer.saveBestHighways(acceptedHighways,
+      acceptedHighwayOutput);
+}
+
+
+/**
+ * Main function of AleRax once the arguments have been parsed
+ *
+ * @param args The program arguments
+ */
+void run( AleArguments &args)
+{
+  Random::setSeed(static_cast<unsigned int>(args.seed));
+  std::string ccpDir;
+  initAleRaxDirectories(args, ccpDir);
+  printInitialMessage(args);
+  auto families = initAndFilterFamilies(args);
+  generateCCPs(ccpDir, args.output, families, args.ccpRooting, args.sampleFrequency);
+  initStartingSpeciesTree(args, families);
+  checkCCPAndSpeciesTree(families, args.speciesTree); 
+  auto info = buildRecModelInfo(args);
+  auto startingRates = buildStartingRates(args, info);
+  if (args.perSpeciesRates) {
+    generatePerSpeciesRateFile(args.speciesCategoryFile, args.speciesTree);
+  }
+  std::string coverageFile(FileSystem::joinPaths(args.output, "fractionMissing.txt"));
+  std::string fractionMissingFile(FileSystem::joinPaths(args.output, "perSpeciesCoverage.txt"));
+  Family::printStats(families, args.speciesTree, coverageFile, fractionMissingFile);
+  AleOptimizer speciesTreeOptimizer(
+      args.speciesTree,
+      families,
+      info,
+      startingRates,
+      !args.fixRates,
+      args.verboseOptRates,
+      args.speciesCategoryFile,
+      args.output);
+  runSpeciesTreeSearch(args, speciesTreeOptimizer);
+  speciesTreeOptimizer.optimizeModelRates(false);
+  runDateOptimization(args, speciesTreeOptimizer);
+  runTransferHighwayInference(args, speciesTreeOptimizer);
   if (!args.skipThoroughRates) {
     speciesTreeOptimizer.optimizeModelRates(true);
   }
-  // sample reconciled gene trees
   Logger::timed <<"Sampling reconciled gene trees... (" << args.geneTreeSamples  << " samples)" << std::endl;
   speciesTreeOptimizer.reconcile(args.geneTreeSamples);
   speciesTreeOptimizer.saveSpeciesTree(); 
@@ -456,6 +505,14 @@ void run( AleArguments &args)
   Logger::timed <<"End of the execution" << std::endl;
 }
 
+
+/**
+ *  This main will be called by the master process and is the entry 
+ *  point to AleRax. It inits the parallel context, the logger, 
+ *  reads the arguments, runs AleRax and closes everything.
+ *  If comm is set to nullptr, MPI_Init will be called to initiate the 
+ *  MPI context
+ */
 int alerax_main(int argc, char** argv, void* comm)
 {
   ParallelContext::init(comm); 
@@ -469,6 +526,12 @@ int alerax_main(int argc, char** argv, void* comm)
   return 0;
 }
 
+
+/**
+ *  AleRax "internal" main (can be called  by a scheduler with
+ *  an already existing MPI communicator, for instance to spawn
+ *  a slave process
+ */
 int internal_main(int argc, char** argv, void* comm)
 {
   if (SlavesMain::isSlave(argc, argv)) {
@@ -482,8 +545,10 @@ int internal_main(int argc, char** argv, void* comm)
 int main(int argc, char** argv)
 {
 #ifdef WITH_MPI
-  return internal_main(argc, argv, 0);
+  // the null communicator signals that we need to call MPI_Init
+  return internal_main(argc, argv, nullptr);
 #else
+  // this fake communicator signals that we're not using MPI
   int noMPIComm = -1;
   return internal_main(argc, argv, &noMPIComm);
 #endif
