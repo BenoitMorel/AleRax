@@ -8,6 +8,7 @@
 #include <IO/Families.hpp>
 #include "AleOptimizer.hpp"
 #include "TrimFamilies.hpp"
+#include "Highways.hpp"
 #include <util/Paths.hpp>
 #include <util/RecModelInfo.hpp>
 #include <routines/Routines.hpp>
@@ -415,19 +416,21 @@ void run( AleArguments &args)
       }
     } else {
       // automatically search for candidates
-      speciesTreeOptimizer.getCandidateHighways(candidateHighways, args.highwayCandidatesStep1);
+      Highways::getCandidateHighways(speciesTreeOptimizer,
+          candidateHighways, 
+          args.highwayCandidatesStep1);
     }
     // first filtering step: we add each highway candidate individually, set a small highway
     // probability, and keep the highway if the likelihood improves. We also sort the
     // highways per likelihood
     std::vector<ScoredHighway> filteredHighways;
-    speciesTreeOptimizer.filterCandidateHighwaysFast(candidateHighways, filteredHighways);
+    Highways::filterCandidateHighwaysFast(speciesTreeOptimizer, candidateHighways, filteredHighways);
     filteredHighways.resize(std::min(filteredHighways.size(), size_t(args.highwayCandidatesStep2)));
     std::vector<ScoredHighway> bestHighways;
     // optimize each highway probability individually. 
     // TODO: remove this step
     if (!args.highwaysSkipIndividualOptimization) {
-      speciesTreeOptimizer.selectBestHighways(filteredHighways, bestHighways);
+        Highways::selectBestHighways(speciesTreeOptimizer, filteredHighways, bestHighways);
       speciesTreeOptimizer.saveBestHighways(bestHighways,
           highwayOutput);
     } else {
@@ -437,7 +440,7 @@ void run( AleArguments &args)
     auto acceptedHighwayOutput = FileSystem::joinPaths(highwaysOutputDir,
       "highway_accepted_highways.txt");
     std::vector<ScoredHighway> acceptedHighways;
-    speciesTreeOptimizer.optimizeAllHighways(bestHighways, acceptedHighways, true);
+    Highways::optimizeAllHighways(speciesTreeOptimizer, bestHighways, acceptedHighways, true);
     speciesTreeOptimizer.saveBestHighways(acceptedHighways,
         acceptedHighwayOutput);
   }

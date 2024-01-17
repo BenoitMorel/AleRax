@@ -100,33 +100,19 @@ public:
   /**
    *  Accessor
    */
-  SpeciesTreeLikelihoodEvaluatorInterface &getEvaluator() {return *_evaluator;}
+  AleEvaluator &getEvaluator() {return *_evaluator;}
   
   /**
    *  Accessor
    */
   SpeciesTree &getSpeciesTree() {return *_speciesTree;}
   
-  /**
-   *  Infer potential highway candidates from the undated reconciliations
-   */
-  void getCandidateHighways(std::vector<ScoredHighway> &highways, unsigned int maxCandidates);
-  
-  /**
-   *  Filter the highway candidates by testing them with a small hardcoded probability
-   */
-  void filterCandidateHighwaysFast(const std::vector<ScoredHighway> &highways, std::vector<ScoredHighway> &filteredHighways);
-  
-  /**
-   *  
-   */
-  void selectBestHighways(const std::vector<ScoredHighway> &highways, std::vector<ScoredHighway> &bestHighways);
+  const RecModelInfo &getRecModelInfo() const {return _info;}
+
   void saveBestHighways(const std::vector<ScoredHighway> &highways,
       const std::string &output);
-  void optimizeAllHighways(const std::vector<ScoredHighway> &candidateHighways,
-      std::vector<ScoredHighway> &acceptedHighways,
-      bool thorough);
   void saveRELLSupports();
+  std::string getHighwaysOutputDir() const;
 private:
   std::unique_ptr<SpeciesTree> _speciesTree;
   const Families &_families;
@@ -142,7 +128,6 @@ private:
   double transferSearch();
   std::string saveCurrentSpeciesTreeId(std::string str = "inferred_species_tree.newick", bool masterRankOnly = true);
   void saveCurrentSpeciesTreePath(const std::string &str, bool masterRankOnly = true);
-  std::string getHighwaysOutputDir() const;
 };
 
 

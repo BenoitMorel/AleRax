@@ -3,6 +3,7 @@ set(alerax_SOURCES ale.cpp
   AleArguments.cpp
   AleEvaluator.cpp
   AleOptimizer.cpp
+  Highways.cpp
   TrimFamilies.cpp
 )
 add_program(alerax "${alerax_SOURCES}")
