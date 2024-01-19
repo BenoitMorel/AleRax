@@ -405,16 +405,19 @@ void AleOptimizer::reconcile(unsigned int samples)
     perHighwayPerFamTransfers = MatrixDouble(highways.size(), VectorDouble(localFamilies.size(), 0.0));
   }
   for (unsigned int i = 0; i < localFamilies.size(); ++i) {
+    std::cerr << localFamilies[i].name << std::endl;
     std::vector<std::string> perSpeciesEventCountsFiles;
     std::vector<std::string> transferFiles;
     std::string geneTreesPath = FileSystem::joinPaths(allRecDir, localFamilies[i].name + std::string(".newick"));
+    std::string geneTreesAlePath = FileSystem::joinPaths(allRecDir, localFamilies[i].name + std::string(".rec_uml"));
     ParallelOfstream geneTreesOs(geneTreesPath, false);
     std::vector< std::shared_ptr<Scenario> > scenarios;
     _evaluator->sampleScenarios(i, samples, scenarios);
     allScenarios.insert(allScenarios.end(), scenarios.begin(), scenarios.end());
     assert(scenarios.size() == samples);
 
-    
+   
+    ParallelOfstream geneTreesAleOs(geneTreesAlePath, false);
     for (unsigned int sample = 0; sample < samples; ++ sample) {
       auto out = FileSystem::joinPaths(allRecDir, 
           localFamilies[i].name + std::string("_") +  std::to_string(sample) + ".xml");
@@ -429,6 +432,7 @@ void AleOptimizer::reconcile(unsigned int samples)
       auto &scenario = *scenarios[sample];
       scenario.saveReconciliation(out, ReconciliationFormat::RecPhyloXML, false);
       scenario.saveReconciliation(geneTreesOs, ReconciliationFormat::NewickEvents);
+      scenario.saveReconciliation(geneTreesAleOs, ReconciliationFormat::ALE);
       scenario.saveEventsCounts(eventCountsFile, false);
       scenario.savePerSpeciesEventsCounts(perSpeciesEventCountsFile, false);
       scenario.saveTransfers(transferFile, false);
