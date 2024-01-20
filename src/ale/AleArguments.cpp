@@ -30,6 +30,7 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
   inferSpeciationOrders(false),
   fixRates(false),
   skipThoroughRates(false),
+  recOpt(RecOpt::Gradient),
   highways(false),
   highwayCandidatesStep1(100),
   highwayCandidatesStep2(50),
@@ -68,6 +69,8 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       reconciliationModelStr = std::string(argv[++i]);
     } else if (arg == "--skip-thorough-rates") {
       skipThoroughRates = true;
+    } else if (arg == "--rec-opt") {
+      recOpt = Enums::strToRecOpt(std::string(argv[++i]));
     } else if (arg == "--fix-rates") {
       fixRates = true;
     } else if (arg == "--highways") {
@@ -188,6 +191,7 @@ void AleArguments::printSummary() const {
   } else {
     Logger::info << " global to all species and families" << std::endl;
   }
+  Logger::info << "Rate optimizer: " << Enums::recOptToStr(recOpt) << std::endl;
   Logger::info << "\tMemory savings: " << getOnOff(memorySavings) << std::endl;
   switch (transferConstraint) {
   case TransferConstaint::NONE:
@@ -272,6 +276,7 @@ void AleArguments::printHelp()
   
   Logger::info << "Reconciliation model options:" << std::endl; 
   Logger::info << "\t-r --rec-model <reconciliationModel>  {UndatedDL, UndatedDTL}" << std::endl;
+  Logger::info << "\t---rec-opt <optimizer>  {Simplex, Gradient}" << std::endl;
   Logger::info << "\t--transfer-constraint {NONE, PARENTS, RELDATED}" << std::endl;
   Logger::info << "\t--prune-species-tree" << std::endl;
   Logger::info << "\t--species-categories filepath" << std::endl; 

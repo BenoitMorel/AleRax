@@ -341,6 +341,7 @@ Families initAndFilterFamilies(const AleArguments &args)
 RecModelInfo buildRecModelInfo(const AleArguments &args) 
 {
   return RecModelInfo(ArgumentsHelper::strToRecModel(args.reconciliationModelStr),
+      args.recOpt,
       args.perFamilyRates, // per family rates
       args.gammaCategories,
       args.originationStrategy,

@@ -405,7 +405,6 @@ void AleOptimizer::reconcile(unsigned int samples)
     perHighwayPerFamTransfers = MatrixDouble(highways.size(), VectorDouble(localFamilies.size(), 0.0));
   }
   for (unsigned int i = 0; i < localFamilies.size(); ++i) {
-    std::cerr << localFamilies[i].name << std::endl;
     std::vector<std::string> perSpeciesEventCountsFiles;
     std::vector<std::string> transferFiles;
     std::string geneTreesPath = FileSystem::joinPaths(allRecDir, localFamilies[i].name + std::string(".newick"));

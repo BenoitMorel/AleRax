@@ -69,6 +69,7 @@ public:
   bool inferSpeciationOrders;
   bool fixRates;
   bool skipThoroughRates;
+  RecOpt recOpt;
 
   // highways
   bool highways;
