@@ -326,6 +326,7 @@ double AleEvaluator::optimizeModelRates(bool thorough)
   double ll = 0.0;
   if (_optimizeRates) {
     OptimizationSettings settings;
+    settings.strategy = _modelRates.getInfo().recOpt;
     settings.verbose = _optimizeVerbose;
     ll = computeLikelihood();
     Logger::timed << "[Species search] Optimizing model rates ";

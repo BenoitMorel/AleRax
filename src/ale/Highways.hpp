@@ -21,10 +21,6 @@ public:
       const std::vector<ScoredHighway> &highways, 
       std::vector<ScoredHighway> &filteredHighways);
   
-  static void selectBestHighways(AleOptimizer &optimizer,
-    const std::vector<ScoredHighway> &highways, 
-    std::vector<ScoredHighway> &bestHighways);
-
   static void optimizeAllHighways(AleOptimizer &optimizer,
       const std::vector<ScoredHighway> &candidateHighways,
       std::vector<ScoredHighway> &acceptedHighways,

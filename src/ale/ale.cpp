@@ -440,21 +440,11 @@ void runTransferHighwayInference(const AleArguments &args,
     std::vector<ScoredHighway> filteredHighways;
     Highways::filterCandidateHighwaysFast(speciesTreeOptimizer, candidateHighways, filteredHighways);
     filteredHighways.resize(std::min(filteredHighways.size(), size_t(args.highwayCandidatesStep2)));
-    std::vector<ScoredHighway> bestHighways;
-    // optimize each highway probability individually. 
-    // TODO: remove this step
-    if (!args.highwaysSkipIndividualOptimization) {
-        Highways::selectBestHighways(speciesTreeOptimizer, filteredHighways, bestHighways);
-      speciesTreeOptimizer.saveBestHighways(bestHighways,
-          highwayOutput);
-    } else {
-      bestHighways = filteredHighways;
-    }
     // now optimize all highways together
     auto acceptedHighwayOutput = FileSystem::joinPaths(highwaysOutputDir,
       "highway_accepted_highways.txt");
     std::vector<ScoredHighway> acceptedHighways;
-    Highways::optimizeAllHighways(speciesTreeOptimizer, bestHighways, acceptedHighways, true);
+    Highways::optimizeAllHighways(speciesTreeOptimizer, filteredHighways, acceptedHighways, true);
     speciesTreeOptimizer.saveBestHighways(acceptedHighways,
         acceptedHighwayOutput);
 }

@@ -34,7 +34,6 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
   highways(false),
   highwayCandidatesStep1(100),
   highwayCandidatesStep2(50),
-  highwaysSkipIndividualOptimization(false),
   skipFamilyFiltering(false),
   minCoveredSpecies(DEFAULT_MIN_COVERED_SPECIES),
   trimFamilyRatio(DEFAULT_TRIM_FAMILY_RATIO),
@@ -70,7 +69,7 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
     } else if (arg == "--skip-thorough-rates") {
       skipThoroughRates = true;
     } else if (arg == "--rec-opt") {
-      recOpt = Enums::strToRecOpt(std::string(argv[++i]));
+      recOpt = ArgumentsHelper::strToRecOpt(std::string(argv[++i]));
     } else if (arg == "--fix-rates") {
       fixRates = true;
     } else if (arg == "--highways") {
@@ -81,8 +80,6 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       highwayCandidatesStep1 = atoi(argv[++i]);
     } else if (arg == "--highway-candidates-step2") {
       highwayCandidatesStep2 = atoi(argv[++i]);
-    } else if (arg == "--highways-skip-individual-opt") {
-      highwaysSkipIndividualOptimization = true;
     } else if (arg == "--transfer-constraint") {
       transferConstraint = ArgumentsHelper::strToTransferConstraint(std::string(argv[++i]));
     } else if (arg == "--origination") {
@@ -147,7 +144,7 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
 }
 
 void AleArguments::printCommand() const {
-  Logger::timed << "GeneRax was called as follow:" << std::endl;
+  Logger::timed << "AleRax was called as follow:" << std::endl;
   for (int i = 0; i < argc; ++i) {
     Logger::info << argv[i] << " ";
   }
@@ -191,7 +188,7 @@ void AleArguments::printSummary() const {
   } else {
     Logger::info << " global to all species and families" << std::endl;
   }
-  Logger::info << "Rate optimizer: " << Enums::recOptToStr(recOpt) << std::endl;
+  Logger::info << "Rate optimizer: " << ArgumentsHelper::recOptToStr(recOpt) << std::endl;
   Logger::info << "\tMemory savings: " << getOnOff(memorySavings) << std::endl;
   switch (transferConstraint) {
   case TransferConstaint::NONE:

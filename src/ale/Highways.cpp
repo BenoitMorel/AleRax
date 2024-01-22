@@ -73,6 +73,7 @@ static Parameters testHighway(AleEvaluator &evaluator,
   Parameters startingParameter(1);
   startingParameter[0] = startingProbability;
   OptimizationSettings settings;
+  settings.strategy = evaluator.getRecModelInfo().recOpt; 
   settings.lineSearchMinImprovement = 0.0;
   settings.minAlpha = 0.0001;
   settings.epsilon = 0.00001;
@@ -93,6 +94,7 @@ static Parameters testHighways(AleEvaluator &evaluator,
   HighwayFunction f(evaluator, highways);
   if (optimize) {
     OptimizationSettings settings;
+    settings.strategy = evaluator.getRecModelInfo().recOpt; 
     settings.minAlpha = 0.001;
     settings.epsilon = 0.000001;
     settings.verbose = true;
@@ -195,28 +197,6 @@ void Highways::filterCandidateHighwaysFast(AleOptimizer &optimizer,
     Logger::info << highway.src->label << "->" << highway.dest->label << " ll diff = " << llDiff << std::endl; 
   }
   std::sort(filteredHighways.begin(), filteredHighways.end());
-}
-
-void Highways::selectBestHighways(AleOptimizer &optimizer,
-    const std::vector<ScoredHighway> &highways, 
-    std::vector<ScoredHighway> &bestHighways)
-{
-  auto &evaluator = optimizer.getEvaluator();
-  Logger::timed << "Looking for the best highways candidates among " << highways.size() << " candidates (slow round)" << std::endl;
-  double initialLL = evaluator.computeLikelihood(); 
-  Logger::info << "initial ll=" << initialLL << std::endl;
-  evaluator.saveSnapshotPerFamilyLL();
-  for (const auto &scoredHighway: highways) {
-    Highway highway(scoredHighway.highway);
-    auto parameters = testHighway(evaluator, highway);
-    highway.proba = parameters[0];
-    bestHighways.push_back(ScoredHighway(highway, 
-          parameters.getScore(),
-          initialLL - parameters.getScore()));
-    Logger::timed << "ph=" << parameters[0] 
-      << " lldiff=" << initialLL - parameters.getScore() << " highway: " << highway.src->label << "->" << highway.dest->label << std::endl;
-  }
-  std::sort(bestHighways.rbegin(), bestHighways.rend());
 }
 
 void Highways::optimizeAllHighways(AleOptimizer &optimizer,

@@ -98,7 +98,9 @@ public:
    *  Are we in prune species tree mode?
    */
   virtual bool pruneSpeciesTree() const {return _modelRates.getInfo().pruneSpeciesTree;}
-  
+ 
+  const RecModelInfo &getRecModelInfo() const {return _modelRates.getInfo();}
+
   /**
    * Set the alpha parameter of the gamma function for the family rate categories
    */

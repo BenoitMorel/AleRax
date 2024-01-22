@@ -76,7 +76,6 @@ public:
   std::string highwayCandidateFile;
   unsigned int highwayCandidatesStep1;
   unsigned int highwayCandidatesStep2;
-  bool highwaysSkipIndividualOptimization;
 
   // trimming
   bool skipFamilyFiltering;
