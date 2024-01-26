@@ -323,9 +323,8 @@ void printInitialMessage(const AleArguments &args)
  *  Filter the families according to the different filtering 
  *  and trimming options
  */
-Families initAndFilterFamilies(const AleArguments &args)
+void filterFamilies(const AleArguments &args, Families &families)
 {
-  auto families = FamiliesFileParser::parseFamiliesFile(args.families);
   if (!args.skipFamilyFiltering) {
     filterInvalidFamilies(families);
   }
@@ -335,7 +334,6 @@ Families initAndFilterFamilies(const AleArguments &args)
     Logger::info << "No valid family, aborting" << std::endl;
     ParallelContext::abort(0);
   }
-  return families;
 }
 
 RecModelInfo buildRecModelInfo(const AleArguments &args) 
@@ -461,8 +459,9 @@ void run( AleArguments &args)
   std::string ccpDir;
   initAleRaxDirectories(args, ccpDir);
   printInitialMessage(args);
-  auto families = initAndFilterFamilies(args);
+  auto families = FamiliesFileParser::parseFamiliesFile(args.families);
   generateCCPs(ccpDir, args.output, families, args.ccpRooting, args.sampleFrequency);
+  filterFamilies(args, families);
   initStartingSpeciesTree(args, families);
   checkCCPAndSpeciesTree(families, args.speciesTree); 
   auto info = buildRecModelInfo(args);
