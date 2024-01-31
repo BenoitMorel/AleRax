@@ -4,7 +4,7 @@
 #include <IO/FileSystem.hpp>
 
 const unsigned int DEFAULT_GENE_TREE_SAMPLES = 100;
-const unsigned int DEFAULT_MIN_COVERED_SPECIES = 4;
+const unsigned int DEFAULT_MIN_COVERED_SPECIES = 1;
 const double DEFAULT_MAX_SPLIT_RATIO = -1.0;
 const double DEFAULT_TRIM_FAMILY_RATIO = 0.0;
 const double DEFAULT_DTL_RATES = 0.1;
