@@ -681,6 +681,9 @@ bool UndatedDTLMultiModel<REAL>::computeProbability(CID cid,
   if (this->_ccp.isLeaf(cid) && isSpeciesLeaf) {
     if (this->_geneToSpecies[cid] == e) {
       proba = REAL(_PS[ec]);
+      if (recCell) {
+        recCell->event.label = this->_ccp.getLeafLabel(cid);
+      }
     }
     return true;
   }
