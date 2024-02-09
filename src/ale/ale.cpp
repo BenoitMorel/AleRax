@@ -492,6 +492,7 @@ void run( AleArguments &args)
   speciesTreeOptimizer.reconcile(args.geneTreeSamples);
   speciesTreeOptimizer.saveSpeciesTree(); 
   speciesTreeOptimizer.saveRatesAndLL();
+  Logger::timed << "Final log likelihood: ll=" << speciesTreeOptimizer.getEvaluator().computeLikelihood() << std::endl;
   if (args.cleanupCCP) {
     cleanupCCPs(families);
   }
