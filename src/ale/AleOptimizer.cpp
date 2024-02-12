@@ -81,32 +81,32 @@ AleOptimizer::AleOptimizer(
     bool optimizeVerbose,
     const std::string &speciesCategoryFile,
     const std::string &outputDir):
-  _speciesTree(std::make_unique<SpeciesTree>(speciesTreeFile)),
+  _state(speciesTreeFile),
   _families(families),
   _geneTrees(families, false, true),
   _info(info),
   _outputDir(outputDir),
-  _searchState(*_speciesTree,
+  _speciesTreeSearchState(getSpeciesTree(),
       Paths::getSpeciesTreeFile(_outputDir, "inferred_species_tree.newick"),
       _geneTrees.getTrees().size()),
   _rootLikelihoods(_geneTrees.getTrees().size())
 {
   std::vector<unsigned int> speciesToCat;
   std::vector<std::string> catToLabel;
-  getSpeciesToCat(_speciesTree->getTree(),
+  getSpeciesToCat(getSpeciesTree().getTree(),
       speciesCategoryFile,
       speciesToCat,
       catToLabel);
-  _modelRates = AleModelParameters(startingRates, 
+  _state.modelParameters = AleModelParameters(startingRates, 
       speciesToCat, 
       catToLabel,
       _geneTrees.getTrees().size(),
       info);
-  _speciesTree->addListener(this);
+  getSpeciesTree().addListener(this);
   ParallelContext::barrier();
   _evaluator = std::make_unique<AleEvaluator>(
-      *_speciesTree, 
-      _modelRates, 
+      getSpeciesTree(), 
+      getModelParameters(), 
       optimizeRates,
       optimizeVerbose,
       families, 
@@ -123,7 +123,7 @@ double AleOptimizer::optimizeModelRates(bool thorough)
   getEvaluator().optimizeModelRates(thorough);
   PerFamLL perFamLL;
   auto ll = getEvaluator().computeLikelihood(&perFamLL);
-  _searchState.betterLikelihoodCallback(ll, perFamLL);
+  _speciesTreeSearchState.betterLikelihoodCallback(ll, perFamLL);
   saveRatesAndLL();
   return ll;
 }
@@ -134,9 +134,9 @@ void AleOptimizer::optimize()
   size_t hash2 = 0;
   unsigned int index = 0;
   PerFamLL initialPerFamLL;
-  _searchState.bestLL = getEvaluator().computeLikelihood(&initialPerFamLL);
-  _searchState.farFromPlausible = true;
-  _searchState.betterTreeCallback(_searchState.bestLL, initialPerFamLL);
+  _speciesTreeSearchState.bestLL = getEvaluator().computeLikelihood(&initialPerFamLL);
+  _speciesTreeSearchState.farFromPlausible = true;
+  _speciesTreeSearchState.betterTreeCallback(_speciesTreeSearchState.bestLL, initialPerFamLL);
   /**
    *  Alternate transfer search and normal
    *  SPR search, until one does not find
@@ -149,10 +149,10 @@ void AleOptimizer::optimize()
     } else {
       sprSearch(1);
     }
-    if (!_searchState.farFromPlausible) {
+    if (!_speciesTreeSearchState.farFromPlausible) {
       rootSearch(3);
     }
-    hash1 = _speciesTree->getHash();
+    hash1 = getSpeciesTree().getHash();
   }
   while(testAndSwap(hash1, hash2));
   rootSearch(-1);
@@ -160,24 +160,24 @@ void AleOptimizer::optimize()
 
 double AleOptimizer::sprSearch(unsigned int radius)
 {
-  SpeciesSPRSearch::SPRSearch(*_speciesTree,
+  SpeciesSPRSearch::SPRSearch(getSpeciesTree(),
       getEvaluator(),
-      _searchState,
+      _speciesTreeSearchState,
       radius);
-  Logger::timed << "After normal search: LL=" << _searchState.bestLL << std::endl;
+  Logger::timed << "After normal search: LL=" << _speciesTreeSearchState.bestLL << std::endl;
   saveSupportTree();
-  return _searchState.bestLL;
+  return _speciesTreeSearchState.bestLL;
 }
 
 void AleOptimizer::saveSupportTree()
 {
   auto outKH = Paths::getSpeciesTreeFile(_outputDir, 
         "species_tree_support_kh.newick");
-  _searchState.saveSpeciesTreeKH(outKH);
+  _speciesTreeSearchState.saveSpeciesTreeKH(outKH);
   Logger::info << "save support tree " << outKH << std::endl;
   auto outBP = Paths::getSpeciesTreeFile(_outputDir, 
         "species_tree_support_bp.newick");
-  _searchState.saveSpeciesTreeBP(outBP);
+  _speciesTreeSearchState.saveSpeciesTreeBP(outBP);
 }
 
 void AleOptimizer::onSpeciesTreeChange(const std::unordered_set<corax_rnode_t *> *nodesToInvalidate)
@@ -195,11 +195,11 @@ std::string AleOptimizer::saveCurrentSpeciesTreeId(std::string name, bool master
 {
   std::string res = Paths::getSpeciesTreeFile(_outputDir, name);
   if (_evaluator->isDated()) {
-    _speciesTree->getDatedTree().rescaleBranchLengths();
+    getSpeciesTree().getDatedTree().rescaleBranchLengths();
   }
   saveCurrentSpeciesTreePath(res, masterRankOnly);
   if (!_rootLikelihoods.isEmpty()) {
-    auto newick = _speciesTree->getTree().getNewickString();
+    auto newick = getSpeciesTree().getTree().getNewickString();
     PLLRootedTree tree(newick, false); 
     _rootLikelihoods.fillTree(tree);
     auto out = Paths::getSpeciesTreeFile(_outputDir, 
@@ -207,7 +207,7 @@ std::string AleOptimizer::saveCurrentSpeciesTreeId(std::string name, bool master
     tree.save(out);
   }
   if (!_rootLikelihoods.isEmpty()) {
-    auto newick = _speciesTree->getTree().getNewickString();
+    auto newick = getSpeciesTree().getTree().getNewickString();
     PLLRootedTree tree(newick, false); 
     _rootLikelihoods.fillTreeBootstraps(tree);
     auto out = Paths::getSpeciesTreeFile(_outputDir, 
@@ -219,7 +219,7 @@ std::string AleOptimizer::saveCurrentSpeciesTreeId(std::string name, bool master
 
 void AleOptimizer::saveCurrentSpeciesTreePath(const std::string &str, bool masterRankOnly)
 {
-  _speciesTree->saveToFile(str, masterRankOnly);
+  getSpeciesTree().saveToFile(str, masterRankOnly);
   if (masterRankOnly) {
     ParallelContext::barrier();
   }
@@ -229,28 +229,28 @@ double AleOptimizer::rootSearch(unsigned int maxDepth, bool thorough)
 {
   _rootLikelihoods.reset();
   if (thorough) {
-    _searchState.farFromPlausible = thorough;
+    _speciesTreeSearchState.farFromPlausible = thorough;
   }
   SpeciesRootSearch::rootSearch(
-      *_speciesTree,
+      getSpeciesTree(),
       getEvaluator(),
-      _searchState,
+      _speciesTreeSearchState,
       maxDepth,
       &_rootLikelihoods);
   
-  return _searchState.bestLL;
+  return _speciesTreeSearchState.bestLL;
 }
   
 double AleOptimizer::transferSearch()
 {
   SpeciesTransferSearch::transferSearch(
-    *_speciesTree,
+    getSpeciesTree(),
     getEvaluator(),
-    _searchState);
+    _speciesTreeSearchState);
   Logger::timed << "After normal search: LL=" 
-    << _searchState.bestLL << std::endl;
+    << _speciesTreeSearchState.bestLL << std::endl;
   saveSupportTree();
-  return _searchState.bestLL;
+  return _speciesTreeSearchState.bestLL;
 }
  
 
@@ -317,7 +317,7 @@ void AleOptimizer::saveRatesAndLL()
         ratesOs << names << " ";
       }
       ratesOs << std::endl;
-      auto parameters = _modelRates.getParametersForFamily(i);
+      auto parameters = getModelParameters().getParametersForFamily(i);
       assert(parameters.dimensions() == parameterNames.size());
       for (unsigned int j = 0; j < parameters.dimensions(); ++j) {
         ratesOs << parameters[j] << " ";
@@ -454,13 +454,13 @@ void AleOptimizer::reconcile(unsigned int samples)
     saveStr(PLLRootedTree::buildConsensusTree(newicks, 0.50001), consensusPrefix + "50.newick");
     auto perSpeciesEventCountsFile = FileSystem::joinPaths(summariesDir, localFamilies[i].name + 
         std::string("_perspecies_eventcount.txt"));
-    Scenario::mergePerSpeciesEventCounts(_speciesTree->getTree(),
+    Scenario::mergePerSpeciesEventCounts(getSpeciesTree().getTree(),
         perSpeciesEventCountsFile,
         perSpeciesEventCountsFiles, false, true);
     summaryPerSpeciesEventCountsFiles.push_back(perSpeciesEventCountsFile);
     auto transferFile = FileSystem::joinPaths(summariesDir, localFamilies[i].name + 
         std::string("_transfers.txt"));
-    Scenario::mergeTransfers(_speciesTree->getTree(),
+    Scenario::mergeTransfers(getSpeciesTree().getTree(),
         transferFile,
         transferFiles, false, true);
     summaryTransferFiles.push_back(transferFile);
@@ -468,15 +468,15 @@ void AleOptimizer::reconcile(unsigned int samples)
   ParallelContext::barrier();
   Logger::timed << "Exporting reconciliation summaries..." << std::endl;
   auto totalPerSpeciesEventCountsFile = FileSystem::joinPaths(recDir, "perspecies_eventcount.txt");
-  Scenario::mergePerSpeciesEventCounts(_speciesTree->getTree(),
+  Scenario::mergePerSpeciesEventCounts(getSpeciesTree().getTree(),
       totalPerSpeciesEventCountsFile, 
       summaryPerSpeciesEventCountsFiles, 
       true, false);
   auto originsDir = FileSystem::joinPaths(recDir, "origins");
   FileSystem::mkdir(originsDir, true);
-  Scenario::saveOriginsGlobal(_speciesTree->getTree(), allScenarios, samples, originsDir);
+  Scenario::saveOriginsGlobal(getSpeciesTree().getTree(), allScenarios, samples, originsDir);
   auto totalTransferFile = FileSystem::joinPaths(recDir, "transfers.txt");
-  Scenario::mergeTransfers(_speciesTree->getTree(),
+  Scenario::mergeTransfers(getSpeciesTree().getTree(),
       totalTransferFile, 
       summaryTransferFiles, 
       true, false);
@@ -493,7 +493,7 @@ void AleOptimizer::optimizeDates(bool )
   if (!_info.isDated()) {
     return; 
   }
-  auto scoredBackups = DatedSpeciesTreeSearch::optimizeDatesFromReconciliation(*_speciesTree, getEvaluator(), 500, 20);
+  auto scoredBackups = DatedSpeciesTreeSearch::optimizeDatesFromReconciliation(getSpeciesTree(), getEvaluator(), 500, 20);
   Logger::timed << "Sorted dating likelihoods from fast datings:" << std::endl;
   for (auto &sb: scoredBackups) {
     Logger::info << sb.score << " ";
@@ -502,11 +502,11 @@ void AleOptimizer::optimizeDates(bool )
  
 
   auto bestLL = scoredBackups[0].score;
-  _searchState.bestLL = bestLL;
-  _speciesTree->getDatedTree().restore(scoredBackups[0].backup);
-  DatedSpeciesTreeSearch::optimizeDates(*_speciesTree,
+  _speciesTreeSearchState.bestLL = bestLL;
+  getSpeciesTree().getDatedTree().restore(scoredBackups[0].backup);
+  DatedSpeciesTreeSearch::optimizeDates(getSpeciesTree(),
       getEvaluator(),
-      _searchState,
+      _speciesTreeSearchState,
       bestLL,
       true);
 
@@ -517,12 +517,12 @@ void AleOptimizer::optimizeDates(bool )
 
 void AleOptimizer::randomizeRoot()
 {
-  auto &tree = _speciesTree->getDatedTree();
+  auto &tree = getSpeciesTree().getDatedTree();
   unsigned int N = tree.getOrderedSpeciations().size();
   for (unsigned int i = 0; i < N; ++i) {
     auto direction = Random::getInt() % 4;
-    if (SpeciesTreeOperator::canChangeRoot(*_speciesTree, direction)) {
-      SpeciesTreeOperator::changeRoot(*_speciesTree, direction);
+    if (SpeciesTreeOperator::canChangeRoot(getSpeciesTree(), direction)) {
+      SpeciesTreeOperator::changeRoot(getSpeciesTree(), direction);
     }
   }
 }

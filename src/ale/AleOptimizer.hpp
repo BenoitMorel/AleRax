@@ -1,5 +1,6 @@
 #pragma once
 
+#include "AleState.hpp"
 #include <search/SpeciesRootSearch.hpp>
 #include <trees/SpeciesTree.hpp>
 #include <IO/FamiliesFileParser.hpp>
@@ -105,8 +106,14 @@ public:
   /**
    *  Accessor
    */
-  SpeciesTree &getSpeciesTree() {return *_speciesTree;}
-  
+  SpeciesTree &getSpeciesTree() {return *_state.speciesTree;}
+ 
+  /**
+   *  Accessor
+   */
+  AleModelParameters &getModelParameters() {return _state.modelParameters;}
+  const AleModelParameters &getModelParameters() const {return _state.modelParameters;}
+
   const RecModelInfo &getRecModelInfo() const {return _info;}
 
   void saveBestHighways(const std::vector<ScoredHighway> &highways,
@@ -114,14 +121,13 @@ public:
   void saveRELLSupports();
   std::string getHighwaysOutputDir() const;
 private:
-  std::unique_ptr<SpeciesTree> _speciesTree;
+  AleState _state;
   const Families &_families;
   PerCoreGeneTrees _geneTrees;
   RecModelInfo _info;
   std::unique_ptr<AleEvaluator> _evaluator;
-  AleModelParameters _modelRates;
   std::string _outputDir;
-  SpeciesSearchState _searchState;
+  SpeciesSearchState _speciesTreeSearchState;
   RootLikelihoods _rootLikelihoods;
   
   double sprSearch(unsigned int radius);

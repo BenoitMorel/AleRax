@@ -1,6 +1,7 @@
 #pragma once
 
 #include <util/RecModelInfo.hpp>
+#include <util/types.hpp>
 #include <maths/ModelParameters.hpp>
 
 #include <vector>
