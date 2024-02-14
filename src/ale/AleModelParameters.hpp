@@ -102,14 +102,6 @@ public:
     return res;
   }
   
-private:
-  unsigned int getSpeciesBranchNumber() const {return _speciesBranchNumber;}
-
-  /**
-   * Number of tree parameters for all categories
-   */
-  unsigned int getFreeParameters() const {return getSpeciesBranchNumber() * getParamTypeNumber();} 
-  
   /**
    *  Get a specific rate for a specific species
    */
@@ -123,6 +115,15 @@ private:
   void setParameter(unsigned int species, unsigned int rate, double val) {
     _parameters[species * getParamTypeNumber() + rate] = val;
   }
+private:
+  unsigned int getSpeciesBranchNumber() const {return _speciesBranchNumber;}
+
+  /**
+   * Number of tree parameters for all categories
+   */
+  unsigned int getFreeParameters() const {return getSpeciesBranchNumber() * getParamTypeNumber();} 
+  
+  
   
   unsigned int _paramTypeNumber;
   unsigned int _speciesBranchNumber;

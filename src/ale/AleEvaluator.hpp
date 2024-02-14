@@ -76,8 +76,6 @@ public:
   
   /**
    *  Optimize the model rates
-   *
-   *  TODO: move it to AleOptimizer
    */
   virtual double optimizeModelRates(bool thorough);
   
