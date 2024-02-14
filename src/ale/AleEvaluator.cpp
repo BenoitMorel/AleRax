@@ -329,7 +329,6 @@ public:
         _evaluator.getSpeciesToCat(),
         paramTypeNumber);
     for (unsigned int i = 0; i < _evaluator.getLocalFamilyNumber(); ++i) {
-      // TODO adapt parameters with perSpecies categories
       _evaluator.setFamilyParameters(i, fullParameters);
     }
     auto res = _evaluator.computeLikelihood();
@@ -349,9 +348,20 @@ public:
     _family(family)
   {}
 
-  virtual double evaluate(Parameters &parameters) {
+  void setParameters(Parameters &parameters) 
+  {
     parameters.ensurePositivity();
-    _evaluator.setFamilyParameters(_family, parameters);
+    auto paramTypeNumber = _evaluator.getRecModelInfo().modelFreeParameters(); 
+    parameters.ensurePositivity();
+    auto fullParameters = AleModelParameters::getParametersFromCategorized(parameters,
+        _evaluator.getSpeciesToCat(),
+        paramTypeNumber);
+    _evaluator.setFamilyParameters(_family, fullParameters);
+  }
+
+  virtual double evaluate(Parameters &parameters) 
+  {
+    setParameters(parameters);
     auto res = _evaluator.computeFamilyLikelihood(_family);
     parameters.setScore(res);
     return res;
@@ -414,15 +424,13 @@ double AleEvaluator::optimizeModelRates(bool thorough)
     }
     if (_info.perFamilyRates) {
       for (unsigned int family = 0; family < _evaluations.size(); ++family) {
-        // TODO
-        assert(false);
-        /*
         DTLFamilyParametersOptimizer function(*this, family);
-        _modelParameters.setParametersForFamily(family, DTLOptimizer::optimizeParameters(
+        auto categorizedParameters = _modelParameters[family].getCategorizedParameters(_speciesToCat);
+        auto bestParameters = DTLOptimizer::optimizeParameters(
               function,
-              _modelParameters.getParametersForFamily(family),
-              settings));
-        */
+              categorizedParameters,
+              settings);
+        function.setParameters(bestParameters);
       }
       ll = computeLikelihood();
       Logger::timed << "[Species search]   After model rate opt, ll=" << ll << std::endl;

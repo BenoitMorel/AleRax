@@ -259,17 +259,12 @@ void AleOptimizer::saveRatesAndLL()
         ratesOs << names << " ";
       }
       ratesOs << std::endl;
-      // TODO
-      assert(false);
-      /*
-      auto parameters = getModelParameters().getParametersForFamily(i);
-      assert(parameters.dimensions() == parameterNames.size());
-      for (unsigned int j = 0; j < parameters.dimensions(); ++j) {
+      auto parameters = getModelParameters()[i].getParameters(); 
+      assert(getModelParameters()[i].getParamTypeNumber() == parameterNames.size());
+      for (unsigned int j = 0; j < getModelParameters()[i].getParamTypeNumber(); ++j) {
         ratesOs << parameters[j] << " ";
       }
-      */
     }
-
   } else {
     auto globalRatesPath = FileSystem::joinPaths(ratesDir, "model_parameters.txt");
 
