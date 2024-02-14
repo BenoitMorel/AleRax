@@ -2,7 +2,6 @@
 #include "AleOptimizer.hpp" 
 #include <IO/FileSystem.hpp>
 #include <IO/Logger.hpp>
-#include <IO/IO.hpp>
 #include <optimizers/DTLOptimizer.hpp>
 #include <util/Paths.hpp>
 #include <maths/Random.hpp>
@@ -19,58 +18,6 @@ static bool testAndSwap(size_t &hash1, size_t &hash2) {
 }
 
 
-static void getSpeciesToCatRec(corax_rnode_t *node,
-    std::vector<unsigned int> &speciesToCat,
-    unsigned int currentCat,
-    const std::map<std::string, unsigned int> &labelToCat)
-{
-  std::string label = node->label;
-  auto it = labelToCat.find(label);
-  if (it != labelToCat.end()) {
-    currentCat = it->second;
-  }
-  speciesToCat[node->node_index] = currentCat;
-  if (node->left) {
-    getSpeciesToCatRec(node->left, speciesToCat, currentCat, labelToCat);
-    getSpeciesToCatRec(node->right, speciesToCat, currentCat, labelToCat);
-  }
-}
-
-void  getSpeciesToCat(const PLLRootedTree &speciesTree,
-    const std::string &speciesCategoryFile,
-    std::vector<unsigned int> &speciesToCat,
-    std::vector<std::string> &catToLabel)
-{
-  unsigned int N = speciesTree.getNodeNumber();
-  speciesToCat = std::vector<unsigned int>(N, 0);
-  catToLabel.push_back("all");
-  std::ifstream is(speciesCategoryFile);
-  if (!is) {
-    return;
-  }
-  std::map<std::string, unsigned int> labelToCat;
-  std::string line;
-  auto allLabels = speciesTree.getLabels(false);
-  while (std::getline(is, line)) {
-    IO::removeSpaces(line);
-    if (line.size() == 0 || labelToCat.find(line) != labelToCat.end()) {
-      continue;
-    }
-    if (allLabels.find(line) == allLabels.end()) {
-      Logger::error << "Warning, label " << line << " from " << 
-        speciesCategoryFile << " is not in the species tree" << std::endl;
-      continue;
-    }
-    unsigned int cat = labelToCat.size() + 1;
-    labelToCat.insert({line, cat});
-    catToLabel.push_back(line);
-  }
-  getSpeciesToCatRec(speciesTree.getRoot(),
-      speciesToCat,
-      0,
-      labelToCat);
-  
-}
 
 AleOptimizer::AleOptimizer(
     const std::string speciesTreeFile, 
@@ -91,26 +38,21 @@ AleOptimizer::AleOptimizer(
       _geneTrees.getTrees().size()),
   _rootLikelihoods(_geneTrees.getTrees().size())
 {
-  std::vector<unsigned int> speciesToCat;
-  std::vector<std::string> catToLabel;
-  getSpeciesToCat(getSpeciesTree().getTree(),
-      speciesCategoryFile,
-      speciesToCat,
-      catToLabel);
-  _state.modelParameters = AleModelParameters(startingRates, 
-      speciesToCat, 
-      catToLabel,
-      _geneTrees.getTrees().size(),
-      info);
+  for (unsigned int i = 0; i < _geneTrees.getTrees().size(); ++i) {
+    _state.perFamilyModelParameters.push_back(AleModelParameters(startingRates, 
+      getSpeciesTree().getTree().getNodeNumber()));
+  }
   getSpeciesTree().addListener(this);
   ParallelContext::barrier();
   _evaluator = std::make_unique<AleEvaluator>(
       getSpeciesTree(), 
+      getRecModelInfo(),
       getModelParameters(), 
       optimizeRates,
       optimizeVerbose,
       families, 
       _geneTrees,
+      speciesCategoryFile,
       _outputDir);
   Logger::timed << "Initial ll=" << getEvaluator().computeLikelihood() 
     << std::endl;
@@ -317,11 +259,15 @@ void AleOptimizer::saveRatesAndLL()
         ratesOs << names << " ";
       }
       ratesOs << std::endl;
+      // TODO
+      assert(false);
+      /*
       auto parameters = getModelParameters().getParametersForFamily(i);
       assert(parameters.dimensions() == parameterNames.size());
       for (unsigned int j = 0; j < parameters.dimensions(); ++j) {
         ratesOs << parameters[j] << " ";
       }
+      */
     }
 
   } else {

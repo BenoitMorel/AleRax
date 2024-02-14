@@ -31,6 +31,7 @@ public:
    *  Constructor
    *
    *  @param speciesTree The instance of the species tree 
+   *  @param info 
    *  @param modelRates The instance of the model parameters
    *  @param optimizeRates If set to false, model parameter optimization will be skipped
    *  @param optimizeVerbose If set to true, the optimization routines will print more logs
@@ -39,11 +40,13 @@ public:
    *  @param outputDir AleRax' output directory
    */
   AleEvaluator(SpeciesTree &speciesTree,
-      AleModelParameters &modelRates, 
+      const RecModelInfo &info,
+      std::vector<AleModelParameters> &modelParameters, 
       bool optimizeRates,
       bool optimizeVerbose,
       const Families &families,
       PerCoreGeneTrees &geneTrees,
+      const std::string &speciesCategoryFile,
       const std::string &outputDir);
   /**
    *  Destructor
@@ -81,7 +84,7 @@ public:
   /**
    *  Return true if the reconciliation model is dated
    */ 
-  virtual bool isDated() const {return _modelRates.getInfo().isDated();}
+  virtual bool isDated() const {return _info.isDated();}
   
   /**
    *  Sample reconciliations and returns the HGT frequencies and 
@@ -97,16 +100,16 @@ public:
   /**
    *  Are we in prune species tree mode?
    */
-  virtual bool pruneSpeciesTree() const {return _modelRates.getInfo().pruneSpeciesTree;}
+  virtual bool pruneSpeciesTree() const {return getRecModelInfo().pruneSpeciesTree;}
  
-  const RecModelInfo &getRecModelInfo() const {return _modelRates.getInfo();}
+  const RecModelInfo &getRecModelInfo() const {return _info;}
 
   /**
    * Set the alpha parameter of the gamma function for the family rate categories
    */
   virtual void setAlpha(double alpha);
-  virtual void setParameters(Parameters &parameters);
-  virtual void setFamilyParameters(unsigned int family, Parameters &parameters);
+  virtual void setParameters(const std::vector<Parameters> &parameters);
+  virtual void setFamilyParameters(unsigned int family, const Parameters &parameters);
   virtual void onSpeciesDatesChange();  
   virtual void onSpeciesTreeChange(
       const std::unordered_set<corax_rnode_t *> *nodesToInvalidate);
@@ -127,6 +130,9 @@ public:
   std::string getOutputDir() const {return _outputDir;}
   void savePerFamilyLikelihoodDiff(const std::string &output); 
   void saveSnapshotPerFamilyLL();
+  std::vector<AleModelParameters> &getModelParameters() {return _modelParameters;}
+  unsigned int getLocalFamilyNumber() const {return _geneTrees.getTrees().size();}
+  const std::vector<unsigned int> &getSpeciesToCat() const {return _speciesToCat;}
 protected:
   virtual double optimizeGammaRates();
   void resetEvaluation(unsigned int i, bool highPrecision);
@@ -136,7 +142,8 @@ protected:
   void resetAllPrecisions();
 private:
   SpeciesTree &_speciesTree;
-  AleModelParameters &_modelRates;
+  const RecModelInfo &_info;
+  std::vector<AleModelParameters> &_modelParameters;
   bool _optimizeRates;
   std::vector<Highway> _highways;
   const Families &_families;
@@ -147,6 +154,8 @@ private:
   std::string _outputDir;
   std::vector<double> _snapshotPerFamilyLL;
   bool _optimizeVerbose;
+  std::vector<unsigned int> _speciesToCat;
+  std::vector<std::string> _catToLabel;
 };
 
 

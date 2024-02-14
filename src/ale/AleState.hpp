@@ -1,5 +1,8 @@
 #pragma once
 
+#include <vector>
+#include <string>
+
 #include <trees/SpeciesTree.hpp>
 #include "AleModelParameters.hpp"
 
@@ -38,6 +41,5 @@ struct AleState {
   // current species tree
   std::unique_ptr<SpeciesTree> speciesTree;
   // current model parameters
-  AleModelParameters modelParameters;
-
+  std::vector<AleModelParameters> perFamilyModelParameters;
 };

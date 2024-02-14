@@ -111,8 +111,8 @@ public:
   /**
    *  Accessor
    */
-  AleModelParameters &getModelParameters() {return _state.modelParameters;}
-  const AleModelParameters &getModelParameters() const {return _state.modelParameters;}
+  std::vector<AleModelParameters> &getModelParameters() {return _state.perFamilyModelParameters;}
+  const std::vector<AleModelParameters> &getModelParameters() const {return _state.perFamilyModelParameters;}
 
   const RecModelInfo &getRecModelInfo() const {return _info;}
 

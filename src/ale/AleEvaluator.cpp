@@ -1,6 +1,7 @@
 #include "AleOptimizer.hpp" 
 #include <IO/FileSystem.hpp>
 #include <IO/Logger.hpp>
+#include <IO/IO.hpp>
 #include <optimizers/DTLOptimizer.hpp>
 #include <util/Paths.hpp>
 #include <maths/Random.hpp>
@@ -10,17 +11,69 @@
 #include <memory>  
 #include <algorithm>
 
+// helper function for getSpeciesToCat
+static void extractSpeciesToCatRec(corax_rnode_t *node,
+    std::vector<unsigned int> &speciesToCat,
+    unsigned int currentCat,
+    const std::map<std::string, unsigned int> &labelToCat)
+{
+  std::string label = node->label;
+  auto it = labelToCat.find(label);
+  if (it != labelToCat.end()) {
+    currentCat = it->second;
+  }
+  speciesToCat[node->node_index] = currentCat;
+  if (node->left) {
+    extractSpeciesToCatRec(node->left, speciesToCat, currentCat, labelToCat);
+    extractSpeciesToCatRec(node->right, speciesToCat, currentCat, labelToCat);
+  }
+}
+
+static void  extractSpeciesToCat(const PLLRootedTree &speciesTree,
+    const std::string &speciesCategoryFile,
+    std::vector<unsigned int> &speciesToCat,
+    std::vector<std::string> &catToLabel)
+{
+  unsigned int N = speciesTree.getNodeNumber();
+  speciesToCat = std::vector<unsigned int>(N, 0);
+  catToLabel.push_back("all");
+  std::ifstream is(speciesCategoryFile);
+  if (!is) {
+    return;
+  }
+  std::map<std::string, unsigned int> labelToCat;
+  std::string line;
+  auto allLabels = speciesTree.getLabels(false);
+  while (std::getline(is, line)) {
+    IO::removeSpaces(line);
+    if (line.size() == 0 || labelToCat.find(line) != labelToCat.end()) {
+      continue;
+    }
+    if (allLabels.find(line) == allLabels.end()) {
+      Logger::error << "Warning, label " << line << " from " << 
+        speciesCategoryFile << " is not in the species tree" << std::endl;
+      continue;
+    }
+    unsigned int cat = labelToCat.size() + 1;
+    labelToCat.insert({line, cat});
+    catToLabel.push_back(line);
+  }
+  extractSpeciesToCatRec(speciesTree.getRoot(),
+      speciesToCat,
+      0,
+      labelToCat);
+}
+
 static std::shared_ptr<MultiModel> createModel(SpeciesTree &speciesTree,
   const FamilyInfo &family,
+  const RecModelInfo &info,
   const AleModelParameters &modelParameters,
   const std::vector<Highway> &highways,
-  bool highPrecision,
-  unsigned int index)
+  bool highPrecision)
 {
   std::shared_ptr<MultiModel> model;
   GeneSpeciesMapping mapping;
   mapping.fill(family.mappingFile, family.startingGeneTree);
-  const auto &info = modelParameters.getInfo();  
   switch (info.model) {
   case RecModel::UndatedDL:
     if (highPrecision) {
@@ -57,7 +110,7 @@ static std::shared_ptr<MultiModel> createModel(SpeciesTree &speciesTree,
     break;
   }
   RatesVector rates;
-  modelParameters.getRatesForFamily(index, rates);
+  modelParameters.getRateVector(rates);
   model->setRates(rates);
   model->setHighways(highways);
   return model;
@@ -65,14 +118,17 @@ static std::shared_ptr<MultiModel> createModel(SpeciesTree &speciesTree,
 
 AleEvaluator::AleEvaluator(
     SpeciesTree &speciesTree,
-    AleModelParameters &modelRates, 
+    const RecModelInfo &info,
+    std::vector<AleModelParameters> &modelParameters, 
     bool optimizeRates,
     bool optimizeVerbose,
     const Families &families,
     PerCoreGeneTrees &geneTrees,
+    const std::string &speciesCategoryFile,
     const std::string &outputDir):
   _speciesTree(speciesTree),
-  _modelRates(modelRates),
+  _info(info),
+  _modelParameters(modelParameters),
   _optimizeRates(optimizeRates),
   _families(families),
   _geneTrees(geneTrees),
@@ -80,6 +136,10 @@ AleEvaluator::AleEvaluator(
   _outputDir(outputDir),
   _optimizeVerbose(optimizeVerbose)
 {
+  extractSpeciesToCat(_speciesTree.getTree(),
+      speciesCategoryFile,
+      _speciesToCat,
+      _catToLabel);
   Logger::timed << "Initializing ccps and evaluators..." << std::endl;
   _evaluations.resize(_geneTrees.getTrees().size());
   for (unsigned int i = 0; i < _geneTrees.getTrees().size(); ++i) {
@@ -109,10 +169,10 @@ void AleEvaluator::resetEvaluation(unsigned int i, bool highPrecision)
   auto &family = _families[famIndex];
   _evaluations[i] = createModel(_speciesTree, 
       family,
-      _modelRates,
+      _info,
+      _modelParameters[i],
       _highways,
-      highPrecision,
-      i);
+      highPrecision);
   _highPrecisions[i] = highPrecision;
   auto ll = _evaluations[i]->computeLogLikelihood();
   if (highPrecision) {
@@ -251,16 +311,27 @@ void AleEvaluator::removeHighway()
 }
 
 
-class DTLParametersOptimizer: public FunctionToOptimize
+
+/**
+ *  Optimize a set of DTL parameters that are shared among gene families
+ */
+class DTLParametersOptimizerGlobal: public FunctionToOptimize
 {
 public:
-  DTLParametersOptimizer(AleEvaluator &evaluator):
+  DTLParametersOptimizerGlobal(AleEvaluator &evaluator):
     _evaluator(evaluator)
   {}
 
   virtual double evaluate(Parameters &parameters) {
+    auto paramTypeNumber = _evaluator.getRecModelInfo().modelFreeParameters(); 
     parameters.ensurePositivity();
-    _evaluator.setParameters(parameters);
+    auto fullParameters = AleModelParameters::getParametersFromCategorized(parameters,
+        _evaluator.getSpeciesToCat(),
+        paramTypeNumber);
+    for (unsigned int i = 0; i < _evaluator.getLocalFamilyNumber(); ++i) {
+      // TODO adapt parameters with perSpecies categories
+      _evaluator.setFamilyParameters(i, fullParameters);
+    }
     auto res = _evaluator.computeLikelihood();
     parameters.setScore(res);
     return res;
@@ -286,39 +357,30 @@ public:
     return res;
   }
 
+  
+
 private:
+
+  
+
   AleEvaluator &_evaluator;
   unsigned int _family;
 };
   
 
-void AleEvaluator::setParameters(Parameters &parameters)
+void AleEvaluator::setParameters(const std::vector<Parameters> &parameters)
 {
-  unsigned int freeParameters = Enums::freeParameters(_modelRates.getInfo().model);
-  if (!freeParameters) {
-    return;
-  }
-  assert(parameters.dimensions());
-  assert(0 == parameters.dimensions() % freeParameters);
-  _modelRates.setParameters(parameters);
-  unsigned int index = 0;
-  for (auto evaluation: _evaluations) { 
-    RatesVector rates;
-    _modelRates.getRatesForFamily(index, rates);
-    evaluation->setRates(rates);
-    ++index;
+  for (unsigned int i = 0; i < getLocalFamilyNumber(); ++i) {
+    setFamilyParameters(i, parameters[i]);
   }
 }
 
-void AleEvaluator::setFamilyParameters(unsigned int family, Parameters &parameters)
+void AleEvaluator::setFamilyParameters(unsigned int family, const Parameters &parameters)
 {
-  unsigned int freeParameters = Enums::freeParameters(_modelRates.getInfo().model);
-  assert(parameters.dimensions());
-  assert(0 == parameters.dimensions() % freeParameters);
-  _modelRates.setParametersForFamily(family, parameters);
-  RatesVector rates;
-  _modelRates.getRatesForFamily(family, rates);
-  _evaluations[family]->setRates(rates);
+  RatesVector rateVector;
+  _modelParameters[family].setParameters(parameters);
+  _modelParameters[family].getRateVector(rateVector);
+  _evaluations[family]->setRates(rateVector);
 }
 
 double AleEvaluator::optimizeModelRates(bool thorough)
@@ -326,7 +388,7 @@ double AleEvaluator::optimizeModelRates(bool thorough)
   double ll = 0.0;
   if (_optimizeRates) {
     OptimizationSettings settings;
-    settings.strategy = _modelRates.getInfo().recOpt;
+    settings.strategy = _info.recOpt;
     settings.verbose = _optimizeVerbose;
     ll = computeLikelihood();
     Logger::timed << "[Species search] Optimizing model rates ";
@@ -350,25 +412,30 @@ double AleEvaluator::optimizeModelRates(bool thorough)
       settings.minAlpha = 0.005;
       settings.optimizationMinImprovement = settings.lineSearchMinImprovement;
     }
-    if (_modelRates.getInfo().perFamilyRates) {
+    if (_info.perFamilyRates) {
       for (unsigned int family = 0; family < _evaluations.size(); ++family) {
+        // TODO
+        assert(false);
+        /*
         DTLFamilyParametersOptimizer function(*this, family);
-        _modelRates.setParametersForFamily(family, DTLOptimizer::optimizeParameters(
+        _modelParameters.setParametersForFamily(family, DTLOptimizer::optimizeParameters(
               function,
-              _modelRates.getParametersForFamily(family),
+              _modelParameters.getParametersForFamily(family),
               settings));
-
+        */
       }
       ll = computeLikelihood();
       Logger::timed << "[Species search]   After model rate opt, ll=" << ll << std::endl;
     } else {
-      DTLParametersOptimizer function(*this);
-      _modelRates.setParameters(DTLOptimizer::optimizeParameters(
+      DTLParametersOptimizerGlobal function(*this);
+      auto categorizedParameters = _modelParameters[0].getCategorizedParameters(_speciesToCat);
+      auto bestParameters = DTLOptimizer::optimizeParameters(
           function, 
-          _modelRates.getParameters(),
-          settings));
+          categorizedParameters,
+          settings);
+      function.evaluate(bestParameters); // set the parameters
       ll = computeLikelihood();
-      Logger::timed << "[Species search]   After model rate opt, ll=" << ll << " rates: " << _modelRates << std::endl;
+      Logger::timed << "[Species search]   After model rate opt, ll=" << ll << std::endl;// " rates: " << _modelParameters << std::endl;
     }
   }
   ll = optimizeGammaRates();
@@ -387,7 +454,7 @@ static double callback(void *p, double x)
 
 double AleEvaluator::optimizeGammaRates()
 {
-  auto gammaCategories = _modelRates.getInfo().gammaCategories;
+  auto gammaCategories = _info.gammaCategories;
   auto ll = computeLikelihood();
   if (gammaCategories == 1) {
     return ll;
@@ -406,7 +473,7 @@ double AleEvaluator::optimizeGammaRates()
                                   (void *)this,
                                   &callback);
   setAlpha(alpha);
-  std::vector<double> categories(_modelRates.getInfo().gammaCategories);
+  std::vector<double> categories(_info.gammaCategories);
   corax_compute_gamma_cats(alpha, categories.size(), &categories[0], 
       CORAX_GAMMA_RATES_MEAN);
   Logger::timed << "[Species search]   After gamma cat  opt, ll=" << ll << std::endl;
@@ -432,7 +499,7 @@ void AleEvaluator::getTransferInformation(SpeciesTree &speciesTree,
   transferFrequencies.count = MatrixUint(labelsNumber, zeros);
   transferFrequencies.idToLabel = idToLabel;
   perSpeciesEvents = PerSpeciesEvents(speciesTree.getTree().getNodeNumber());
-  auto infoCopy = _modelRates.getInfo();
+  auto infoCopy = _info;
   infoCopy.originationStrategy = OriginationStrategy::UNIFORM;
   infoCopy.transferConstraint = TransferConstaint::PARENTS;
   for (const auto &geneTree: _geneTrees.getTrees()) {
