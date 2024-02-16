@@ -73,35 +73,6 @@ public:
     }
   }
 
-  Parameters getCategorizedParameters(std::vector<unsigned int> &speciesToCategories)
-  {
-    auto catNumber = *std::max_element(speciesToCategories.begin(), 
-        speciesToCategories.end()) + 1; 
-    Parameters res(catNumber * getParamTypeNumber());
-    for (unsigned int type = 0; type < getParamTypeNumber(); ++type) {
-      for (unsigned int species = 0; species < speciesToCategories.size(); ++species) {
-        auto cat = speciesToCategories[species];
-        res[cat * getParamTypeNumber() + type] = getParameter(species, type);
-      }
-    }
-    return res;
-  }
-
-  static Parameters getParametersFromCategorized(const Parameters &categorizedParameters,
-      const std::vector<unsigned int> &speciesToCategories,
-      unsigned int paramTypeNumber)
-  {
-    Parameters res(paramTypeNumber * speciesToCategories.size());
-    for (unsigned int type = 0; type < paramTypeNumber; ++type) {
-      for (unsigned int species = 0; species < speciesToCategories.size(); ++species) {
-        auto cat = speciesToCategories[species];
-        res[species * paramTypeNumber +  type] = 
-          categorizedParameters[cat * paramTypeNumber + type];
-      }
-    }
-    return res;
-  }
-  
   /**
    *  Get a specific rate for a specific species
    */

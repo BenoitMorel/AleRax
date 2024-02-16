@@ -11,59 +11,6 @@
 #include <memory>  
 #include <algorithm>
 
-// helper function for getSpeciesToCat
-static void extractSpeciesToCatRec(corax_rnode_t *node,
-    std::vector<unsigned int> &speciesToCat,
-    unsigned int currentCat,
-    const std::map<std::string, unsigned int> &labelToCat)
-{
-  std::string label = node->label;
-  auto it = labelToCat.find(label);
-  if (it != labelToCat.end()) {
-    currentCat = it->second;
-  }
-  speciesToCat[node->node_index] = currentCat;
-  if (node->left) {
-    extractSpeciesToCatRec(node->left, speciesToCat, currentCat, labelToCat);
-    extractSpeciesToCatRec(node->right, speciesToCat, currentCat, labelToCat);
-  }
-}
-
-static void  extractSpeciesToCat(const PLLRootedTree &speciesTree,
-    const std::string &speciesCategoryFile,
-    std::vector<unsigned int> &speciesToCat,
-    std::vector<std::string> &catToLabel)
-{
-  unsigned int N = speciesTree.getNodeNumber();
-  speciesToCat = std::vector<unsigned int>(N, 0);
-  catToLabel.push_back("all");
-  std::ifstream is(speciesCategoryFile);
-  if (!is) {
-    return;
-  }
-  std::map<std::string, unsigned int> labelToCat;
-  std::string line;
-  auto allLabels = speciesTree.getLabels(false);
-  while (std::getline(is, line)) {
-    IO::removeSpaces(line);
-    if (line.size() == 0 || labelToCat.find(line) != labelToCat.end()) {
-      continue;
-    }
-    if (allLabels.find(line) == allLabels.end()) {
-      Logger::error << "Warning, label " << line << " from " << 
-        speciesCategoryFile << " is not in the species tree" << std::endl;
-      continue;
-    }
-    unsigned int cat = labelToCat.size() + 1;
-    labelToCat.insert({line, cat});
-    catToLabel.push_back(line);
-  }
-  extractSpeciesToCatRec(speciesTree.getRoot(),
-      speciesToCat,
-      0,
-      labelToCat);
-}
-
 static std::shared_ptr<MultiModel> createModel(SpeciesTree &speciesTree,
   const FamilyInfo &family,
   const RecModelInfo &info,
@@ -134,12 +81,9 @@ AleEvaluator::AleEvaluator(
   _geneTrees(geneTrees),
   _highPrecisions(_geneTrees.getTrees().size(), -1),
   _outputDir(outputDir),
-  _optimizeVerbose(optimizeVerbose)
+  _optimizeVerbose(optimizeVerbose),
+  _optimizationClasses(_speciesTree.getTree(), speciesCategoryFile, _info)
 {
-  extractSpeciesToCat(_speciesTree.getTree(),
-      speciesCategoryFile,
-      _speciesToCat,
-      _catToLabel);
   Logger::timed << "Initializing ccps and evaluators..." << std::endl;
   _evaluations.resize(_geneTrees.getTrees().size());
   for (unsigned int i = 0; i < _geneTrees.getTrees().size(); ++i) {
@@ -323,11 +267,8 @@ public:
   {}
 
   virtual double evaluate(Parameters &parameters) {
-    auto paramTypeNumber = _evaluator.getRecModelInfo().modelFreeParameters(); 
     parameters.ensurePositivity();
-    auto fullParameters = AleModelParameters::getParametersFromCategorized(parameters,
-        _evaluator.getSpeciesToCat(),
-        paramTypeNumber);
+    auto fullParameters = _evaluator.getOptimizationClasses().getFullParameters(parameters);
     for (unsigned int i = 0; i < _evaluator.getLocalFamilyNumber(); ++i) {
       _evaluator.setFamilyParameters(i, fullParameters);
     }
@@ -353,9 +294,7 @@ public:
     parameters.ensurePositivity();
     auto paramTypeNumber = _evaluator.getRecModelInfo().modelFreeParameters(); 
     parameters.ensurePositivity();
-    auto fullParameters = AleModelParameters::getParametersFromCategorized(parameters,
-        _evaluator.getSpeciesToCat(),
-        paramTypeNumber);
+    auto fullParameters = _evaluator.getOptimizationClasses().getFullParameters(parameters);
     _evaluator.setFamilyParameters(_family, fullParameters);
   }
 
@@ -367,12 +306,7 @@ public:
     return res;
   }
 
-  
-
 private:
-
-  
-
   AleEvaluator &_evaluator;
   unsigned int _family;
 };
@@ -425,7 +359,7 @@ double AleEvaluator::optimizeModelRates(bool thorough)
     if (_info.perFamilyRates) {
       for (unsigned int family = 0; family < _evaluations.size(); ++family) {
         DTLFamilyParametersOptimizer function(*this, family);
-        auto categorizedParameters = _modelParameters[family].getCategorizedParameters(_speciesToCat);
+        auto categorizedParameters = getOptimizationClasses().getCompressedParameters(_modelParameters[family].getParameters());
         auto bestParameters = DTLOptimizer::optimizeParameters(
               function,
               categorizedParameters,
@@ -436,7 +370,7 @@ double AleEvaluator::optimizeModelRates(bool thorough)
       Logger::timed << "[Species search]   After model rate opt, ll=" << ll << std::endl;
     } else {
       DTLParametersOptimizerGlobal function(*this);
-      auto categorizedParameters = _modelParameters[0].getCategorizedParameters(_speciesToCat);
+      auto categorizedParameters = getOptimizationClasses().getCompressedParameters(_modelParameters[0].getParameters());
       auto bestParameters = DTLOptimizer::optimizeParameters(
           function, 
           categorizedParameters,

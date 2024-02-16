@@ -11,11 +11,12 @@
 #include "Highways.hpp"
 #include <util/Paths.hpp>
 #include <util/RecModelInfo.hpp>
+#include <util/enums.hpp>
 #include <routines/Routines.hpp>
 #include <routines/SlavesMain.hpp>
 #include <IO/HighwayCandidateParser.hpp>
 
-const char *version = "AleRax v1.0.0";
+const char *version = "AleRax v1.0.1";
 
 
 /**
@@ -282,12 +283,17 @@ void initStartingSpeciesTree(AleArguments &args,
  *  that share the same DTL parameters
  */
 void generatePerSpeciesRateFile(const std::string &perSpeciesRatesFile,
-    const std::string &speciesTreePath)
+    const std::string &speciesTreePath,
+    const RecModelInfo &info)
 {
   PLLRootedTree speciesTree(speciesTreePath);
   ParallelOfstream os(perSpeciesRatesFile);
   for (auto label: speciesTree.getLabels(false)) {
-    os << label << std::endl;
+    os << label << " ";
+    for (auto p: info.getParamTypes()) {
+      os << p;
+    }
+    os << "\n";
   }
   os.close();
   ParallelContext::barrier();
@@ -467,7 +473,7 @@ void run( AleArguments &args)
   auto info = buildRecModelInfo(args);
   auto startingRates = buildStartingRates(args, info);
   if (args.perSpeciesRates) {
-    generatePerSpeciesRateFile(args.speciesCategoryFile, args.speciesTree);
+    generatePerSpeciesRateFile(args.speciesCategoryFile, args.speciesTree, info);
   }
   std::string coverageFile(FileSystem::joinPaths(args.output, "fractionMissing.txt"));
   std::string fractionMissingFile(FileSystem::joinPaths(args.output, "perSpeciesCoverage.txt"));

@@ -11,6 +11,7 @@
 #include <vector>
 #include <maths/ModelParameters.hpp>
 
+#include "OptimizationClasses.hpp"
 #include "AleModelParameters.hpp"
 #include <search/UFBoot.hpp>
 
@@ -19,7 +20,7 @@ using MultiEvaluation = MultiModel;
 using MultiEvaluationPtr = 
   std::shared_ptr<MultiEvaluation>;
 using PerCoreMultiEvaluation = std::vector<MultiEvaluationPtr>;
-
+using ParamOptGlasses = std::unordered_map<char, std::vector<unsigned int> >;
 
 /**
  *  Implement the main functions to evaluate the species tree likelihood 
@@ -131,6 +132,7 @@ public:
   std::vector<AleModelParameters> &getModelParameters() {return _modelParameters;}
   unsigned int getLocalFamilyNumber() const {return _geneTrees.getTrees().size();}
   const std::vector<unsigned int> &getSpeciesToCat() const {return _speciesToCat;}
+  const OptimizationClasses &getOptimizationClasses() const {return _optimizationClasses;}
 protected:
   virtual double optimizeGammaRates();
   void resetEvaluation(unsigned int i, bool highPrecision);
@@ -152,8 +154,14 @@ private:
   std::string _outputDir;
   std::vector<double> _snapshotPerFamilyLL;
   bool _optimizeVerbose;
+
+  // _optimizationClasses["D"][5] is the index of the optimization class
+  // of the duplication probability of species branch with index 5.
+  // All parameters that belong to the same optimization class share
+  // the same value
+  OptimizationClasses _optimizationClasses;
+
   std::vector<unsigned int> _speciesToCat;
-  std::vector<std::string> _catToLabel;
 };
 
 

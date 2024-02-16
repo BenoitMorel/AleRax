@@ -104,7 +104,7 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       ccpRooting = ArgumentsHelper::strToCCPRooting(std::string(argv[++i]));
     } else if (arg == "--fraction-missing-file") {
       fractionMissingFile = argv[++i];
-    } else if (arg == "--species-categories") {
+    } else if (arg == "--param-opt-classes") {
       speciesCategoryFile = argv[++i];
     } else if (arg == "--gene-tree-samples") {
       geneTreeSamples = atoi(argv[++i]);
@@ -276,7 +276,7 @@ void AleArguments::printHelp()
   Logger::info << "\t---rec-opt <optimizer>  {Simplex, Gradient}" << std::endl;
   Logger::info << "\t--transfer-constraint {NONE, PARENTS, RELDATED}" << std::endl;
   Logger::info << "\t--prune-species-tree" << std::endl;
-  Logger::info << "\t--species-categories filepath" << std::endl; 
+  Logger::info << "\t--param-opt-classes filepath" << std::endl; 
   Logger::info << "\t--speciation-probability-categories <VALUE>" << std::endl; 
   Logger::info << "\t--gene-tree-rooting {UNIFORM, ROOTED}" << std::endl;
   Logger::info << "\t--fraction-missing-file <filepath>" << std::endl;
