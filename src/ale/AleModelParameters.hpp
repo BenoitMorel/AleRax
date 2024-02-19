@@ -40,10 +40,32 @@ public:
   }
 
   /**
+   *  @brief Constructor
+   *  @param paramTypeNumber Number of different rates per species branch
+   *  @param speciesBranchNumber Number of species branches in the species tree
+   *  @param startingValue Starting value for all rates
+   */
+  AleModelParameters(unsigned int paramTypeNumber,
+      unsigned int speciesBranchNumber,
+      double startingValue):
+    _paramTypeNumber(paramTypeNumber),
+    _speciesBranchNumber(speciesBranchNumber),
+    _parameters(_paramTypeNumber * _speciesBranchNumber)
+  {
+    for (unsigned int i = 0; i < _parameters.dimensions(); ++i) {
+      _parameters[i] = startingValue;
+    }
+  }
+
+  /**
    *  Number of free parameters for a single species category
    */
   unsigned int getParamTypeNumber() const {return _paramTypeNumber;}
-  
+
+  /**
+   *  Number of species branches
+   */
+  unsigned int getSpeciesBranchNumber() const {return _speciesBranchNumber;}
 
   /**
    *  Set rates from a parameter vector
@@ -56,22 +78,14 @@ public:
   /**
    *  Get rates as a parameter vector
    */
-  const Parameters &getParameters() {return _parameters;}
+  const Parameters &getParameters() const {return _parameters;}
+  Parameters &getParameters() {return _parameters;}
   
   /**
    *  Fill rates for a family. Rates is indexed as:
    *  rates[event][species * C + category]
    */
-  void getRateVector(RatesVector &rates) const
-  {
-    rates.resize(getParamTypeNumber());
-    for (unsigned int d = 0; d < getParamTypeNumber(); ++d) { 
-      rates[d].resize(getSpeciesBranchNumber());
-      for (unsigned int s = 0; s < getSpeciesBranchNumber(); ++s) {
-        rates[d][s] = getParameter(s, d);
-      }
-    }
-  }
+  void getRateVector(RatesVector &rates) const;
 
   /**
    *  Get a specific rate for a specific species
@@ -87,14 +101,11 @@ public:
     _parameters[species * getParamTypeNumber() + rate] = val;
   }
 private:
-  unsigned int getSpeciesBranchNumber() const {return _speciesBranchNumber;}
 
   /**
    * Number of tree parameters for all categories
    */
   unsigned int getFreeParameters() const {return getSpeciesBranchNumber() * getParamTypeNumber();} 
-  
-  
   
   unsigned int _paramTypeNumber;
   unsigned int _speciesBranchNumber;

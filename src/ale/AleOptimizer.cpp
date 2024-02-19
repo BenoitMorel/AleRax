@@ -8,7 +8,19 @@
 #include <search/SpeciesSPRSearch.hpp>
 #include <search/SpeciesTransferSearch.hpp>
 #include <search/DatedSpeciesTreeSearch.hpp>
+#include <sys/types.h>
+#include <sys/stat.h>
 
+static bool dirExists(const std::string &pathname) {
+  struct stat info;
+  if(stat(pathname.c_str(), &info) != 0) {
+    return false;
+  } else if( info.st_mode & S_IFDIR) {
+    return true;
+  } else {
+    return false;
+  }
+}
 
 
 
@@ -33,14 +45,21 @@ AleOptimizer::AleOptimizer(
   _geneTrees(families, false, true),
   _info(info),
   _outputDir(outputDir),
+  _checkpointDir(getCheckpointDir(outputDir)),
   _speciesTreeSearchState(getSpeciesTree(),
       Paths::getSpeciesTreeFile(_outputDir, "inferred_species_tree.newick"),
       _geneTrees.getTrees().size()),
   _rootLikelihoods(_geneTrees.getTrees().size())
 {
-  for (unsigned int i = 0; i < _geneTrees.getTrees().size(); ++i) {
-    _state.perFamilyModelParameters.push_back(AleModelParameters(startingRates, 
-      getSpeciesTree().getTree().getNodeNumber()));
+  
+  if (checkpointExists()) {
+    loadCheckpoint();
+  } else {
+    for (unsigned int i = 0; i < _geneTrees.getTrees().size(); ++i) {
+      _state.perFamilyModelParameters.push_back(AleModelParameters(startingRates, 
+        getSpeciesTree().getTree().getNodeNumber()));
+      _state.familyNames.push_back(_geneTrees.getTrees()[i].name);
+    }
   }
   getSpeciesTree().addListener(this);
   ParallelContext::barrier();
@@ -58,6 +77,8 @@ AleOptimizer::AleOptimizer(
     << std::endl;
   saveCurrentSpeciesTreeId("starting_species_tree.newick");
   saveCurrentSpeciesTreeId();
+  FileSystem::mkdir(_checkpointDir, true);
+  saveCheckpoint();
 }
   
 double AleOptimizer::optimizeModelRates(bool thorough)
@@ -67,6 +88,7 @@ double AleOptimizer::optimizeModelRates(bool thorough)
   auto ll = getEvaluator().computeLikelihood(&perFamLL);
   _speciesTreeSearchState.betterLikelihoodCallback(ll, perFamLL);
   saveRatesAndLL();
+  saveCheckpoint();
   return ll;
 }
 
@@ -107,6 +129,7 @@ double AleOptimizer::sprSearch(unsigned int radius)
       _speciesTreeSearchState,
       radius);
   Logger::timed << "After normal search: LL=" << _speciesTreeSearchState.bestLL << std::endl;
+  saveCheckpoint();
   saveSupportTree();
   return _speciesTreeSearchState.bestLL;
 }
@@ -179,7 +202,7 @@ double AleOptimizer::rootSearch(unsigned int maxDepth, bool thorough)
       _speciesTreeSearchState,
       maxDepth,
       &_rootLikelihoods);
-  
+  saveCheckpoint(); 
   return _speciesTreeSearchState.bestLL;
 }
   
@@ -457,7 +480,7 @@ void AleOptimizer::optimizeDates(bool )
       _speciesTreeSearchState,
       bestLL,
       true);
-
+  saveCheckpoint();
   saveCurrentSpeciesTreeId();
 }
 
@@ -503,5 +526,25 @@ bool cmpHighwayByProbability(const ScoredHighway &a, const ScoredHighway &b)
 std::string AleOptimizer::getHighwaysOutputDir() const
 {
   return FileSystem::joinPaths(_outputDir, "highways");
+}
+  
+void AleOptimizer::saveCheckpoint() const 
+{
+  _state.serialize(_checkpointDir);
+}
+  
+void AleOptimizer::loadCheckpoint()
+{
+  assert(checkpointExists());
+  std::vector<std::string> perFamilyNames;
+  for (auto family: _geneTrees.getTrees()) {
+    perFamilyNames.push_back(family.name);
+  }
+  _state.unserialize(_checkpointDir, perFamilyNames);
+}
+
+bool AleOptimizer::checkpointExists(const std::string &outputDir) 
+{
+  return dirExists(getCheckpointDir(outputDir));
 }
 

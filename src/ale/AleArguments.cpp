@@ -41,7 +41,7 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
   sampleFrequency(1),
   geneTreeSamples(DEFAULT_GENE_TREE_SAMPLES),
   output("alerax_output"),
-  cleanupCCP(true),
+  cleanupCCP(false),
   seed(123),
   randomSpeciesRoot(false),
   verboseOptRates(false)
@@ -122,8 +122,8 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       t = atof(argv[++i]);
     } else if (arg == "-p" || arg == "--prefix") {
       output = std::string(argv[++i]);
-    } else if (arg == "--skip-cleanup-ccp") {
-      cleanupCCP = false;
+    } else if (arg == "--cleanup-ccp") {
+      cleanupCCP = true;
     } else if (arg == "--seed") {
       seed = atoi(argv[++i]);
     } else if (arg == "--random-species-root") {

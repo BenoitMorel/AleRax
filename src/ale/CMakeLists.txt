@@ -2,6 +2,7 @@
 set(alerax_SOURCES ale.cpp 
   AleArguments.cpp
   AleEvaluator.cpp
+  AleModelParameters.cpp
   AleOptimizer.cpp
   AleState.cpp
   Highways.cpp

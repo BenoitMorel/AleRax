@@ -4,6 +4,7 @@
 #include <search/SpeciesRootSearch.hpp>
 #include <trees/SpeciesTree.hpp>
 #include <IO/FamiliesFileParser.hpp>
+#include <IO/FileSystem.hpp>
 #include "UndatedDLMultiModel.hpp"
 #include "UndatedDTLMultiModel.hpp"
 #include <trees/PLLRootedTree.hpp>
@@ -120,6 +121,16 @@ public:
       const std::string &output);
   void saveRELLSupports();
   std::string getHighwaysOutputDir() const;
+
+  void saveCheckpoint() const;
+  void loadCheckpoint();
+  bool checkpointExists() const {return checkpointExists(_outputDir);}
+  static bool checkpointExists(const std::string &outputDir);
+  static std::string getCheckpointDir(const std::string &outputDir) {
+    return FileSystem::joinPaths(outputDir, "checkpoint");
+  }
+  AleStep getCurrentStep() const {return _state.currentStep;} 
+  void setCurrentStep(AleStep step) {_state.currentStep = step;} 
 private:
   AleState _state;
   const Families &_families;
@@ -127,6 +138,7 @@ private:
   RecModelInfo _info;
   std::unique_ptr<AleEvaluator> _evaluator;
   std::string _outputDir;
+  std::string _checkpointDir;
   SpeciesSearchState _speciesTreeSearchState;
   RootLikelihoods _rootLikelihoods;
   

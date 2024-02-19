@@ -73,26 +73,19 @@ std::vector<unsigned int> getSortedIndices(const std::vector<unsigned int> &valu
  *  the corresponding CCP objects, and serialize them to a binary file
  *  Each MPI rank will run this function on a subset of the families
  *
- *  @param ccpDir Output directory to store the seralized files
- *  @param ccpDimensionFile Output file with the per-family ccp sizes
  *  @param families The gene families to process
  *  @param ccpRooting Mode to decide how to deal with rooted gene trees
  *  @param sampleFrequency Number used to subsample the gene trees (if set to 2, we only use half)
- *
+ *  @param ccpDimensionFile Output file with the per-family ccp sizes
  *
  */
-void generateCCPs(const std::string &ccpDir, 
-    std::string &outputDir, 
-    Families &families, 
+void generateCCPs(const Families &families, 
     CCPRooting ccpRooting,
-    unsigned int sampleFrequency)
+    unsigned int sampleFrequency,
+    const std::string ccpDimensionFile)
 {
   ParallelContext::barrier();
-  auto ccpDimensionFile = FileSystem::joinPaths(outputDir, "ccpdim.txt");
   Logger::timed << "Generating ccp files..." << std::endl;
-  for (auto &family: families) {
-    family.ccp = FileSystem::joinPaths(ccpDir, family.name + ".ccp");
-  } 
   auto N = families.size();
   
   std::vector<unsigned int> familyIndices;
@@ -303,12 +296,10 @@ void generatePerSpeciesRateFile(const std::string &perSpeciesRatesFile,
 /**
  *  Create AleRax top directories and set ccpDir
  */
-void initAleRaxDirectories(const AleArguments &args, 
-    std::string &ccpDir) 
+void initAleRaxDirectories(const AleArguments &args, const std::string ccpDir) 
 {
   FileSystem::mkdir(args.output, true);
   FileSystem::mkdir(args.output + "/species_trees", true);
-  ccpDir = FileSystem::joinPaths(args.output, "ccps");
   FileSystem::mkdir(ccpDir, true);
   Logger::initFileOutput(FileSystem::joinPaths(args.output, "alerax"));
 }
@@ -462,14 +453,27 @@ void runTransferHighwayInference(const AleArguments &args,
 void run( AleArguments &args)
 {
   Random::setSeed(static_cast<unsigned int>(args.seed));
-  std::string ccpDir;
-  initAleRaxDirectories(args, ccpDir);
+  bool checkpointDetected = AleOptimizer::checkpointExists(args.output);
+  if (checkpointDetected) {
+    Logger::info << "Checkpoint detected" << std::endl;
+  }
+ 
+  auto ccpDir = FileSystem::joinPaths(args.output, "ccps");
+  if (!checkpointDetected) {
+    initAleRaxDirectories(args, ccpDir);
+  }
   printInitialMessage(args);
   auto families = FamiliesFileParser::parseFamiliesFile(args.families);
-  generateCCPs(ccpDir, args.output, families, args.ccpRooting, args.sampleFrequency);
-  filterFamilies(args, families);
-  initStartingSpeciesTree(args, families);
-  checkCCPAndSpeciesTree(families, args.speciesTree); 
+  auto ccpDimensionFile = FileSystem::joinPaths(args.output, "ccpdim.txt");
+  for (auto &family: families) {
+    family.ccp = FileSystem::joinPaths(ccpDir, family.name + ".ccp");
+  } 
+  if (!checkpointDetected) {
+    generateCCPs(families, args.ccpRooting, args.sampleFrequency, ccpDimensionFile);
+    filterFamilies(args, families);
+    initStartingSpeciesTree(args, families);
+    checkCCPAndSpeciesTree(families, args.speciesTree); 
+  }
   auto info = buildRecModelInfo(args);
   auto startingRates = buildStartingRates(args, info);
   if (args.perSpeciesRates) {
@@ -487,13 +491,37 @@ void run( AleArguments &args)
       args.verboseOptRates,
       args.speciesCategoryFile,
       args.output);
-  runSpeciesTreeSearch(args, speciesTreeOptimizer);
-  speciesTreeOptimizer.optimizeModelRates(false);
-  runDateOptimization(args, speciesTreeOptimizer);
-  runTransferHighwayInference(args, speciesTreeOptimizer);
-  if (!args.skipThoroughRates) {
-    speciesTreeOptimizer.optimizeModelRates(true);
+  
+  if (speciesTreeOptimizer.getCurrentStep() <= AleStep::SpeciesTreeOpt) {
+    runSpeciesTreeSearch(args, speciesTreeOptimizer);
+    speciesTreeOptimizer.setCurrentStep(AleStep::ModelRateOpt);
+    speciesTreeOptimizer.saveCheckpoint();
   }
+
+  if (speciesTreeOptimizer.getCurrentStep() <= AleStep::ModelRateOpt) {
+    speciesTreeOptimizer.optimizeModelRates(false);
+    speciesTreeOptimizer.setCurrentStep(AleStep::RelDating);
+    speciesTreeOptimizer.saveCheckpoint();
+  }
+  if (speciesTreeOptimizer.getCurrentStep() <= AleStep::RelDating) {
+    runDateOptimization(args, speciesTreeOptimizer);
+    speciesTreeOptimizer.setCurrentStep(AleStep::Highways);
+    speciesTreeOptimizer.saveCheckpoint();
+  }
+  if (speciesTreeOptimizer.getCurrentStep() <= AleStep::Highways) {
+    runTransferHighwayInference(args, speciesTreeOptimizer);
+    speciesTreeOptimizer.setCurrentStep(AleStep::ModelRateOpt2);
+    speciesTreeOptimizer.saveCheckpoint();
+  }
+  
+  if (speciesTreeOptimizer.getCurrentStep() <= AleStep::ModelRateOpt2) {
+    if (!args.skipThoroughRates) {
+      speciesTreeOptimizer.optimizeModelRates(true);
+    }
+    speciesTreeOptimizer.setCurrentStep(AleStep::Reconciliation);
+    speciesTreeOptimizer.saveCheckpoint();
+  }
+
   Logger::timed <<"Sampling reconciled gene trees... (" << args.geneTreeSamples  << " samples)" << std::endl;
   speciesTreeOptimizer.reconcile(args.geneTreeSamples);
   speciesTreeOptimizer.saveSpeciesTree(); 
