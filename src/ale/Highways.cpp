@@ -63,26 +63,6 @@ static Parameters testHighwayFast(AleEvaluator &evaluator,
   return parameters;
 }
 
-static Parameters testHighway(AleEvaluator &evaluator,
-    Highway &highway,
-    double startingProbability = 0.1)
-{
-  std::vector<Highway *> highways;
-  highways.push_back(&highway);
-  HighwayFunction f(evaluator, highways);
-  Parameters startingParameter(1);
-  startingParameter[0] = startingProbability;
-  OptimizationSettings settings;
-  settings.strategy = evaluator.getRecModelInfo().recOpt; 
-  settings.lineSearchMinImprovement = 0.0;
-  settings.minAlpha = 0.0001;
-  settings.epsilon = 0.00001;
-  auto parameters = DTLOptimizer::optimizeParameters(
-      f, 
-      startingParameter, 
-      settings);
-  return parameters;
-}
 
 static Parameters testHighways(AleEvaluator &evaluator,
     const std::vector<Highway *> &highways,
