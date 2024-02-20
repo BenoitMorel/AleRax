@@ -139,7 +139,7 @@ private:
   std::unique_ptr<AleEvaluator> _evaluator;
   std::string _outputDir;
   std::string _checkpointDir;
-  SpeciesSearchState _speciesTreeSearchState;
+  std::unique_ptr<SpeciesSearchState> _speciesTreeSearchState;
   RootLikelihoods _rootLikelihoods;
   
   double sprSearch(unsigned int radius);

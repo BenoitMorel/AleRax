@@ -46,13 +46,11 @@ AleOptimizer::AleOptimizer(
   _info(info),
   _outputDir(outputDir),
   _checkpointDir(getCheckpointDir(outputDir)),
-  _speciesTreeSearchState(getSpeciesTree(),
-      Paths::getSpeciesTreeFile(_outputDir, "inferred_species_tree.newick"),
-      _geneTrees.getTrees().size()),
   _rootLikelihoods(_geneTrees.getTrees().size())
 {
   
   if (checkpointExists()) {
+    Logger::info << "Loading checkpoint information..." << std::endl;
     loadCheckpoint();
   } else {
     for (unsigned int i = 0; i < _geneTrees.getTrees().size(); ++i) {
@@ -61,6 +59,10 @@ AleOptimizer::AleOptimizer(
       _state.familyNames.push_back(_geneTrees.getTrees()[i].name);
     }
   }
+  _speciesTreeSearchState= std::make_unique<SpeciesSearchState>(getSpeciesTree(),
+      Paths::getSpeciesTreeFile(_outputDir, "inferred_species_tree.newick"),
+      _geneTrees.getTrees().size());
+  Logger::info << getSpeciesTree().getTree().getNewickString() << std::endl;
   getSpeciesTree().addListener(this);
   ParallelContext::barrier();
   _evaluator = std::make_unique<AleEvaluator>(
@@ -86,7 +88,7 @@ double AleOptimizer::optimizeModelRates(bool thorough)
   getEvaluator().optimizeModelRates(thorough);
   PerFamLL perFamLL;
   auto ll = getEvaluator().computeLikelihood(&perFamLL);
-  _speciesTreeSearchState.betterLikelihoodCallback(ll, perFamLL);
+  _speciesTreeSearchState->betterLikelihoodCallback(ll, perFamLL);
   saveRatesAndLL();
   saveCheckpoint();
   return ll;
@@ -98,9 +100,9 @@ void AleOptimizer::optimize()
   size_t hash2 = 0;
   unsigned int index = 0;
   PerFamLL initialPerFamLL;
-  _speciesTreeSearchState.bestLL = getEvaluator().computeLikelihood(&initialPerFamLL);
-  _speciesTreeSearchState.farFromPlausible = true;
-  _speciesTreeSearchState.betterTreeCallback(_speciesTreeSearchState.bestLL, initialPerFamLL);
+  _speciesTreeSearchState->bestLL = getEvaluator().computeLikelihood(&initialPerFamLL);
+  _speciesTreeSearchState->farFromPlausible = true;
+  _speciesTreeSearchState->betterTreeCallback(_speciesTreeSearchState->bestLL, initialPerFamLL);
   /**
    *  Alternate transfer search and normal
    *  SPR search, until one does not find
@@ -113,7 +115,7 @@ void AleOptimizer::optimize()
     } else {
       sprSearch(1);
     }
-    if (!_speciesTreeSearchState.farFromPlausible) {
+    if (!_speciesTreeSearchState->farFromPlausible) {
       rootSearch(3);
     }
     hash1 = getSpeciesTree().getHash();
@@ -126,23 +128,23 @@ double AleOptimizer::sprSearch(unsigned int radius)
 {
   SpeciesSPRSearch::SPRSearch(getSpeciesTree(),
       getEvaluator(),
-      _speciesTreeSearchState,
+      *_speciesTreeSearchState,
       radius);
-  Logger::timed << "After normal search: LL=" << _speciesTreeSearchState.bestLL << std::endl;
+  Logger::timed << "After normal search: LL=" << _speciesTreeSearchState->bestLL << std::endl;
   saveCheckpoint();
   saveSupportTree();
-  return _speciesTreeSearchState.bestLL;
+  return _speciesTreeSearchState->bestLL;
 }
 
 void AleOptimizer::saveSupportTree()
 {
   auto outKH = Paths::getSpeciesTreeFile(_outputDir, 
         "species_tree_support_kh.newick");
-  _speciesTreeSearchState.saveSpeciesTreeKH(outKH);
+  _speciesTreeSearchState->saveSpeciesTreeKH(outKH);
   Logger::info << "save support tree " << outKH << std::endl;
   auto outBP = Paths::getSpeciesTreeFile(_outputDir, 
         "species_tree_support_bp.newick");
-  _speciesTreeSearchState.saveSpeciesTreeBP(outBP);
+  _speciesTreeSearchState->saveSpeciesTreeBP(outBP);
 }
 
 void AleOptimizer::onSpeciesTreeChange(const std::unordered_set<corax_rnode_t *> *nodesToInvalidate)
@@ -194,16 +196,16 @@ double AleOptimizer::rootSearch(unsigned int maxDepth, bool thorough)
 {
   _rootLikelihoods.reset();
   if (thorough) {
-    _speciesTreeSearchState.farFromPlausible = thorough;
+    _speciesTreeSearchState->farFromPlausible = thorough;
   }
   SpeciesRootSearch::rootSearch(
       getSpeciesTree(),
       getEvaluator(),
-      _speciesTreeSearchState,
+      *_speciesTreeSearchState,
       maxDepth,
       &_rootLikelihoods);
   saveCheckpoint(); 
-  return _speciesTreeSearchState.bestLL;
+  return _speciesTreeSearchState->bestLL;
 }
   
 double AleOptimizer::transferSearch()
@@ -211,11 +213,11 @@ double AleOptimizer::transferSearch()
   SpeciesTransferSearch::transferSearch(
     getSpeciesTree(),
     getEvaluator(),
-    _speciesTreeSearchState);
+    *_speciesTreeSearchState);
   Logger::timed << "After normal search: LL=" 
-    << _speciesTreeSearchState.bestLL << std::endl;
+    << _speciesTreeSearchState->bestLL << std::endl;
   saveSupportTree();
-  return _speciesTreeSearchState.bestLL;
+  return _speciesTreeSearchState->bestLL;
 }
  
 
@@ -473,11 +475,11 @@ void AleOptimizer::optimizeDates(bool )
  
 
   auto bestLL = scoredBackups[0].score;
-  _speciesTreeSearchState.bestLL = bestLL;
+  _speciesTreeSearchState->bestLL = bestLL;
   getSpeciesTree().getDatedTree().restore(scoredBackups[0].backup);
   DatedSpeciesTreeSearch::optimizeDates(getSpeciesTree(),
       getEvaluator(),
-      _speciesTreeSearchState,
+      *_speciesTreeSearchState,
       bestLL,
       true);
   saveCheckpoint();

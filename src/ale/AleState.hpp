@@ -50,6 +50,8 @@ struct AleState {
   void unserialize(const std::string &inputDir,
       const std::vector<std::string> &perCoreFamilyNames);
 
+  static std::string readSpeciesTreeNewick(const std::string inputDir);
+
   // running step
   AleStep currentStep;
   // current species tree

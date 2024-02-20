@@ -2,7 +2,7 @@
 
 #include <IO/FileSystem.hpp>
 #include <fstream>
-
+  
 void AleState::serialize(const std::string &outputDir) const
 {
   ParallelContext::barrier();
@@ -33,6 +33,21 @@ void AleState::serialize(const std::string &outputDir) const
   ParallelContext::barrier();
 }
   
+
+std::string AleState::readSpeciesTreeNewick(const std::string inputDir)
+{
+  std::string checkpointPath = FileSystem::joinPaths(inputDir, "mainCheckpoint.txt");
+  std::ifstream is(checkpointPath);
+  if (!is.good()) {
+    Logger::error << "Error, can't read checkpoint file " << checkpointPath << std::endl;
+    ParallelContext::abort(32);
+  }
+  unsigned int bufferUint = 0;
+  is >> bufferUint;
+  std::string speciesTreeNewick;
+  is >> speciesTreeNewick;
+  return speciesTreeNewick;
+}
 
 void AleState::unserialize(const std::string &inputDir,
     const std::vector<std::string> &perCoreFamilyNames)

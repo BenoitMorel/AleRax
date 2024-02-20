@@ -445,6 +445,17 @@ void runTransferHighwayInference(const AleArguments &args,
 }
 
 
+void initStartingSpeciesTreeFromCheckpoint(AleArguments &args)
+{
+  auto checkpointPath = AleOptimizer::getCheckpointDir(args.output);
+  auto newick = AleState::readSpeciesTreeNewick(checkpointPath);
+  args.speciesTree = Paths::getSpeciesTreeFile(args.output, "inferred_species_tree.newick");
+  ParallelOfstream os(args.speciesTree);
+  os << newick;
+  os.close();
+  ParallelContext::barrier();
+}
+
 /**
  * Main function of AleRax once the arguments have been parsed
  *
@@ -473,6 +484,8 @@ void run( AleArguments &args)
     filterFamilies(args, families);
     initStartingSpeciesTree(args, families);
     checkCCPAndSpeciesTree(families, args.speciesTree); 
+  } else {
+    initStartingSpeciesTreeFromCheckpoint(args);
   }
   auto info = buildRecModelInfo(args);
   auto startingRates = buildStartingRates(args, info);
@@ -491,7 +504,12 @@ void run( AleArguments &args)
       args.verboseOptRates,
       args.speciesCategoryFile,
       args.output);
-  
+ 
+  if (!checkpointDetected) {
+    speciesTreeOptimizer.setCurrentStep(AleStep::SpeciesTreeOpt);
+    speciesTreeOptimizer.saveCheckpoint();
+  }
+
   if (speciesTreeOptimizer.getCurrentStep() <= AleStep::SpeciesTreeOpt) {
     runSpeciesTreeSearch(args, speciesTreeOptimizer);
     speciesTreeOptimizer.setCurrentStep(AleStep::ModelRateOpt);
