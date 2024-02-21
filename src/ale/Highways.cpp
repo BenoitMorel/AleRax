@@ -77,7 +77,7 @@ static Parameters testHighways(AleEvaluator &evaluator,
     settings.strategy = evaluator.getRecModelInfo().recOpt; 
     settings.minAlpha = 0.001;
     settings.epsilon = 0.000001;
-    settings.verbose = true;
+    //settings.verbose = true;
     if (thorough) {
       settings.individualParamOpt = true;
       settings.individualParamOptMinImprovement = 10000.0;
