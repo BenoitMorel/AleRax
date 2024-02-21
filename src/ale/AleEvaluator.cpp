@@ -64,6 +64,7 @@ static std::shared_ptr<MultiModel> createModel(SpeciesTree &speciesTree,
 }
 
 AleEvaluator::AleEvaluator(
+    AleOptimizer &optimizer,
     SpeciesTree &speciesTree,
     const RecModelInfo &info,
     std::vector<AleModelParameters> &modelParameters, 
@@ -73,6 +74,7 @@ AleEvaluator::AleEvaluator(
     PerCoreGeneTrees &geneTrees,
     const std::string &speciesCategoryFile,
     const std::string &outputDir):
+  _optimizer(optimizer),
   _speciesTree(speciesTree),
   _info(info),
   _modelParameters(modelParameters),
@@ -330,8 +332,9 @@ void AleEvaluator::setFamilyParameters(unsigned int family, const Parameters &pa
 double AleEvaluator::optimizeModelRates(bool thorough)
 {
   double ll = 0.0;
+  OptimizationSettings settings;
+  settings.listeners.push_back(&_optimizer);
   if (_optimizeRates) {
-    OptimizationSettings settings;
     settings.strategy = _info.recOpt;
     settings.verbose = _optimizeVerbose;
     ll = computeLikelihood();

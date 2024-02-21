@@ -13,6 +13,7 @@
 #include <vector>
 #include <maths/ModelParameters.hpp>
 #include "AleEvaluator.hpp"
+#include <optimizers/DTLOptimizer.hpp>
 
 struct ScoredHighway {
   ScoredHighway() 
@@ -36,7 +37,9 @@ struct ScoredHighway {
 bool cmpHighwayByProbability(const ScoredHighway &a, const ScoredHighway &b);
 
 
-class AleOptimizer: public SpeciesTree::Listener {
+class AleOptimizer: public SpeciesTree::Listener, 
+  public SpeciesSearchState::Listener, 
+  public DTLOptimizerListener {
 public:
   AleOptimizer(const std::string speciesTreeFile, 
       const Families &families, 
@@ -61,6 +64,16 @@ public:
    *  Callback called when the species tree topology changes
    */
   void onSpeciesTreeChange(const std::unordered_set<corax_rnode_t *> *nodesToInvalidate);
+    
+  /**
+   *  Callback called when the species tree improves (the likelihood)
+   */
+  virtual void betterTreeCallback();
+    
+  /**
+   *  Callback called when better model parameters have been found
+   */
+  virtual void onBetterParametersFoundCallback();
 
   /**
    *  Sample reconciliations and generate many output files

@@ -62,10 +62,12 @@ AleOptimizer::AleOptimizer(
   _speciesTreeSearchState= std::make_unique<SpeciesSearchState>(getSpeciesTree(),
       Paths::getSpeciesTreeFile(_outputDir, "inferred_species_tree.newick"),
       _geneTrees.getTrees().size());
+  _speciesTreeSearchState->addListener(this);
   Logger::info << getSpeciesTree().getTree().getNewickString() << std::endl;
   getSpeciesTree().addListener(this);
   ParallelContext::barrier();
   _evaluator = std::make_unique<AleEvaluator>(
+      *this,
       getSpeciesTree(), 
       getRecModelInfo(),
       getModelParameters(), 
@@ -150,6 +152,11 @@ void AleOptimizer::saveSupportTree()
 void AleOptimizer::onSpeciesTreeChange(const std::unordered_set<corax_rnode_t *> *nodesToInvalidate)
 {
   getEvaluator().onSpeciesTreeChange(nodesToInvalidate);
+}
+
+void AleOptimizer::betterTreeCallback()
+{
+  saveCheckpoint();
 }
 
 
@@ -548,5 +555,10 @@ void AleOptimizer::loadCheckpoint()
 bool AleOptimizer::checkpointExists(const std::string &outputDir) 
 {
   return dirExists(getCheckpointDir(outputDir));
+}
+  
+void AleOptimizer::onBetterParametersFoundCallback()
+{
+  saveCheckpoint();
 }
 

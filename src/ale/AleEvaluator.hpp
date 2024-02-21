@@ -21,6 +21,7 @@ using MultiEvaluationPtr =
   std::shared_ptr<MultiEvaluation>;
 using PerCoreMultiEvaluation = std::vector<MultiEvaluationPtr>;
 using ParamOptGlasses = std::unordered_map<char, std::vector<unsigned int> >;
+class AleOptimizer;
 
 /**
  *  Implement the main functions to evaluate the species tree likelihood 
@@ -30,7 +31,7 @@ class AleEvaluator: public SpeciesTreeLikelihoodEvaluatorInterface {
 public:
   /**
    *  Constructor
-   *
+   *  @param optimizer
    *  @param speciesTree The instance of the species tree 
    *  @param info 
    *  @param modelRates The instance of the model parameters
@@ -40,7 +41,8 @@ public:
    *  @param geneTrees List of the gene families assigned to the MPI rank
    *  @param outputDir AleRax' output directory
    */
-  AleEvaluator(SpeciesTree &speciesTree,
+  AleEvaluator(AleOptimizer &optimizer,
+      SpeciesTree &speciesTree,
       const RecModelInfo &info,
       std::vector<AleModelParameters> &modelParameters, 
       bool optimizeRates,
@@ -141,6 +143,7 @@ protected:
    */
   void resetAllPrecisions();
 private:
+  AleOptimizer &_optimizer;
   SpeciesTree &_speciesTree;
   const RecModelInfo &_info;
   std::vector<AleModelParameters> &_modelParameters;
