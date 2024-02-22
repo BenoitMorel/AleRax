@@ -294,7 +294,6 @@ public:
   void setParameters(Parameters &parameters) 
   {
     parameters.ensurePositivity();
-    auto paramTypeNumber = _evaluator.getRecModelInfo().modelFreeParameters(); 
     parameters.ensurePositivity();
     auto fullParameters = _evaluator.getOptimizationClasses().getFullParameters(parameters);
     _evaluator.setFamilyParameters(_family, fullParameters);

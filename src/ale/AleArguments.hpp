@@ -55,7 +55,7 @@ public:
   unsigned int gammaCategories;
   CCPRooting ccpRooting;
   std::string fractionMissingFile;
-  std::string speciesCategoryFile;
+  std::string optimizationClassFile;
   bool perFamilyRates;
   bool perSpeciesRates;
   bool memorySavings;

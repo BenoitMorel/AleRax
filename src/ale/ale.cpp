@@ -355,15 +355,24 @@ RecModelInfo buildRecModelInfo(const AleArguments &args)
 Parameters buildStartingRates(const AleArguments &args,
     const RecModelInfo &info)
 {
+  Parameters res(info.modelFreeParameters());
   switch (info.model) {
   case RecModel::UndatedDL:
-    return Parameters(args.d, args.l);
+    res[0] = args.d;
+    res[1] = args.l;
+    break;
   case RecModel::UndatedDTL:
-    return Parameters(args.d, args.l, args.t);
+    res[0] = args.d;
+    res[1] = args.l;
+    res[2] = args.t;
+    break;
   default:
     assert(false);
-    return Parameters();
   }
+  if (args.originationStrategy == OriginationStrategy::OPTIMIZE) {
+    res[res.dimensions() - 1] = 1.0;
+  }
+  return res;
 }
 
 void runSpeciesTreeSearch(const AleArguments &args,
@@ -490,7 +499,7 @@ void run( AleArguments &args)
   auto info = buildRecModelInfo(args);
   auto startingRates = buildStartingRates(args, info);
   if (args.perSpeciesRates) {
-    generatePerSpeciesRateFile(args.speciesCategoryFile, args.speciesTree, info);
+    generatePerSpeciesRateFile(args.optimizationClassFile, args.speciesTree, info);
   }
   std::string coverageFile(FileSystem::joinPaths(args.output, "fractionMissing.txt"));
   std::string fractionMissingFile(FileSystem::joinPaths(args.output, "perSpeciesCoverage.txt"));
@@ -502,7 +511,7 @@ void run( AleArguments &args)
       startingRates,
       !args.fixRates,
       args.verboseOptRates,
-      args.speciesCategoryFile,
+      args.optimizationClassFile,
       args.output);
  
   if (!checkpointDetected) {

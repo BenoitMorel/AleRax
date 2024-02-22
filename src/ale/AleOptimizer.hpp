@@ -47,7 +47,7 @@ public:
       const Parameters &startingRates,
       bool optimizeRates,
       bool optimizeVerbose,
-      const std::string &speciesCategoryFile,
+      const std::string &optimizationClassFile,
       const std::string &outputDir);
 
   /**

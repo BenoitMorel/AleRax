@@ -93,7 +93,21 @@ public:
   double getParameter(unsigned int species, unsigned int rate) const {
     return _parameters[species * getParamTypeNumber() + rate];
   }
-  
+
+  double &getParameter(unsigned int species, unsigned int rate) {
+    return _parameters[species * getParamTypeNumber() + rate];
+  }
+
+  void normalizeParamType(unsigned int paramType)  {
+    double sum = 0.0;
+    for (unsigned int i = 0; i < getSpeciesBranchNumber(); ++i) {
+      sum += getParameter(i, paramType);
+    }
+    for (unsigned int i = 0; i < getSpeciesBranchNumber(); ++i) {
+      getParameter(i, paramType) /= sum;    
+    }
+  }
+
   /**
    *  Set a specific rate for a specific species
    */

@@ -89,6 +89,7 @@ private:
   std::vector<double> _PL; // Loss probability, per species branch
   std::vector<double> _PT; // Transfer probability, per species branch
   std::vector<double> _PS; // Speciation probability, per species branch
+  std::vector<double> _OP; // Origination probability, per species branch
   std::vector<REAL> _uE; // Extinction probability, per species branch
   std::unordered_map<size_t, double> _llCache;
   std::vector<std::vector<WeightedHighway> > _highways;
@@ -236,18 +237,16 @@ UndatedDTLMultiModel<REAL>::UndatedDTLMultiModel(DatedTree &speciesTree,
   _PL(this->_speciesTree.getNodeNumber() * _gammaCatNumber, 0.2),
   _PT(this->_speciesTree.getNodeNumber() * _gammaCatNumber, 0.1),
   _PS(this->_speciesTree.getNodeNumber() * _gammaCatNumber, 1.0),
+  _OP(this->_speciesTree.getNodeNumber(), 1.0 / static_cast<double>(this->_speciesTree.getNodeNumber())),
   _uE(this->_speciesTree.getNodeNumber() * _gammaCatNumber, REAL()),
   _transferConstraint(info.transferConstraint),
   _originationStrategy(info.originationStrategy)
 {
   auto N = this->_speciesTree.getNodeNumber();
   _highways.resize(N);
-  _dtlRates.resize(3);
-  for (unsigned int i = 0; i < 3; ++i) {
-    _dtlRates[i] = std::vector<double>(N, 0.2);
-  }
-  setAlpha(1.0);
+  _dtlRates.resize(this->_info.modelFreeParameters(), std::vector<double>(N, 0.2));
   this->onSpeciesTreeChange(nullptr);
+  setAlpha(1.0);
   if (!this->_memorySavings) {
     allocateMemory();
   }
@@ -270,7 +269,7 @@ template <class REAL>
 void UndatedDTLMultiModel<REAL>::setRates(const RatesVector &rates) 
 {
   resetCache();
-  assert(rates.size() == 3);
+  assert(rates.size() == this->_info.modelFreeParameters());
   _dtlRates = rates;
   recomputeSpeciesProbabilities();
 }
@@ -420,27 +419,12 @@ double UndatedDTLMultiModel<REAL>::computeLogLikelihood()
   auto rootCID = this->_ccp.getCladesNumber() - 1;
   std::vector<REAL> categoryLikelihoods(_gammaCatNumber, REAL());
 
-  std::vector<corax_rnode_t *> rootNode;
-  std::vector<corax_rnode_t *> *speciesNodes;
-  switch (_originationStrategy) {
-  case OriginationStrategy::ROOT:
-    rootNode.push_back(this->_speciesTree.getRoot());
-    speciesNodes = &rootNode;
-    break;
-  case OriginationStrategy::UNIFORM:
-    speciesNodes = &(this->getPrunedSpeciesNodes());
-    break;
-  case OriginationStrategy::LCA:
-    rootNode.push_back(getSpeciesLCA());
-    speciesNodes = &rootNode;
-    break;
-  default:
-    assert(false);
-  }
-  for (auto speciesNode: *speciesNodes) {
+  for (auto speciesNode: this->getPrunedSpeciesNodes()) {
     auto e = speciesNode->node_index;
+    REAL sum = REAL();
     for (size_t c = 0; c < _gammaCatNumber; ++c) {
-      categoryLikelihoods[c] += _dtlclvs[rootCID]._uq[e * _gammaCatNumber + c];
+      sum += _dtlclvs[rootCID]._uq[e * _gammaCatNumber + c];
+      categoryLikelihoods[c] += _dtlclvs[rootCID]._uq[e * _gammaCatNumber + c] * _OP[e];
     }
   }
   // condition on survival
@@ -573,7 +557,38 @@ void UndatedDTLMultiModel<REAL>::recomputeSpeciesProbabilities()
       }
     }
   }
-  
+
+  std::vector<corax_rnode_t *> speciesNodesBuffer;
+  std::vector<corax_rnode_t *> *possibleSpeciesRootNodes = nullptr;
+  switch (_originationStrategy) {
+  case OriginationStrategy::UNIFORM:
+  case OriginationStrategy::OPTIMIZE:
+    possibleSpeciesRootNodes = &(this->getPrunedSpeciesNodes());
+    break;
+  case OriginationStrategy::ROOT:
+    speciesNodesBuffer.push_back(this->_speciesTree.getRoot());
+    possibleSpeciesRootNodes = &speciesNodesBuffer;
+    break;
+  case OriginationStrategy::LCA:
+    speciesNodesBuffer.push_back(getSpeciesLCA());
+    possibleSpeciesRootNodes = &speciesNodesBuffer;
+    break;
+  }
+  if (_originationStrategy == OriginationStrategy::OPTIMIZE) {
+    double sum = 0.0;
+    for (auto speciesNode: *possibleSpeciesRootNodes) {
+      sum += _dtlRates[3][speciesNode->node_index];
+    }
+    sum /= static_cast<double>(this->getPrunedSpeciesNodes().size());
+    for (auto speciesNode: *possibleSpeciesRootNodes) {
+      _OP[speciesNode->node_index] = _dtlRates[3][speciesNode->node_index] / sum;
+    }
+  } else {
+    std::fill(_OP.begin(), _OP.end(), 0.0);
+    for (auto speciesNode: *possibleSpeciesRootNodes) {
+      _OP[speciesNode->node_index] = 1.0;
+    }
+  }
   std::fill(_uE.begin(), _uE.end(), REAL());
   auto transferSum = std::vector<REAL>(_gammaCatNumber, REAL());
   unsigned int maxIt = 4;
@@ -924,37 +939,19 @@ corax_rnode_t *UndatedDTLMultiModel<REAL>::sampleSpeciesNode(unsigned int &categ
 {
   auto rootCID = this->_ccp.getCladesNumber() - 1;
   auto &uq = _dtlclvs[rootCID]._uq;
-  std::vector<corax_rnode_t *> rootNodeVector;
-  std::vector<corax_rnode_t *> *speciesNodeCandidates = nullptr;
-  switch (_originationStrategy) {
-  case OriginationStrategy::UNIFORM:
-    speciesNodeCandidates = &(this->getPrunedSpeciesNodes());
-    break;
-  case OriginationStrategy::ROOT:
-    rootNodeVector.push_back(this->_speciesTree.getRoot());
-    speciesNodeCandidates = &rootNodeVector;
-    break;
-  case OriginationStrategy::LCA:
-    rootNodeVector.push_back(getSpeciesLCA());
-    speciesNodeCandidates = &rootNodeVector;
-    break;
-  default:
-    assert(false);
-  }
-  assert(speciesNodeCandidates);
   REAL totalLL = REAL();
-  for (auto node: *speciesNodeCandidates) {
+  for (auto node: this->getPrunedSpeciesNodes()) {
     auto e = node->node_index;
     for (unsigned int c = 0; c < _gammaCatNumber; ++c) {
-      totalLL += uq[e * _gammaCatNumber + c];
+      totalLL += uq[e * _gammaCatNumber + c] * _OP[e];
     }
   }
   auto toSample = totalLL * Random::getProba();
   auto sumLL = REAL();
-  for (auto node: *speciesNodeCandidates) {
+  for (auto node: this->getPrunedSpeciesNodes()) {
     auto e = node->node_index;
     for (unsigned int c = 0; c < _gammaCatNumber; ++c) {
-      sumLL += uq[e * _gammaCatNumber + c];
+      sumLL += uq[e * _gammaCatNumber + c] * _OP[e];
       if (sumLL >= toSample) {
         category = c;
         return node;

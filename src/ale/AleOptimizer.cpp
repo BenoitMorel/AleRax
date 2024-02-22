@@ -38,7 +38,7 @@ AleOptimizer::AleOptimizer(
     const Parameters &startingRates,
     bool optimizeRates,
     bool optimizeVerbose,
-    const std::string &speciesCategoryFile,
+    const std::string &optimizationClassFile,
     const std::string &outputDir):
   _state(speciesTreeFile),
   _families(families),
@@ -75,7 +75,7 @@ AleOptimizer::AleOptimizer(
       optimizeVerbose,
       families, 
       _geneTrees,
-      speciesCategoryFile,
+      optimizationClassFile,
       _outputDir);
   Logger::timed << "Initial ll=" << getEvaluator().computeLikelihood() 
     << std::endl;

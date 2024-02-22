@@ -105,7 +105,7 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
     } else if (arg == "--fraction-missing-file") {
       fractionMissingFile = argv[++i];
     } else if (arg == "--param-opt-classes") {
-      speciesCategoryFile = argv[++i];
+      optimizationClassFile = argv[++i];
     } else if (arg == "--gene-tree-samples") {
       geneTreeSamples = atoi(argv[++i]);
     } else if (arg == "--per-family-rates") {
@@ -135,11 +135,11 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
     }
   }
   if (perSpeciesRates) {
-    if (speciesCategoryFile.size() > 0) {
+    if (optimizationClassFile.size() > 0) {
       Logger::error << "Error: --per-species-rates and --species-categories are not compatible" << std::endl;
       ParallelContext::abort(0);
     }
-    speciesCategoryFile = FileSystem::joinPaths(output, "speciesRateCategories.txt");
+    optimizationClassFile = FileSystem::joinPaths(output, "speciesRateCategories.txt");
   }
 }
 
@@ -183,7 +183,7 @@ void AleArguments::printSummary() const {
     Logger::info << " per family" << std::endl;
   } else if (perSpeciesRates) {
     Logger::info << " per species" << std::endl;
-  } else if (speciesCategoryFile.size()) {
+  } else if (optimizationClassFile.size()) {
     Logger::info << " per species subtree" << std::endl;
   } else {
     Logger::info << " global to all species and families" << std::endl;
@@ -230,6 +230,9 @@ void AleArguments::printSummary() const {
     break;
   case OriginationStrategy::LCA:
     Logger::info << "gene families only originate at the LCA of the species that they cover" << std::endl;
+    break;
+  case OriginationStrategy::OPTIMIZE:
+    Logger::info << "gene families can originate from each species. The origination probabilities will be estimated if --per-species-rates or --param-opt-classes are set" << std::endl;
     break;
   }
   Logger::info << "\tSpecies tree search: ";
@@ -308,7 +311,7 @@ void AleArguments::printHelp()
 void AleArguments::checkValid()
 {
   bool ok = true;
-  if (perFamilyRates && speciesCategoryFile.size()) {
+  if (perFamilyRates && optimizationClassFile.size()) {
     Logger::error << "Error: cannot per family rates and per species category rates are incompatible" << std::endl;
     ok = false;
   }
