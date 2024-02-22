@@ -26,13 +26,15 @@ enum class AleStep {
 
 /**
  *  Store all information about the current state of an AleRax run:
+ *  - the current step in the pipeline
  *  - the current species tree
  *  - the current model parameters
  */ 
 struct AleState {
  
   /**
-   *  Constructor
+   *  Constructor to build the AleState when not restarting
+   *  from a checkpoint
    */
   AleState(const std::string &speciesTreePath):
     currentStep(AleStep::Init),
@@ -40,16 +42,20 @@ struct AleState {
   {}
 
   /**
-   *  Dump the current state to an output file
+   *  Dump the current state to an output directory (checkpoint)
    */
   void serialize(const std::string &outputDir) const;
   
   /**
-   *  Load the current state from an input file
+   *  Load the current state from an input directory (checkpoint
    */
   void unserialize(const std::string &inputDir,
       const std::vector<std::string> &perCoreFamilyNames);
 
+  /**
+   *  Read the species tree newick from the dumped current state
+   *  (from the checkpoint directory)
+   */
   static std::string readSpeciesTreeNewick(const std::string inputDir);
 
   // running step
