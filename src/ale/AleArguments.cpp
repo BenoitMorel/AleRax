@@ -19,8 +19,6 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
   noTL(false),
   gammaCategories(1),
   ccpRooting(CCPRooting::UNIFORM),
-  perFamilyRates(false),
-  perSpeciesRates(false),
   memorySavings(false),
   d(DEFAULT_DTL_RATES),
   l(DEFAULT_DTL_RATES),
@@ -108,10 +106,12 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       optimizationClassFile = argv[++i];
     } else if (arg == "--gene-tree-samples") {
       geneTreeSamples = atoi(argv[++i]);
-    } else if (arg == "--per-family-rates") {
-      perFamilyRates = true;
-    } else if (arg == "--per-species-rates") {
-      perSpeciesRates = true;
+    } else if (arg == "--model-parametrization") {
+      std::string temp(argv[++i]);
+      modelParametrization = Enums::strToModelParametrization(temp);
+      if (ModelParametrization::CUSTOM == modelParametrization) {
+        optimizationClassFile = temp;
+      }
     } else if (arg == "--memory-savings") {
       memorySavings = true;
     } else if (arg == "--d") {
@@ -134,6 +134,7 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       std::cerr << "Unknown argument " << arg << std::endl;
     }
   }
+  /*
   if (perSpeciesRates) {
     if (optimizationClassFile.size() > 0) {
       Logger::error << "Error: --per-species-rates and --species-categories are not compatible" << std::endl;
@@ -141,6 +142,7 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
     }
     optimizationClassFile = FileSystem::joinPaths(output, "speciesRateCategories.txt");
   }
+  */
 }
 
 void AleArguments::printCommand() const {
@@ -178,16 +180,24 @@ void AleArguments::printSummary() const {
   Logger::info << "\tNumber of reconciled gene trees to sample: " << geneTreeSamples << std::endl;
   Logger::info << "\tRandom seed: " << seed << std::endl;
   Logger::info << "\tReconciliation model: " << reconciliationModelStr << std::endl;
-  Logger::info << "\tModel parameters: ";
-  if (perFamilyRates) {
-    Logger::info << " per family" << std::endl;
-  } else if (perSpeciesRates) {
-    Logger::info << " per species" << std::endl;
-  } else if (optimizationClassFile.size()) {
-    Logger::info << " per species subtree" << std::endl;
-  } else {
+  Logger::info << "\tModel parametrization: ";
+  switch (modelParametrization) {
+  case ModelParametrization::GLOBAL:
     Logger::info << " global to all species and families" << std::endl;
-  }
+    break;
+  case ModelParametrization::PER_SPECIES:
+    Logger::info << " each species has a different set of rates, common to all families" << std::endl;
+    break;
+  case ModelParametrization::ORIGINATION_PER_SPECIES:
+    Logger::info << " each species has a different set of origination probabilities. The other rates are global to all families and sepcies" << std::endl;
+    break;
+  case ModelParametrization::PER_FAMILY:
+    Logger::info << " each family has a different set of rates, common to all species" << std::endl;
+    break;
+  case ModelParametrization::CUSTOM:
+    Logger::info << " described in the user-given file: " << optimizationClassFile << std::endl;
+    break;
+  };
   Logger::info << "Rate optimizer: " << ArgumentsHelper::recOptToStr(recOpt) << std::endl;
   Logger::info << "\tMemory savings: " << getOnOff(memorySavings) << std::endl;
   switch (transferConstraint) {
@@ -310,11 +320,8 @@ void AleArguments::printHelp()
 
 void AleArguments::checkValid()
 {
+  // this method is not really relevant anymore...
   bool ok = true;
-  if (perFamilyRates && optimizationClassFile.size()) {
-    Logger::error << "Error: cannot per family rates and per species category rates are incompatible" << std::endl;
-    ok = false;
-  }
   if (!ok) {
     Logger::error << "Error occured, aborting" << std::endl;
     ParallelContext::abort(1);

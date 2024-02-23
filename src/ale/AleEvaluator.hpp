@@ -34,6 +34,7 @@ public:
    *  @param optimizer
    *  @param speciesTree The instance of the species tree 
    *  @param info 
+   *  @param modelParametrization Describes how parameters should be optimized
    *  @param modelRates The instance of the model parameters
    *  @param optimizeRates If set to false, model parameter optimization will be skipped
    *  @param optimizeVerbose If set to true, the optimization routines will print more logs
@@ -44,6 +45,7 @@ public:
   AleEvaluator(AleOptimizer &optimizer,
       SpeciesTree &speciesTree,
       const RecModelInfo &info,
+      ModelParametrization modelParametrization,
       std::vector<AleModelParameters> &modelParameters, 
       bool optimizeRates,
       bool optimizeVerbose,

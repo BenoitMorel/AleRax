@@ -23,8 +23,95 @@ static void extractSpeciesToCatRec(corax_rnode_t *node,
     extractSpeciesToCatRec(node->right, speciesToCat, _classNumber, labelToCat);
   }
 }
+  
+static void fillFromOptimizationClassFile(const std::string &optimizationClassFile,
+    const std::unordered_set<std::string> & allSpeciesLabels,
+    const std::vector<char> &allTypes,
+    const std::string &rootLabel,
+    std::map<char, std::map<std::string, unsigned int> > &labelToCat,
+    unsigned int &classNumber)
+{
+  std::ifstream is(optimizationClassFile);
+  if (!is) {
+    Logger::error << "Error: cannot open parametrization file " << optimizationClassFile << std::endl;
+    ParallelContext::abort(30);
+  }
+  std::string line;
+  while (std::getline(is, line)) {
+    if (line.size() == 0) {
+      continue;
+    }
+    std::stringstream iss(line);
+    std::string speciesLabel;
+    std::string paramTypes;
+    iss >> speciesLabel;
+    iss >> paramTypes;
+    if (speciesLabel == rootLabel) {
+      // already added by default
+      continue;
+    }
+    if (allSpeciesLabels.find(speciesLabel) == allSpeciesLabels.end()) {
+      Logger::error << "Error, label " << line << " from " << 
+        optimizationClassFile << " is not in the species tree" << std::endl;
+      ParallelContext::abort(30);
+    }
+    if (paramTypes.size() == 0) {
+      Logger::error << "Error: no parameter type (e.g. D, T, L...) specified for species " << speciesLabel << " in " << optimizationClassFile << std::endl;
+      ParallelContext::abort(30);
+    }
+    for (unsigned int i = 0; i < paramTypes.size(); ++i) {
+      auto paramType = paramTypes[i];
+      if (std::find(allTypes.begin(), allTypes.end(), paramType) == allTypes.end()) {
+        Logger::error << "Error: the parameter type encoded with the letter " << paramType << " does not correspond to any parameter supported by the current reconciliation model. Please edit the file " << optimizationClassFile << std::endl;
+        ParallelContext::abort(30);
+      }
+      labelToCat[paramType].insert({speciesLabel, classNumber});
+      classNumber++;
+    }
+  }
+}
+
+static void fillFromAllSpecies(const std::unordered_set<std::string> & allSpeciesLabels,
+    const std::vector<char> &allTypes,
+    const std::string &rootLabel,
+    std::map<char, std::map<std::string, unsigned int> > &labelToCat,
+    unsigned int &classNumber)
+{
+  for (auto &speciesLabel: allSpeciesLabels) {
+    if (speciesLabel == rootLabel) {
+      // the root has already been added
+      continue;
+    }
+    for (auto paramType: allTypes) {
+      labelToCat[paramType].insert({speciesLabel, classNumber});
+      classNumber++;
+    }
+  }
+}
+
+static void fillFromOriginations(const std::unordered_set<std::string> & allSpeciesLabels,
+    const std::vector<char> &allTypes,
+    const std::string &rootLabel,
+    std::map<char, std::map<std::string, unsigned int> > &labelToCat,
+    unsigned int &classNumber)
+{
+  const auto ORIGINATION_TYPE = 'C';
+  if (std::find(allTypes.begin(), allTypes.end(), ORIGINATION_TYPE) == allTypes.end()) {
+    // origination probabilities do not belong to the types to optimize, return
+    return;
+  }
+  for (auto &speciesLabel: allSpeciesLabels) {
+    if (speciesLabel == rootLabel) {
+      // the root has already been added
+      continue;
+    }
+    labelToCat[ORIGINATION_TYPE].insert({speciesLabel, classNumber});
+    classNumber++;
+  }
+}
 
 OptimizationClasses::OptimizationClasses(const PLLRootedTree &speciesTree,
+  ModelParametrization parametrization,
   const std::string &optimizationClassFile,
   const RecModelInfo &info):
   _classNumber(0)
@@ -32,8 +119,7 @@ OptimizationClasses::OptimizationClasses(const PLLRootedTree &speciesTree,
   unsigned int N = speciesTree.getNodeNumber();
   std::map<char, std::map<std::string, unsigned int> >labelToCat;
   const std::string rootLabel(speciesTree.getRoot()->label);
-  std::string line;
-  auto allLabels = speciesTree.getLabels(false);
+  auto allSpeciesLabels = speciesTree.getLabels(false);
   _allTypes = info.getParamTypes();
   for (unsigned int i = 0; i < _allTypes.size(); ++i) {
     auto paramType = _allTypes[i];
@@ -43,41 +129,36 @@ OptimizationClasses::OptimizationClasses(const PLLRootedTree &speciesTree,
     _classNumber++;
     _classes[paramType] = std::vector<unsigned int>(N, i);
   }
-  std::ifstream is(optimizationClassFile);
-  if (is) {
-    while (std::getline(is, line)) {
-      if (line.size() == 0) {
-        continue;
-      }
-      std::stringstream iss(line);
-      std::string speciesLabel;
-      std::string paramTypes;
-      iss >> speciesLabel;
-      iss >> paramTypes;
-      if (speciesLabel == rootLabel) {
-        // already added by default
-        continue;
-      }
-      if (allLabels.find(speciesLabel) == allLabels.end()) {
-        Logger::error << "Warning, label " << line << " from " << 
-          optimizationClassFile << " is not in the species tree" << std::endl;
-        ParallelContext::abort(30);
-      }
-      if (paramTypes.size() == 0) {
-        Logger::error << "Error: no parameter type (e.g. D, T, L...) specified for species " << speciesLabel << " in " << optimizationClassFile << std::endl;
-        ParallelContext::abort(30);
-      }
-      for (unsigned int i = 0; i < paramTypes.size(); ++i) {
-        auto paramType = paramTypes[i];
-        if (std::find(_allTypes.begin(), _allTypes.end(), paramType) == _allTypes.end()) {
-          Logger::error << "Error: the parameter type encoded with the letter " << paramType << " does not correspond to any parameter supported by the current reconciliation model. Please edit the file " << optimizationClassFile << std::endl;
-          ParallelContext::abort(30);
-        }
-        labelToCat[paramType].insert({speciesLabel, _classNumber});
-        _classNumber++;
-      }
-    }
-  }
+
+  switch (parametrization) {
+  case ModelParametrization::GLOBAL: 
+  case ModelParametrization::PER_FAMILY:
+    // nothing to be done
+    break;
+  case ModelParametrization::PER_SPECIES:
+    fillFromAllSpecies(allSpeciesLabels,
+        _allTypes,
+        rootLabel,
+        labelToCat,
+        _classNumber);
+    break;
+  case ModelParametrization::ORIGINATION_PER_SPECIES:
+    fillFromOriginations(allSpeciesLabels,
+        _allTypes,
+        rootLabel,
+        labelToCat,
+        _classNumber);
+    break;
+  case ModelParametrization::CUSTOM:
+    fillFromOptimizationClassFile(optimizationClassFile,
+        allSpeciesLabels,
+        _allTypes,
+        rootLabel,
+        labelToCat,
+        _classNumber);
+    break;
+  };
+
   for (auto paramType: _allTypes) {
     extractSpeciesToCatRec(speciesTree.getRoot(),
         _classes[paramType],

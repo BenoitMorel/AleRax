@@ -44,6 +44,7 @@ public:
   AleOptimizer(const std::string speciesTreeFile, 
       const Families &families, 
       const RecModelInfo &info,
+      ModelParametrization modelParametrization,
       const Parameters &startingRates,
       bool optimizeRates,
       bool optimizeVerbose,

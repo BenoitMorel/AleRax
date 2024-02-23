@@ -16,7 +16,7 @@
 #include <routines/SlavesMain.hpp>
 #include <IO/HighwayCandidateParser.hpp>
 
-const char *version = "AleRax v1.0.1";
+const char *version = "AleRax v1.1.1";
 
 
 /**
@@ -337,7 +337,7 @@ RecModelInfo buildRecModelInfo(const AleArguments &args)
 {
   return RecModelInfo(ArgumentsHelper::strToRecModel(args.reconciliationModelStr),
       args.recOpt,
-      args.perFamilyRates, // per family rates
+      (args.modelParametrization == ModelParametrization::PER_FAMILY), // per family rates
       args.gammaCategories,
       args.originationStrategy,
       args.pruneSpeciesTree,
@@ -498,9 +498,11 @@ void run( AleArguments &args)
   }
   auto info = buildRecModelInfo(args);
   auto startingRates = buildStartingRates(args, info);
+  /*
   if (args.perSpeciesRates) {
     generatePerSpeciesRateFile(args.optimizationClassFile, args.speciesTree, info);
   }
+  */
   std::string coverageFile(FileSystem::joinPaths(args.output, "fractionMissing.txt"));
   std::string fractionMissingFile(FileSystem::joinPaths(args.output, "perSpeciesCoverage.txt"));
   Family::printStats(families, args.speciesTree, coverageFile, fractionMissingFile);
@@ -508,6 +510,7 @@ void run( AleArguments &args)
       args.speciesTree,
       families,
       info,
+      args.modelParametrization,
       startingRates,
       !args.fixRates,
       args.verboseOptRates,
