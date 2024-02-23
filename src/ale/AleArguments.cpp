@@ -136,15 +136,6 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       ParallelContext::abort(10);
     }
   }
-  /*
-  if (perSpeciesRates) {
-    if (optimizationClassFile.size() > 0) {
-      Logger::error << "Error: --per-species-rates and --species-categories are not compatible" << std::endl;
-      ParallelContext::abort(0);
-    }
-    optimizationClassFile = FileSystem::joinPaths(output, "speciesRateCategories.txt");
-  }
-  */
 }
 
 void AleArguments::printCommand() const {

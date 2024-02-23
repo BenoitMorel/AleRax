@@ -356,21 +356,28 @@ Parameters buildStartingRates(const AleArguments &args,
     const RecModelInfo &info)
 {
   Parameters res(info.modelFreeParameters());
+  double average = 0.0;
   switch (info.model) {
   case RecModel::UndatedDL:
     res[0] = args.d;
     res[1] = args.l;
+    average = (args.d + args.l) / 2.0;
     break;
   case RecModel::UndatedDTL:
     res[0] = args.d;
     res[1] = args.l;
     res[2] = args.t;
+    average = (args.d + args.l + args.t) / 3.0;
     break;
   default:
     assert(false);
   }
   if (args.originationStrategy == OriginationStrategy::OPTIMIZE) {
-    res[res.dimensions() - 1] = 1.0;
+    // The initial value of the origination probabilities doesn't matter
+    // because they will be normalized in the likelihood computatation.
+    // We set it to the average of the other parameters such that all parameters
+    // are in the same range (to facilitate gradient optimization)
+    res[res.dimensions() - 1] = average;
   }
   return res;
 }
