@@ -19,6 +19,7 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
   noTL(false),
   gammaCategories(1),
   ccpRooting(CCPRooting::UNIFORM),
+  modelParametrization(ModelParametrization::GLOBAL), 
   memorySavings(false),
   d(DEFAULT_DTL_RATES),
   l(DEFAULT_DTL_RATES),
@@ -132,6 +133,7 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       verboseOptRates = true;
     } else {
       std::cerr << "Unknown argument " << arg << std::endl;
+      ParallelContext::abort(10);
     }
   }
   /*

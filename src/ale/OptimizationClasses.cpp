@@ -95,7 +95,7 @@ static void fillFromOriginations(const std::unordered_set<std::string> & allSpec
     std::map<char, std::map<std::string, unsigned int> > &labelToCat,
     unsigned int &classNumber)
 {
-  const auto ORIGINATION_TYPE = 'C';
+  const auto ORIGINATION_TYPE = 'O';
   if (std::find(allTypes.begin(), allTypes.end(), ORIGINATION_TYPE) == allTypes.end()) {
     // origination probabilities do not belong to the types to optimize, return
     return;
