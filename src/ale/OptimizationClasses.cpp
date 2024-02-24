@@ -167,16 +167,27 @@ OptimizationClasses::OptimizationClasses(const PLLRootedTree &speciesTree,
   }
 }
 
+static bool normalizeParamType(char paramType) {
+  return paramType == 'O';
+}
 
 Parameters OptimizationClasses::getCompressedParameters(const Parameters &fullParameters) const
 {
   Parameters res(_classNumber);
   for (auto type: _allTypes) {
     const auto &typeClasses = _classes.at(type);
+    double norm = 1.0;
+    if (normalizeParamType(type)) {
+      norm = 0;
+      for (unsigned int species = 0; species < typeClasses.size(); ++species) {
+        auto typeIndex = _allTypeIndices.at(type);
+        norm += fullParameters[species * _allTypes.size() + typeIndex]; 
+      }
+    }
     for (unsigned int species = 0; species < typeClasses.size(); ++species) {
       auto cat = typeClasses[species];
       auto typeIndex = _allTypeIndices.at(type);
-      res[cat] = fullParameters[species * _allTypes.size() + typeIndex]; 
+      res[cat] = fullParameters[species * _allTypes.size() + typeIndex] / norm; 
     }
   }
   return res;
@@ -187,10 +198,19 @@ Parameters OptimizationClasses::getFullParameters(const Parameters &compressedPa
   Parameters res(_allTypes.size() *_classes.at(_allTypes[0]).size());
   for (auto type: _allTypes) {
     const auto &typeClasses = _classes.at(type);
+    double norm = 1.0;
+    if (normalizeParamType(type)) {
+      norm = 0.0;
+      for (unsigned int species = 0; species < typeClasses.size(); ++species) {
+        auto cat = typeClasses[species];
+        auto typeIndex = _allTypeIndices.at(type);
+        norm += res[species * _allTypes.size() + typeIndex] = compressedParameters[cat];
+      }
+    }
     for (unsigned int species = 0; species < typeClasses.size(); ++species) {
       auto cat = typeClasses[species];
       auto typeIndex = _allTypeIndices.at(type);
-      res[species * _allTypes.size() + typeIndex] = compressedParameters[cat];
+      res[species * _allTypes.size() + typeIndex] = compressedParameters[cat] / norm;
     }
   }
   return res;
