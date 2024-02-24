@@ -56,8 +56,7 @@ public:
   CCPRooting ccpRooting;
   std::string fractionMissingFile;
   std::string optimizationClassFile;
-  bool perFamilyRates;
-  bool perSpeciesRates;
+  ModelParametrization modelParametrization;
   bool memorySavings;
   double d;
   double l;

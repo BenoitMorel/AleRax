@@ -16,7 +16,7 @@
 #include <routines/SlavesMain.hpp>
 #include <IO/HighwayCandidateParser.hpp>
 
-const char *version = "AleRax v1.0.1";
+const char *version = "AleRax v1.1.1";
 
 
 /**
@@ -337,7 +337,7 @@ RecModelInfo buildRecModelInfo(const AleArguments &args)
 {
   return RecModelInfo(ArgumentsHelper::strToRecModel(args.reconciliationModelStr),
       args.recOpt,
-      args.perFamilyRates, // per family rates
+      (args.modelParametrization == ModelParametrization::PER_FAMILY), // per family rates
       args.gammaCategories,
       args.originationStrategy,
       args.pruneSpeciesTree,
@@ -356,21 +356,28 @@ Parameters buildStartingRates(const AleArguments &args,
     const RecModelInfo &info)
 {
   Parameters res(info.modelFreeParameters());
+  double average = 0.0;
   switch (info.model) {
   case RecModel::UndatedDL:
     res[0] = args.d;
     res[1] = args.l;
+    average = (args.d + args.l) / 2.0;
     break;
   case RecModel::UndatedDTL:
     res[0] = args.d;
     res[1] = args.l;
     res[2] = args.t;
+    average = (args.d + args.l + args.t) / 3.0;
     break;
   default:
     assert(false);
   }
   if (args.originationStrategy == OriginationStrategy::OPTIMIZE) {
-    res[res.dimensions() - 1] = 1.0;
+    // The initial value of the origination probabilities doesn't matter
+    // because they will be normalized in the likelihood computatation.
+    // We set it to the average of the other parameters such that all parameters
+    // are in the same range (to facilitate gradient optimization)
+    res[res.dimensions() - 1] = average;
   }
   return res;
 }
@@ -498,9 +505,11 @@ void run( AleArguments &args)
   }
   auto info = buildRecModelInfo(args);
   auto startingRates = buildStartingRates(args, info);
+  /*
   if (args.perSpeciesRates) {
     generatePerSpeciesRateFile(args.optimizationClassFile, args.speciesTree, info);
   }
+  */
   std::string coverageFile(FileSystem::joinPaths(args.output, "fractionMissing.txt"));
   std::string fractionMissingFile(FileSystem::joinPaths(args.output, "perSpeciesCoverage.txt"));
   Family::printStats(families, args.speciesTree, coverageFile, fractionMissingFile);
@@ -508,6 +517,7 @@ void run( AleArguments &args)
       args.speciesTree,
       families,
       info,
+      args.modelParametrization,
       startingRates,
       !args.fixRates,
       args.verboseOptRates,

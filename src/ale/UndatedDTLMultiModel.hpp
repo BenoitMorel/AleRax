@@ -19,9 +19,6 @@ template <class REAL>
 class UndatedDTLMultiModel: public MultiModelTemplate<REAL> {
 
 
-#define EXCLUDE_ABOVE_PRUNED
-#define EXCLUDE_DEAD_NODES
-#define COMPUTE_TL
 public: 
   UndatedDTLMultiModel(DatedTree &speciesTree, 
       const GeneSpeciesMapping &geneSpeciesMapping, 
@@ -44,8 +41,8 @@ public:
       hp.highway = highway;
       // map the highway to the pruned species tree
       if (this->prunedMode()) {
-        hp.highway.src = _speciesToPrunedNode[highway.src->node_index];
-        hp.highway.dest = _speciesToPrunedNode[highway.dest->node_index];
+        hp.highway.src = this->_speciesToPrunedNode[highway.src->node_index];
+        hp.highway.dest = this->_speciesToPrunedNode[highway.dest->node_index];
       } else {
         hp.highway.src = highway.src;
         hp.highway.dest = highway.dest;
@@ -63,13 +60,13 @@ public:
     resetCache();
     recomputeSpeciesProbabilities();
   }
-  virtual void onSpeciesDatesChange() {resetCache(); recomputeSpeciesProbabilities();}
 
-  virtual void onSpeciesTreeChange(
-      const std::unordered_set<corax_rnode_t *> *nodesToInvalidate)  {
-    MultiModelTemplate<REAL>::onSpeciesTreeChange(nodesToInvalidate);
-    updateSpeciesToPrunedNode();
+  virtual void onSpeciesTreeChange(const std::unordered_set<corax_rnode_t *> *nodesToInvalidate) {
+    MultiModel::onSpeciesTreeChange(nodesToInvalidate);
+    resetCache(); 
+    recomputeSpeciesProbabilities();
   }
+
 
 protected:
   virtual void updateCLVs();
@@ -123,7 +120,6 @@ private:
   
   std::vector<DTLCLV> _dtlclvs;
 
-  std::vector<corax_rnode_t *> _speciesToPrunedNode;
 
 
   void updateCLV(CID cid);
@@ -138,7 +134,6 @@ private:
     corax_rnode_t *originSpeciesNode,
     size_t category,
     Scenario::Event &event);
-  corax_rnode_t *getSpeciesLCA();
   size_t getHash();
   void resetCache() {_llCache.clear();}
 
@@ -146,80 +141,9 @@ private:
     return double(this->getPrunedSpeciesNodeNumber());
   }
   
-  void updateSpeciesToPrunedNode();
 };
 
 
-// helper function for updateSpeciesToPrunedNode
-static void auxUntilPrunedRoot(corax_rnode_t *speciesNode, 
-    corax_rnode_t *prunedRoot,
-    std::vector<corax_rnode_t *> &speciesToPrunedNode)
-{
-  assert(speciesNode);
-  assert(prunedRoot);
-  speciesToPrunedNode[speciesNode->node_index] = prunedRoot;
-  if (speciesNode == prunedRoot) {
-    return;
-  }
-  if (speciesNode->left) {
-    assert(speciesNode->right);
-    auxUntilPrunedRoot(speciesNode->left, prunedRoot, speciesToPrunedNode);
-    auxUntilPrunedRoot(speciesNode->right, prunedRoot, speciesToPrunedNode);
-  }
-}
-
-// helper function for updateSpeciesToPrunedNode
-static void fillUnsampledSpeciesRec(corax_rnode_t *unsampledNode,
-    corax_rnode_t *prunedNodeToAssign,
-    std::vector<corax_rnode_t *> &speciesToPrunedNode)
-{
-  speciesToPrunedNode[unsampledNode->node_index] = prunedNodeToAssign;
-  if (unsampledNode->left) {
-    fillUnsampledSpeciesRec(unsampledNode->left, prunedNodeToAssign, speciesToPrunedNode);
-    fillUnsampledSpeciesRec(unsampledNode->right, prunedNodeToAssign, speciesToPrunedNode);
-  }
-}
-
-template <class REAL>
-void UndatedDTLMultiModel<REAL>::updateSpeciesToPrunedNode() 
-{
-  if (!_speciesToPrunedNode.size()) {
-    _speciesToPrunedNode.resize(this->getAllSpeciesNodeNumber());
-  }
-  std::fill(_speciesToPrunedNode.begin(), _speciesToPrunedNode.end(), nullptr);
-  for (auto speciesNode: this->getAllSpeciesNodes()) {
-    auto e = speciesNode->node_index;
-    if (speciesNode->left) {
-      auto left = speciesNode->left->node_index;
-      auto right = speciesNode->right->node_index;
-      if (_speciesToPrunedNode[left] && _speciesToPrunedNode[right]) {
-        // this node belongs to the pruned nodes
-        _speciesToPrunedNode[e] = speciesNode;
-      } else if (_speciesToPrunedNode[left]) {
-        _speciesToPrunedNode[e] = _speciesToPrunedNode[left];
-        #ifndef EXCLUDE_DEAD_NODES
-        fillUnsampledSpeciesRec(speciesNode->right, _speciesToPrunedNode[e], _speciesToPrunedNode);
-        #endif
-      } else if (_speciesToPrunedNode[right]) {
-        _speciesToPrunedNode[e] = _speciesToPrunedNode[right];
-        #ifndef EXCLUDE_DEAD_NODES
-        fillUnsampledSpeciesRec(speciesNode->left, _speciesToPrunedNode[e], _speciesToPrunedNode);
-        #endif
-      } // else do nothing
-    } else {
-      if (this->_speciesCoverage[e]) {
-        _speciesToPrunedNode[e] = speciesNode;
-      }
-    }
-  } 
-  // if the  root of the pruned species tree is not the root, we need 
-  // to map all parents and siblings of the pruned root to the pruned root
-#ifndef EXCLUDE_ABOVE_PRUNED
-  auxUntilPrunedRoot(this->getSpeciesTree().getRoot(),
-    this->getPrunedRoot(),
-    _speciesToPrunedNode);
-#endif
-}
 
 template <class REAL>
 UndatedDTLMultiModel<REAL>::UndatedDTLMultiModel(DatedTree &speciesTree, 
@@ -570,7 +494,7 @@ void UndatedDTLMultiModel<REAL>::recomputeSpeciesProbabilities()
     possibleSpeciesRootNodes = &speciesNodesBuffer;
     break;
   case OriginationStrategy::LCA:
-    speciesNodesBuffer.push_back(getSpeciesLCA());
+    speciesNodesBuffer.push_back(this->getSpeciesLCA());
     possibleSpeciesRootNodes = &speciesNodesBuffer;
     break;
   }
@@ -960,18 +884,6 @@ corax_rnode_t *UndatedDTLMultiModel<REAL>::sampleSpeciesNode(unsigned int &categ
   } 
   assert(false);
   return nullptr;
-}
-template <class REAL>  
-corax_rnode_t *UndatedDTLMultiModel<REAL>::getSpeciesLCA()
-{
-  auto tree = &this->_speciesTree;
-  corax_rnode_t *lca = nullptr;
-  for (auto it: this->_speciesNameToId) {
-    auto spid = it.second;
-    auto node = tree->getNode(spid);
-    lca = tree->getLCA(lca, node);
-  }
-  return _speciesToPrunedNode[lca->node_index];
 }
   
 template <class REAL> 

@@ -29,7 +29,9 @@ private:
   std::vector<double> _PD; // Duplication probability, per species branch
   std::vector<double> _PL; // Loss probability, per species branch
   std::vector<double> _PS; // Speciation probability, per species branch
+  std::vector<double> _OP; // Origination probability, per species branch
   std::vector<double> _uE; // Extinction probability, per species branch
+  OriginationStrategy _originationStrategy;
   using DLCLV = std::vector<REAL>;
   std::vector<DLCLV> _dlclvs;
   RatesVector _dlRates;
@@ -57,7 +59,9 @@ UndatedDLMultiModel<REAL>::UndatedDLMultiModel(PLLRootedTree &speciesTree,
   _PD(this->getAllSpeciesNodeNumber(), 0.2),
   _PL(this->getAllSpeciesNodeNumber(), 0.2),
   _PS(this->getAllSpeciesNodeNumber(), 1.0),
-  _uE(this->getAllSpeciesNodeNumber(), 0.0)
+  _OP(this->getAllSpeciesNodeNumber(), 1.0 / static_cast<double>(this->getAllSpeciesNodeNumber())),
+  _uE(this->getAllSpeciesNodeNumber(), 0.0),
+  _originationStrategy(info.originationStrategy)
 {
   std::vector<REAL> zeros(this->getAllSpeciesNodeNumber(), REAL());
   _dlclvs = std::vector<std::vector<REAL> >(
@@ -74,7 +78,7 @@ UndatedDLMultiModel<REAL>::UndatedDLMultiModel(PLLRootedTree &speciesTree,
 template <class REAL>
 void UndatedDLMultiModel<REAL>::setRates(const RatesVector &rates) 
 {
-  assert(rates.size() == 2);
+  assert(rates.size() == this->_info.modelFreeParameters());
   _dlRates = rates;
   recomputeSpeciesProbabilities();
 }
@@ -101,7 +105,8 @@ double UndatedDLMultiModel<REAL>::computeLogLikelihood()
   auto rootCID = this->_ccp.getCladesNumber() - 1;
   REAL res = REAL();
   for (auto speciesNode: this->getPrunedSpeciesNodes()) {
-    res += _dlclvs[rootCID][speciesNode->node_index];
+    auto e = speciesNode->node_index;
+    res += _dlclvs[rootCID][e] * _OP[e];
   }
   // the root correction makes sure that UndatedDLMultiModel and
   // UndatedDL model are equivalent when there is one tree per
@@ -132,6 +137,37 @@ void UndatedDLMultiModel<REAL>::recomputeSpeciesProbabilities()
     _PL[e] /= sum;
     _PS[e] = 1.0 / sum;
   } 
+  std::vector<corax_rnode_t *> speciesNodesBuffer;
+  std::vector<corax_rnode_t *> *possibleSpeciesRootNodes = nullptr;
+  switch (_originationStrategy) {
+  case OriginationStrategy::UNIFORM:
+  case OriginationStrategy::OPTIMIZE:
+    possibleSpeciesRootNodes = &(this->getPrunedSpeciesNodes());
+    break;
+  case OriginationStrategy::ROOT:
+    speciesNodesBuffer.push_back(this->_speciesTree.getRoot());
+    possibleSpeciesRootNodes = &speciesNodesBuffer;
+    break;
+  case OriginationStrategy::LCA:
+    speciesNodesBuffer.push_back(this->getSpeciesLCA());
+    possibleSpeciesRootNodes = &speciesNodesBuffer;
+    break;
+  }
+  if (_originationStrategy == OriginationStrategy::OPTIMIZE) {
+    double sum = 0.0;
+    for (auto speciesNode: *possibleSpeciesRootNodes) {
+      sum += _dlRates[2][speciesNode->node_index];
+    }
+    sum /= static_cast<double>(this->getPrunedSpeciesNodes().size());
+    for (auto speciesNode: *possibleSpeciesRootNodes) {
+      _OP[speciesNode->node_index] = _dlRates[2][speciesNode->node_index] / sum;
+    }
+  } else {
+    std::fill(_OP.begin(), _OP.end(), 0.0);
+    for (auto speciesNode: *possibleSpeciesRootNodes) {
+      _OP[speciesNode->node_index] = 1.0;
+    }
+  }
   for (auto speciesNode: this->getPrunedSpeciesNodes()) {
     auto e = speciesNode->node_index;
     double a = _PD[e];

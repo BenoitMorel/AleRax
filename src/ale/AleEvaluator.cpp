@@ -67,6 +67,7 @@ AleEvaluator::AleEvaluator(
     AleOptimizer &optimizer,
     SpeciesTree &speciesTree,
     const RecModelInfo &info,
+    ModelParametrization modelParametrization,
     std::vector<AleModelParameters> &modelParameters, 
     bool optimizeRates,
     bool optimizeVerbose,
@@ -84,7 +85,7 @@ AleEvaluator::AleEvaluator(
   _highPrecisions(_geneTrees.getTrees().size(), -1),
   _outputDir(outputDir),
   _optimizeVerbose(optimizeVerbose),
-  _optimizationClasses(_speciesTree.getTree(), speciesCategoryFile, _info)
+  _optimizationClasses(_speciesTree.getTree(), modelParametrization, speciesCategoryFile, _info)
 {
   Logger::timed << "Initializing ccps and evaluators..." << std::endl;
   _evaluations.resize(_geneTrees.getTrees().size());
@@ -371,6 +372,7 @@ double AleEvaluator::optimizeModelRates(bool thorough)
       ll = computeLikelihood();
       Logger::timed << "[Species search]   After model rate opt, ll=" << ll << std::endl;
     } else {
+      Logger::timed << "Free parameters: " << _optimizationClasses.getFreeParameters() << std::endl;
       DTLParametersOptimizerGlobal function(*this);
       auto categorizedParameters = getOptimizationClasses().getCompressedParameters(_modelParameters[0].getParameters());
       auto bestParameters = DTLOptimizer::optimizeParameters(

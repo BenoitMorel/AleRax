@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <maths/Parameters.hpp>
+#include <util/enums.hpp>
 
 class PLLRootedTree;
 struct RecModelInfo;
@@ -20,10 +21,12 @@ public:
   /**
    *  Constructor
    *  @param speciesTree 
-   *  @param optimizationClassFile (syntax described in the wiki)
+   *  @param parametrization
+   *  @param optimizationClassFile
    *  @param info 
    */
   OptimizationClasses(const PLLRootedTree &speciesTree,
+    ModelParametrization parametrization,
     const std::string &optimizationClassFile,
     const RecModelInfo &info);
 
@@ -46,6 +49,7 @@ public:
   Parameters getCompressedParameters(const Parameters &fullParameters) const;
   Parameters getFullParameters(const Parameters &compressedParameters) const;
 
+  unsigned int getFreeParameters() const {return _classNumber;}
 private:
   // _classes[parameter type][species node index] = integer representing the corresponding class
   std::unordered_map<char, std::vector<unsigned int> > _classes;
