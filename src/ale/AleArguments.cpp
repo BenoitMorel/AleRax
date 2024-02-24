@@ -103,8 +103,6 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       ccpRooting = ArgumentsHelper::strToCCPRooting(std::string(argv[++i]));
     } else if (arg == "--fraction-missing-file") {
       fractionMissingFile = argv[++i];
-    } else if (arg == "--param-opt-classes") {
-      optimizationClassFile = argv[++i];
     } else if (arg == "--gene-tree-samples") {
       geneTreeSamples = atoi(argv[++i]);
     } else if (arg == "--model-parametrization") {
@@ -131,6 +129,9 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       randomSpeciesRoot = true;
     } else if (arg == "--verbose-opt-rates") {
       verboseOptRates = true;
+    } else if (arg == "--per-family-rates" || arg == "--per-species-rates") {
+      Logger::error << "Error: --per-family-rates and --per-species-rates are deprecated and have been replaced with --model-parametrization PER-FAMILY or --model-paramtetrization PER-SPECIES"<< std::endl;
+      ParallelContext::abort(10);
     } else {
       std::cerr << "Unknown argument " << arg << std::endl;
       ParallelContext::abort(10);
