@@ -73,11 +73,11 @@ AleArguments::AleArguments(int iargc, char * iargv[]):
       fixRates = true;
     } else if (arg == "--highways") {
       highways = true;
-    } else if (arg == "--highway-candidates-file") {
+    } else if (arg == "--highway-candidate-file") {
       highwayCandidateFile= std::string(argv[++i]);
-    } else if (arg == "--highway-candidates-step1") {
+    } else if (arg == "--highway-candidate-step1") {
       highwayCandidatesStep1 = atoi(argv[++i]);
-    } else if (arg == "--highway-candidates-step2") {
+    } else if (arg == "--highway-candidate-step2") {
       highwayCandidatesStep2 = atoi(argv[++i]);
     } else if (arg == "--transfer-constraint") {
       transferConstraint = ArgumentsHelper::strToTransferConstraint(std::string(argv[++i]));
