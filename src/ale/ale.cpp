@@ -455,7 +455,7 @@ void runTransferHighwayInference(const AleArguments &args,
     auto acceptedHighwayOutput = FileSystem::joinPaths(highwaysOutputDir,
       "highway_accepted_highways.txt");
     std::vector<ScoredHighway> acceptedHighways;
-    Highways::optimizeAllHighways(speciesTreeOptimizer, filteredHighways, acceptedHighways, true);
+    Highways::optimizeAllHighways(speciesTreeOptimizer, filteredHighways, acceptedHighways, false);
     speciesTreeOptimizer.saveBestHighways(acceptedHighways,
         acceptedHighwayOutput);
 }

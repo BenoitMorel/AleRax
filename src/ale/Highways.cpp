@@ -4,6 +4,7 @@
 #include <optimizers/DTLOptimizer.hpp>
 #include <IO/FileSystem.hpp>
 #include <IO/Logger.hpp>
+#include "IO/IniParser.h"
 
 const double MIN_PH = 0.00000001;
 const double MAX_PH = 0.25;
@@ -73,10 +74,12 @@ static Parameters testHighways(AleEvaluator &evaluator,
   assert(highways.size() == startingProbabilities.dimensions());
   HighwayFunction f(evaluator, highways);
   if (optimize) {
+    IniParser& parser = IniParser::getInstance();
     OptimizationSettings settings;
     settings.strategy = evaluator.getRecModelInfo().recOpt; 
-    settings.minAlpha = 0.001;
-    settings.epsilon = 0.000001;
+    settings.minAlpha = parser.getValue("optimizer.minAlpha");
+    settings.epsilon = parser.getValue("optimizer.epsilon");
+    settings.use_for_ll();
     //settings.verbose = true;
     if (thorough) {
       settings.individualParamOpt = true;
