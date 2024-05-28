@@ -88,6 +88,7 @@ private:
   std::vector<double> _PS; // Speciation probability, per species branch
   std::vector<double> _OP; // Origination probability, per species branch
   std::vector<REAL> _uE; // Extinction probability, per species branch
+  std::vector<REAL> _uEBar;
   std::unordered_map<size_t, double> _llCache;
   std::vector<std::vector<WeightedHighway> > _highways;
   TransferConstaint _transferConstraint;
@@ -163,6 +164,7 @@ UndatedDTLMultiModel<REAL>::UndatedDTLMultiModel(DatedTree &speciesTree,
   _PS(this->_speciesTree.getNodeNumber() * _gammaCatNumber, 1.0),
   _OP(this->_speciesTree.getNodeNumber(), 1.0 / static_cast<double>(this->_speciesTree.getNodeNumber())),
   _uE(this->_speciesTree.getNodeNumber() * _gammaCatNumber, REAL()),
+  _uEBar(this->_speciesTree.getNodeNumber() * _gammaCatNumber, REAL()),
   _transferConstraint(info.transferConstraint),
   _originationStrategy(info.originationStrategy)
 {
@@ -575,11 +577,52 @@ void UndatedDTLMultiModel<REAL>::recomputeSpeciesProbabilities()
         }
       }
       for (size_t c = 0; c < _gammaCatNumber; ++c) {
-        transferSum[c] /= double(this->getPrunedSpeciesNodeNumber());
-        assert(transferSum[c] < REAL(1.0001));
+        transferSum[c] /= getTransferWeightNorm();    
+        assert(transferSum[c] < REAL(1.0001));                             
+      }
+    } else {
+      // precompute ancestral correction sum 
+      // (to forbid transfers to parents) 
+      std::fill(_uEBar.begin(), _uEBar.end(), REAL());
+      if (_transferConstraint == TransferConstaint::PARENTS) {
+        auto postOrder = this->_speciesTree.getPostOrderNodes();
+        for (auto it = postOrder.rbegin();
+            it != postOrder.rend(); ++it)  {
+          auto speciesNode = *it;
+          auto e = speciesNode->node_index;
+          for (size_t c = 0; c < _gammaCatNumber; ++c) {
+            auto parent = speciesNode;
+            auto ec = e * _gammaCatNumber + c;
+            while (parent) {
+              auto p = parent->node_index;
+              auto pc = p * _gammaCatNumber + c;
+              auto temp = _uE[pc];
+              scale(temp);
+              _uEBar[ec] += temp;
+              parent = parent->parent;
+            }
+          }
+        }
+      } else {
+        assert(false);
+      }
+      for (auto speciesNode: this->getPrunedSpeciesNodes()) {
+        auto e = speciesNode->node_index;
+        for (size_t c = 0; c < _gammaCatNumber; ++c) {
+          auto ec = e * _gammaCatNumber + c;
+          _uEBar[ec] = (transferSum[c]) - (_uEBar[ec]  / getTransferWeightNorm());
+        }
       }
     }
   } // iterations to account for TL
+  // std::cout << "Estimated extinction probabilities:" << std::endl;
+  // for (auto speciesNode: this->getPrunedSpeciesNodes()) {
+  //   auto e = speciesNode->node_index;
+  //   for (size_t c = 0; c < _gammaCatNumber; ++c) {
+  //     auto ec = e * _gammaCatNumber + c;
+  //     std::cout << e << ", " << _uE[ec] << std::endl;
+  //   }
+  // }
 }
 
 template <class REAL>
@@ -787,6 +830,14 @@ bool UndatedDTLMultiModel<REAL>::computeProbability(CID cid,
       return true;
     }
   }
+  // DL event
+  temp = _dtlclvs[cid]._uq[ec] * _uE[ec] * (_PD[ec] * 2.0);
+  scale(temp);
+  proba += temp;
+  if (recCell && proba > maxProba) {
+    recCell->event.type = ReconciliationEventType::EVENT_DL;
+    return true;
+  }
   // TL event
   if (!this->_info.noTL) {
     // the gene is transfered to the dest species and goes extinct in 
@@ -805,6 +856,18 @@ bool UndatedDTLMultiModel<REAL>::computeProbability(CID cid,
       }
       recCell->event.destSpeciesNode = 
         recCell->event.pllDestSpeciesNode->node_index;
+      return true;
+    }
+    // the gene is transfered to the dest species and goes extinct in 
+    // the dest species
+    temp = _dtlclvs[cid]._uq[ec] * (_PT[ec]);
+    temp *= _uEBar[ec];
+    scale(temp);
+    proba += temp;
+    if (recCell && proba > maxProba) {
+      // in fact, nothing happens, we'll have to resample
+      recCell->event.type = ReconciliationEventType::EVENT_TL;
+      recCell->event.pllDestSpeciesNode = nullptr; 
       return true;
     }
     // TL from a highway

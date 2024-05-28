@@ -338,6 +338,9 @@ bool MultiModelTemplate<REAL>::backtrace(unsigned int cid,
     ok &= backtrace(leftCid, speciesNode, leftGeneNode, c, scenario, stochastic); 
     ok &= backtrace(rightCid, speciesNode, rightGeneNode, c, scenario, stochastic); 
     break;
+  case ReconciliationEventType::EVENT_DL:
+    ok &= backtrace(cid, speciesNode, geneNode, c, scenario, stochastic); 
+    break;
   case ReconciliationEventType::EVENT_SL:
     ok &= backtrace(cid, recCell.event.pllDestSpeciesNode, geneNode, c, scenario, stochastic); 
     break;
