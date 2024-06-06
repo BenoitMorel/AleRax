@@ -1,10 +1,9 @@
 #pragma once
 
+#include "IO/ArgumentsHelper.hpp"
 #include "util/enums.hpp"
 #include <string>
-#include "IO/ArgumentsHelper.hpp"
 
-  
 /**
  *  Parse and store the program arguments
  */
@@ -13,20 +12,20 @@ public:
   /**
    *  Parse the arguments from main()
    */
-  AleArguments(int argc, char * argv[]);
+  AleArguments(int argc, char *argv[]);
 
   /**
    *  Print AleRax' help message
    */
   void printHelp();
-  
+
   /**
    *  Print the command line used to call the AleRax' executable
    */
   void printCommand() const;
 
   /**
-   *  Write a user-friendly summary of the most important 
+   *  Write a user-friendly summary of the most important
    *  parameters set by the user
    */
   void printSummary() const;
@@ -36,17 +35,17 @@ public:
    *  If not, terminates the program with an explicit error message
    */
   void checkValid();
+
 public:
- 
   // the parameters of the main() function
   int argc;
-  char ** argv;
+  char **argv;
 
   // input data
   std::string families;
   std::string speciesTree;
   std::string reconciliationModelStr;
-  
+
   // model
   TransferConstaint transferConstraint;
   OriginationStrategy originationStrategy;
@@ -90,9 +89,8 @@ public:
 
   // random seed
   int seed;
-  
+
   // experimental
   bool randomSpeciesRoot;
   bool verboseOptRates;
 };
-

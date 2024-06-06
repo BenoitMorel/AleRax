@@ -1,12 +1,12 @@
 #pragma once
 
+#include <maths/ModelParameters.hpp>
 #include <util/RecModelInfo.hpp>
 #include <util/types.hpp>
-#include <maths/ModelParameters.hpp>
 
-#include <vector>
 #include <algorithm>
 #include <fstream>
+#include <vector>
 
 /**
  * Stores the model parameters for a gene family
@@ -16,12 +16,8 @@ public:
   /**
    *  @brief Default constructor
    */
-  AleModelParameters():
-    _speciesBranchNumber(0)
-  {
-    
-  }
- 
+  AleModelParameters() : _speciesBranchNumber(0) {}
+
   /**
    *  @brief Constructor
    *  @param startingRates the set of rates to assign to each category
@@ -29,11 +25,10 @@ public:
    *  @param info Description of the model
    */
   AleModelParameters(const Parameters &startingRates,
-      unsigned int speciesBranchNumber):
-    _paramTypeNumber(startingRates.dimensions()),
-    _speciesBranchNumber(speciesBranchNumber),
-    _parameters(_speciesBranchNumber, startingRates)
-  {
+                     unsigned int speciesBranchNumber)
+      : _paramTypeNumber(startingRates.dimensions()),
+        _speciesBranchNumber(speciesBranchNumber),
+        _parameters(_speciesBranchNumber, startingRates) {
     for (unsigned int i = 0; i < getFreeParameters(); ++i) {
       _parameters[i] = startingRates[i % getParamTypeNumber()];
     }
@@ -46,12 +41,10 @@ public:
    *  @param startingValue Starting value for all rates
    */
   AleModelParameters(unsigned int paramTypeNumber,
-      unsigned int speciesBranchNumber,
-      double startingValue):
-    _paramTypeNumber(paramTypeNumber),
-    _speciesBranchNumber(speciesBranchNumber),
-    _parameters(_paramTypeNumber * _speciesBranchNumber)
-  {
+                     unsigned int speciesBranchNumber, double startingValue)
+      : _paramTypeNumber(paramTypeNumber),
+        _speciesBranchNumber(speciesBranchNumber),
+        _parameters(_paramTypeNumber * _speciesBranchNumber) {
     for (unsigned int i = 0; i < _parameters.dimensions(); ++i) {
       _parameters[i] = startingValue;
     }
@@ -60,12 +53,12 @@ public:
   /**
    *  Number of free parameters for a single species category
    */
-  unsigned int getParamTypeNumber() const {return _paramTypeNumber;}
+  unsigned int getParamTypeNumber() const { return _paramTypeNumber; }
 
   /**
    *  Number of species branches
    */
-  unsigned int getSpeciesBranchNumber() const {return _speciesBranchNumber;}
+  unsigned int getSpeciesBranchNumber() const { return _speciesBranchNumber; }
 
   /**
    *  Set rates from a parameter vector
@@ -78,9 +71,9 @@ public:
   /**
    *  Get rates as a parameter vector
    */
-  const Parameters &getParameters() const {return _parameters;}
-  Parameters &getParameters() {return _parameters;}
-  
+  const Parameters &getParameters() const { return _parameters; }
+  Parameters &getParameters() { return _parameters; }
+
   /**
    *  Fill rates for a family. Rates is indexed as:
    *  rates[event][species * C + category]
@@ -98,13 +91,13 @@ public:
     return _parameters[species * getParamTypeNumber() + rate];
   }
 
-  void normalizeParamType(unsigned int paramType)  {
+  void normalizeParamType(unsigned int paramType) {
     double sum = 0.0;
     for (unsigned int i = 0; i < getSpeciesBranchNumber(); ++i) {
       sum += getParameter(i, paramType);
     }
     for (unsigned int i = 0; i < getSpeciesBranchNumber(); ++i) {
-      getParameter(i, paramType) /= sum;    
+      getParameter(i, paramType) /= sum;
     }
   }
 
@@ -114,17 +107,16 @@ public:
   void setParameter(unsigned int species, unsigned int rate, double val) {
     _parameters[species * getParamTypeNumber() + rate] = val;
   }
-private:
 
+private:
   /**
    * Number of tree parameters for all categories
    */
-  unsigned int getFreeParameters() const {return getSpeciesBranchNumber() * getParamTypeNumber();} 
-  
+  unsigned int getFreeParameters() const {
+    return getSpeciesBranchNumber() * getParamTypeNumber();
+  }
+
   unsigned int _paramTypeNumber;
   unsigned int _speciesBranchNumber;
   Parameters _parameters;
 };
-
-
-

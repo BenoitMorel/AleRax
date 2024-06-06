@@ -1,10 +1,8 @@
-#include <trees/DatedTree.hpp>
-#include <iostream>
 #include <fstream>
+#include <iostream>
+#include <trees/DatedTree.hpp>
 
-
-int main(int argc, char** argv)
-{
+int main(int argc, char **argv) {
   if (argc != 3) {
     std::cerr << "Error, syntax is:" << std::endl;
     std::cerr << "order_speciation input_tree output_tree" << std::endl;
@@ -19,7 +17,3 @@ int main(int argc, char** argv)
   os << rootedTree.getNewickString() << std::endl;
   return 0;
 }
-
-
-
-
