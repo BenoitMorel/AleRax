@@ -382,19 +382,17 @@ bool UndatedDTLMultiModel<REAL>::sampleTransferEvent(
     max = survivingTransferSum[c];
     break;
   case TransferConstaint::PARENTS:
-    // TODO: verify this, adjust other cases
     max =
-        (survivingTransferSum[c] - correctionSum[ec]) / getTransferWeightNorm();
+        survivingTransferSum[c] - correctionSum[ec];
     break;
   case TransferConstaint::RELDATED:
-    max = correctionSum[ec];
+    max = correctionSum[ec] * N;
     break;
   default:
     assert(false);
   }
   auto samplingProba = Random::getProba();
   max *= samplingProba;
-  max *= N;
   REAL sum = REAL();
 
   std::unordered_set<unsigned int> parents;
@@ -617,8 +615,7 @@ REAL UndatedDTLMultiModel<REAL>::getTransferSum(unsigned int cid,
             _dtlclvs[cid]._correctionSum[ec]) /
            _dtlclvs[cid]._correctionNorm[ec];
   case TransferConstaint::RELDATED:
-    // TODO: adjust to new normalization
-    return _dtlclvs[cid]._correctionSum[ec] / getTransferWeightNorm();
+    return _dtlclvs[cid]._correctionSum[ec];
   default:
     assert(false);
   }
