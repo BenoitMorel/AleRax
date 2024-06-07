@@ -28,7 +28,7 @@ We will publish a manuscript on bioarxiv very soon!
 To download AleRax, please use git,  and clone with --recursive!!!
 
 ```
-git clone --recursive https://github.com/BenoitMorel/AleRax
+git clone --recursive https://github.com/noahares/AleRax
 ```
 
 For some reason, cloning coraxlib (one of the dependencies) sometimes fails:
