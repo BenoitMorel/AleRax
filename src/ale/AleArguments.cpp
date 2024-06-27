@@ -20,7 +20,7 @@ AleArguments::AleArguments(int iargc, char *iargv[])
       speciesTreeAlgorithm(SpeciesTreeAlgorithm::User),
       speciesSearchStrategy(SpeciesSearchStrategy::SKIP),
       inferSpeciationOrders(false), fixRates(false), skipThoroughRates(false),
-      recOpt(RecOpt::Gradient), highways(false), highwayCandidatesStep1(100),
+      recOpt(RecOpt::LBFGSB), highways(false), highwayCandidatesStep1(100),
       highwayCandidatesStep2(50), skipFamilyFiltering(false),
       minCoveredSpecies(DEFAULT_MIN_COVERED_SPECIES),
       trimFamilyRatio(DEFAULT_TRIM_FAMILY_RATIO),
@@ -73,6 +73,8 @@ AleArguments::AleArguments(int iargc, char *iargv[])
     } else if (arg == "--no-tl") {
       noTL = true;
     } else if (arg == "--trim-ratio") {
+      trimFamilyRatio = atof(argv[++i]);
+    } else if (arg == "--skip-ratio") {
       trimFamilyRatio = atof(argv[++i]);
     } else if (arg == "--skip-family-filtering") {
       skipFamilyFiltering = true;
@@ -313,7 +315,7 @@ void AleArguments::printHelp() {
   Logger::info
       << "\t-r --rec-model <reconciliationModel>  {UndatedDL, UndatedDTL}"
       << std::endl;
-  Logger::info << "\t---rec-opt <optimizer>  {Simplex, Gradient}" << std::endl;
+  Logger::info << "\t---rec-opt <optimizer>  {Simplex, LBFGSB, Gradient}" << std::endl;
   Logger::info << "\t--transfer-constraint {NONE, PARENTS, RELDATED}"
                << std::endl;
   Logger::info << "\t--prune-species-tree" << std::endl;
@@ -333,7 +335,7 @@ void AleArguments::printHelp() {
   Logger::info << "Trimming options" << std::endl;
   Logger::info << "\t--min-covered-species <value>" << std::endl;
   Logger::info << "\t--max-clade-split-ratio <value>" << std::endl;
-  Logger::info << "\t--trim-ratio <proportion>" << std::endl;
+  Logger::info << "\t--skip-ratio <proportion>" << std::endl;
   Logger::info << "\t--gene-tree-sample-frequency <int>" << std::endl;
 
   Logger::info << "Transfer highway options" << std::endl;
