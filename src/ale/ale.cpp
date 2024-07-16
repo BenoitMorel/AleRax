@@ -414,7 +414,7 @@ void runDateOptimization(const AleArguments &args,
 }
 
 void runTransferHighwayInference(const AleArguments &args,
-                                 AleOptimizer &speciesTreeOptimizer) {
+                                 AleOptimizer &speciesTreeOptimizer, size_t sample_size) {
   if (!args.highways) {
     return;
   }
@@ -443,7 +443,7 @@ void runTransferHighwayInference(const AleArguments &args,
   // We also sort the highways per likelihood
   std::vector<ScoredHighway> filteredHighways;
   Highways::filterCandidateHighwaysFast(speciesTreeOptimizer, candidateHighways,
-                                        filteredHighways);
+                                        filteredHighways, sample_size);
   filteredHighways.resize(
       std::min(filteredHighways.size(), size_t(args.highwayCandidatesStep2)));
   // now optimize all highways together
@@ -451,7 +451,7 @@ void runTransferHighwayInference(const AleArguments &args,
       FileSystem::joinPaths(highwaysOutputDir, "highway_accepted_highways.txt");
   std::vector<ScoredHighway> acceptedHighways;
   Highways::optimizeAllHighways(speciesTreeOptimizer, filteredHighways,
-                                acceptedHighways, false);
+                                acceptedHighways, true);
   speciesTreeOptimizer.saveBestHighways(acceptedHighways,
                                         acceptedHighwayOutput);
 }
@@ -539,7 +539,7 @@ void run(AleArguments &args) {
     speciesTreeOptimizer.saveCheckpoint();
   }
   if (speciesTreeOptimizer.getCurrentStep() <= AleStep::Highways) {
-    runTransferHighwayInference(args, speciesTreeOptimizer);
+    runTransferHighwayInference(args, speciesTreeOptimizer, args.geneTreeSamples * families.size());
     speciesTreeOptimizer.setCurrentStep(AleStep::ModelRateOpt2);
     speciesTreeOptimizer.saveCheckpoint();
   }

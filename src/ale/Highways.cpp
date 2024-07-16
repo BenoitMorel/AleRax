@@ -3,6 +3,8 @@
 #include "IO/IniParser.h"
 #include <IO/FileSystem.hpp>
 #include <IO/Logger.hpp>
+#include <cmath>
+#include <cstdio>
 #include <optimizers/DTLOptimizer.hpp>
 #include <search/SpeciesTransferSearch.hpp>
 
@@ -77,9 +79,10 @@ static Parameters testHighways(AleEvaluator &evaluator,
     IniParser &parser = IniParser::getInstance();
     OptimizationSettings settings;
     settings.strategy = evaluator.getRecModelInfo().recOpt;
-    settings.minAlpha = parser.getValue("optimizer.minAlpha");
-    settings.epsilon = parser.getValue("optimizer.epsilon");
+    settings.minAlpha = parser.getValue("optimizer.minAlpha", 0.001);
+    settings.epsilon = parser.getValue("optimizer.epsilon", 0.000001);
     settings.use_for_ll();
+    settings.onlyIndividualOpt = false;
     // settings.verbose = true;
     if (thorough) {
       settings.individualParamOpt = true;
@@ -94,6 +97,29 @@ static Parameters testHighways(AleEvaluator &evaluator,
     f.evaluate(parameters);
     return parameters;
   }
+}
+
+static Parameters optimizeSingleHighway(AleEvaluator &evaluator,
+                               Highway &highway,
+                               double startingProbability,
+                               double required_ll) {
+  std::vector<Highway *> highways;
+  auto copy = highway;
+  highways.push_back(&copy);
+  HighwayFunction f(evaluator, highways);
+  Parameters startingProbabilities(1);
+  startingProbabilities[0] = startingProbability;
+  IniParser &parser = IniParser::getInstance();
+  OptimizationSettings settings;
+  settings.strategy = RecOpt::Gradient;
+  settings.minAlpha = parser.getValue("optimizer.minAlpha", 0.001);
+  settings.epsilon = parser.getValue("optimizer.epsilon", 0.000001);
+  // settings.verbose = true;
+  settings.required_ll = required_ll;
+  auto res =
+  DTLOptimizer::optimizeParameters(f, startingProbabilities, settings);
+  res.constrain(MIN_PH, MAX_PH);
+  return res;
 }
 
 static bool isHighwayCompatible(Highway &highway, const RecModelInfo &info,
@@ -121,8 +147,9 @@ static bool isHighwayCompatible(Highway &highway, const RecModelInfo &info,
 void Highways::getCandidateHighways(AleOptimizer &optimizer,
                                     std::vector<ScoredHighway> &scoredHighways,
                                     unsigned int maxCandidates) {
+  IniParser &parser = IniParser::getInstance();
   auto &speciesTree = optimizer.getSpeciesTree();
-  unsigned int minTransfers = 1;
+  unsigned int minTransfers = parser.getValue("highways.minTransfers", 2);
   MovesBlackList blacklist;
   std::vector<TransferMove> transferMoves;
   SpeciesTransferSearch::getSortedTransferList(
@@ -142,7 +169,8 @@ void Highways::getCandidateHighways(AleOptimizer &optimizer,
 
 void Highways::filterCandidateHighwaysFast(
     AleOptimizer &optimizer, const std::vector<ScoredHighway> &highways,
-    std::vector<ScoredHighway> &filteredHighways) {
+    std::vector<ScoredHighway> &filteredHighways,
+    size_t sample_size) {
   auto &evaluator = optimizer.getEvaluator();
   auto &speciesTree = optimizer.getSpeciesTree();
   double proba = 0.01;
@@ -159,18 +187,21 @@ void Highways::filterCandidateHighwaysFast(
                    << highway.dest->label << std::endl;
       continue;
     }
-    auto parameters = testHighwayFast(evaluator, highway,
-                                      optimizer.getHighwaysOutputDir(), proba);
-    auto llDiff = parameters.getScore() - initialLL;
+    auto plausibility_params = testHighwayFast(evaluator, highway, optimizer.getHighwaysOutputDir(), proba);
+    auto llDiff = plausibility_params.getScore() - initialLL;
     if (llDiff > 0.01) {
-      Logger::timed << "Accepting candidate: ";
-      highway.proba = parameters[0];
-      filteredHighways.push_back(ScoredHighway(highway, -llDiff));
-    } else {
-      Logger::timed << "Rejecting candidate: ";
+      auto parameters = optimizeSingleHighway(evaluator, highway, proba, initialLL + log(sample_size));
+      auto llDiff = parameters.getScore() - initialLL;
+      if (llDiff > log(sample_size)) {
+        Logger::timed << "Accepting candidate: ";
+        highway.proba = parameters[0];
+        filteredHighways.push_back(ScoredHighway(highway, -llDiff));
+      } else {
+        Logger::timed << "Rejecting candidate: ";
+      }
+      Logger::info << highway.src->label << "->" << highway.dest->label
+                   << " ll diff = " << llDiff << std::endl;
     }
-    Logger::info << highway.src->label << "->" << highway.dest->label
-                 << " ll diff = " << llDiff << std::endl;
   }
   std::sort(filteredHighways.begin(), filteredHighways.end());
 }
