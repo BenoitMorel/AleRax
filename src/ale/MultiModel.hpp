@@ -293,8 +293,9 @@ bool MultiModelTemplate<REAL>::backtrace(unsigned int cid,
     rightGeneNode->length = recCell.blRight;
   }
   bool addEvent = true;
-  if (recCell.event.type == ReconciliationEventType::EVENT_TL &&
-      recCell.event.pllDestSpeciesNode == nullptr) {
+  if ((recCell.event.type == ReconciliationEventType::EVENT_TL &&
+      recCell.event.pllDestSpeciesNode == nullptr) || 
+      recCell.event.type == ReconciliationEventType::EVENT_DL) {
     addEvent = false;
   }
 

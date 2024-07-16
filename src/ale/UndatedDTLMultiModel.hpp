@@ -386,7 +386,7 @@ bool UndatedDTLMultiModel<REAL>::sampleTransferEvent(
         survivingTransferSum[c] - correctionSum[ec];
     break;
   case TransferConstaint::RELDATED:
-    max = correctionSum[ec] * N;
+    max = correctionSum[ec] * static_cast<REAL>(N);
     break;
   default:
     assert(false);
