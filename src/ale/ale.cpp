@@ -7,6 +7,7 @@
 #include <IO/FileSystem.hpp>
 #include <IO/HighwayCandidateParser.hpp>
 #include <IO/Logger.hpp>
+#include <algorithm>
 #include <ccp/ConditionalClades.hpp>
 #include <cstdio>
 #include <numeric>
@@ -435,8 +436,14 @@ void runTransferHighwayInference(const AleArguments &args,
     auto highways = HighwayCandidateParser::parse(
         args.highwayCandidateFile,
         speciesTreeOptimizer.getSpeciesTree().getTree());
-    for (const auto &highway : highways) {
-      candidateHighways.push_back(ScoredHighway(highway));
+
+    std::vector<ScoredHighway> sortedCandidateHighways;
+    Highways::getCandidateHighways(speciesTreeOptimizer, sortedCandidateHighways,
+                                   args.highwayCandidatesStep1);
+    for (const auto &highway : sortedCandidateHighways) {
+      if (std::find_if(highways.begin(), highways.end(), [&](auto &x) {return highway == x; }) != highways.end()) {
+        candidateHighways.push_back(ScoredHighway(highway));
+      }
     }
   } else {
     // automatically search for candidates

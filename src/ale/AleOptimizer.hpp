@@ -28,6 +28,9 @@ struct ScoredHighway {
   bool operator<(const ScoredHighway &other) const {
     return score < other.score;
   }
+  bool operator==(const Highway &other) const {
+    return highway.src == other.src && highway.dest == other.dest;
+  }
 };
 
 bool cmpHighwayByProbability(const ScoredHighway &a, const ScoredHighway &b);
