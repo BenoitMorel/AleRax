@@ -192,7 +192,7 @@ void Highways::filterCandidateHighwaysFast(
     if (llDiff > 0.01) {
       auto parameters = optimizeSingleHighway(evaluator, highway, proba, initialLL + log(sample_size));
       auto llDiff = parameters.getScore() - initialLL;
-      if (llDiff > log(sample_size)) {
+      if (2 * llDiff > log(sample_size)) {
         Logger::timed << "Accepting candidate: ";
         highway.proba = parameters[0];
         filteredHighways.push_back(ScoredHighway(highway, -llDiff));

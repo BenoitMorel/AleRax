@@ -9,6 +9,7 @@
 #include <IO/Logger.hpp>
 #include <ccp/ConditionalClades.hpp>
 #include <cstdio>
+#include <numeric>
 #include <parallelization/ParallelContext.hpp>
 #include <routines/Routines.hpp>
 #include <routines/SlavesMain.hpp>
@@ -81,7 +82,7 @@ getSortedIndices(const std::vector<unsigned int> &values) {
  *  @param ccpDimensionFile Output file with the per-family ccp sizes
  *
  */
-void generateCCPs(const Families &families, CCPRooting ccpRooting,
+unsigned int generateCCPs(const Families &families, CCPRooting ccpRooting,
                   unsigned int sampleFrequency,
                   const std::string ccpDimensionFile) {
   ParallelContext::barrier();
@@ -91,6 +92,7 @@ void generateCCPs(const Families &families, CCPRooting ccpRooting,
   std::vector<unsigned int> familyIndices;
   std::vector<unsigned int> treeSizes;
   std::vector<unsigned int> ccpSizes;
+  unsigned int numTrees = 0;
   for (auto i = ParallelContext::getBegin(N); i < ParallelContext::getEnd(N);
        i++) {
     // Read and seralize the ccps
@@ -108,6 +110,7 @@ void generateCCPs(const Families &families, CCPRooting ccpRooting,
     familyIndices.push_back(i);
     treeSizes.push_back(ccp.getLeafNumber());
     ccpSizes.push_back(ccp.getCladesNumber());
+    numTrees += ccp.getInputTreesNumber();
   }
   ParallelContext::barrier();
   // Gather the family ccp dimensions from all MPI ranks
@@ -115,6 +118,7 @@ void generateCCPs(const Families &families, CCPRooting ccpRooting,
                                                         familyIndices);
   ParallelContext::concatenateHetherogeneousUIntVectors(treeSizes, treeSizes);
   ParallelContext::concatenateHetherogeneousUIntVectors(ccpSizes, ccpSizes);
+  ParallelContext::sumUInt(numTrees);
   // Output the families and there cpp sizes, from the largest to the smallest
   ParallelOfstream os(ccpDimensionFile);
   assert(familyIndices.size() == families.size());
@@ -126,6 +130,7 @@ void generateCCPs(const Families &families, CCPRooting ccpRooting,
   }
 
   ParallelContext::barrier();
+  return numTrees;
 }
 
 /**
@@ -489,8 +494,9 @@ void run(AleArguments &args) {
   for (auto &family : families) {
     family.ccp = FileSystem::joinPaths(ccpDir, family.name + ".ccp");
   }
+  unsigned int sample_size = 1000 * families.size();
   if (!checkpointDetected) {
-    generateCCPs(families, args.ccpRooting, args.sampleFrequency,
+    sample_size = generateCCPs(families, args.ccpRooting, args.sampleFrequency,
                  ccpDimensionFile);
     filterFamilies(args, families);
     initStartingSpeciesTree(args, families);
@@ -539,7 +545,7 @@ void run(AleArguments &args) {
     speciesTreeOptimizer.saveCheckpoint();
   }
   if (speciesTreeOptimizer.getCurrentStep() <= AleStep::Highways) {
-    runTransferHighwayInference(args, speciesTreeOptimizer, args.geneTreeSamples * families.size());
+    runTransferHighwayInference(args, speciesTreeOptimizer, sample_size);
     speciesTreeOptimizer.setCurrentStep(AleStep::ModelRateOpt2);
     speciesTreeOptimizer.saveCheckpoint();
   }
