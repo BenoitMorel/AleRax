@@ -9,7 +9,7 @@
 #include <search/SpeciesTransferSearch.hpp>
 
 const double MIN_PH = 0.00000001;
-const double MAX_PH = 0.25;
+const double MAX_PH = 0.8;
 
 class HighwayFunction : public FunctionToOptimize {
 public:
