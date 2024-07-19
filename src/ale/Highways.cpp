@@ -190,9 +190,11 @@ void Highways::filterCandidateHighwaysFast(
     auto plausibility_params = testHighwayFast(evaluator, highway, optimizer.getHighwaysOutputDir(), proba);
     auto llDiff = plausibility_params.getScore() - initialLL;
     if (llDiff > 0.01) {
-      auto parameters = optimizeSingleHighway(evaluator, highway, proba, initialLL + log(sample_size));
+      auto parameters = optimizeSingleHighway(evaluator, highway, proba, 1e10);
       auto llDiff = parameters.getScore() - initialLL;
       if (2 * llDiff > log(sample_size)) {
+        evaluator.addHighway(highway);
+        initialLL = parameters.getScore();
         Logger::timed << "Accepting candidate: ";
         highway.proba = parameters[0];
         filteredHighways.push_back(ScoredHighway(highway, -llDiff));
@@ -202,6 +204,10 @@ void Highways::filterCandidateHighwaysFast(
       Logger::info << highway.src->label << "->" << highway.dest->label
                    << " ll diff = " << llDiff << std::endl;
     }
+  }
+  for (auto &highway : filteredHighways) {
+    (void)(highway);
+    evaluator.removeHighway();
   }
   std::sort(filteredHighways.begin(), filteredHighways.end());
 }
