@@ -167,6 +167,32 @@ void Highways::getCandidateHighways(AleOptimizer &optimizer,
   }
 }
 
+std::vector<ScoredHighway> Highways::getSortedCandidatesFromList(AleOptimizer &optimizer,
+                                                                 std::vector<Highway> &candidateHighways,
+                                                                 unsigned int maxCandidates) {
+  auto &speciesTree = optimizer.getSpeciesTree();
+  unsigned int minTransfers = 1;
+  MovesBlackList blacklist;
+  std::vector<ScoredHighway> scoredHighways;
+  std::vector<TransferMove> transferMoves;
+  SpeciesTransferSearch::getSortedTransferList(
+    speciesTree, optimizer.getEvaluator(), minTransfers, blacklist,
+    transferMoves);
+
+  for (const auto &transferMove : transferMoves) {
+    auto prune = speciesTree.getNode(transferMove.prune);
+    auto regraft = speciesTree.getNode(transferMove.regraft);
+    Highway highway(regraft, prune);
+    if (std::find(candidateHighways.begin(), candidateHighways.end(), highway) != candidateHighways.end()) {
+      scoredHighways.push_back(ScoredHighway(highway, 0.0));
+      if (scoredHighways.size() >= maxCandidates) {
+        break;
+      }
+    }
+  }
+  return scoredHighways;
+}
+
 void Highways::filterCandidateHighwaysFast(
     AleOptimizer &optimizer, const std::vector<ScoredHighway> &highways,
     std::vector<ScoredHighway> &filteredHighways,

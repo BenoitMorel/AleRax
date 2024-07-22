@@ -437,14 +437,8 @@ void runTransferHighwayInference(const AleArguments &args,
         args.highwayCandidateFile,
         speciesTreeOptimizer.getSpeciesTree().getTree());
 
-    std::vector<ScoredHighway> sortedCandidateHighways;
-    Highways::getCandidateHighways(speciesTreeOptimizer, sortedCandidateHighways,
+    candidateHighways = Highways::getSortedCandidatesFromList(speciesTreeOptimizer, highways,
                                    args.highwayCandidatesStep1);
-    for (const auto &highway : sortedCandidateHighways) {
-      if (std::find_if(highways.begin(), highways.end(), [&](auto &x) {return highway == x; }) != highways.end()) {
-        candidateHighways.push_back(ScoredHighway(highway));
-      }
-    }
   } else {
     // automatically search for candidates
     Highways::getCandidateHighways(speciesTreeOptimizer, candidateHighways,
