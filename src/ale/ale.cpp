@@ -437,8 +437,7 @@ void runTransferHighwayInference(const AleArguments &args,
         args.highwayCandidateFile,
         speciesTreeOptimizer.getSpeciesTree().getTree());
 
-    candidateHighways = Highways::getSortedCandidatesFromList(speciesTreeOptimizer, highways,
-                                   args.highwayCandidatesStep1);
+    candidateHighways = Highways::getSortedCandidatesFromList(speciesTreeOptimizer, highways);
   } else {
     // automatically search for candidates
     Highways::getCandidateHighways(speciesTreeOptimizer, candidateHighways,
