@@ -14,8 +14,7 @@ public:
                                    unsigned int maxCandidates);
 
   static std::vector<ScoredHighway> getSortedCandidatesFromList(AleOptimizer &optimizer,
-                                   std::vector<Highway> &highways,
-                                   unsigned int maxCandidates);
+                                   std::vector<Highway> &highways);
   /**
    *  Filter the highway candidates by testing them with a small hardcoded
    * probability
