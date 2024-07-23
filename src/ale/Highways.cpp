@@ -8,8 +8,8 @@
 #include <optimizers/DTLOptimizer.hpp>
 #include <search/SpeciesTransferSearch.hpp>
 
-const double MIN_PH = 0.00000001;
-const double MAX_PH = 0.8;
+// const double MIN_PH = 0.00000001;
+// const double MAX_PH = 0.8;
 
 class HighwayFunction : public FunctionToOptimize {
 public:
@@ -27,7 +27,7 @@ public:
   virtual double evaluatePrint(Parameters &parameters, bool print,
                                const std::string outputDir = "") {
     assert(parameters.dimensions() == _highways.size());
-    parameters.constrain(MIN_PH, MAX_PH);
+    // parameters.constrain(MIN_PH, MAX_PH);
     for (unsigned int i = 0; i < _highways.size(); ++i) {
       Highway highwayCopy = *_highways[i];
       highwayCopy.proba = parameters[i];
@@ -90,7 +90,7 @@ static Parameters testHighways(AleEvaluator &evaluator,
     }
     auto res =
         DTLOptimizer::optimizeParameters(f, startingProbabilities, settings);
-    res.constrain(MIN_PH, MAX_PH);
+    // res.constrain(MIN_PH, MAX_PH);
     return res;
   } else {
     auto parameters = startingProbabilities;
@@ -111,14 +111,15 @@ static Parameters optimizeSingleHighway(AleEvaluator &evaluator,
   startingProbabilities[0] = startingProbability;
   IniParser &parser = IniParser::getInstance();
   OptimizationSettings settings;
-  settings.strategy = RecOpt::Gradient;
+  settings.strategy = RecOpt::LBFGSB;
   settings.minAlpha = parser.getValue("optimizer.minAlpha", 0.001);
   settings.epsilon = parser.getValue("optimizer.epsilon", 0.000001);
   // settings.verbose = true;
   settings.required_ll = required_ll;
+  settings.use_for_ll();
   auto res =
   DTLOptimizer::optimizeParameters(f, startingProbabilities, settings);
-  res.constrain(MIN_PH, MAX_PH);
+  // res.constrain(MIN_PH, MAX_PH);
   return res;
 }
 
@@ -199,13 +200,13 @@ void Highways::filterCandidateHighwaysFast(
     size_t sample_size) {
   auto &evaluator = optimizer.getEvaluator();
   auto &speciesTree = optimizer.getSpeciesTree();
-  double proba = 0.01;
   Logger::timed << "Filering " << highways.size()
-                << " candidate highways using p=" << proba << std::endl;
+                << " candidate highways" << std::endl;
   double initialLL = evaluator.computeLikelihood();
   Logger::timed << "initial ll=" << initialLL << std::endl;
   evaluator.saveSnapshotPerFamilyLL();
   for (const auto &scoredHighway : highways) {
+    double proba = 0.01;
     auto highway = scoredHighway.highway;
     if (!isHighwayCompatible(highway, optimizer.getRecModelInfo(),
                              speciesTree.getDatedTree())) {
@@ -215,6 +216,13 @@ void Highways::filterCandidateHighwaysFast(
     }
     auto plausibility_params = testHighwayFast(evaluator, highway, optimizer.getHighwaysOutputDir(), proba);
     auto llDiff = plausibility_params.getScore() - initialLL;
+    if (llDiff < 0.01) {
+      proba = 0.1;
+      Logger::timed << "No improvement with small probability! Trying again with p = " << proba << std::endl;
+      plausibility_params = testHighwayFast(evaluator, highway, optimizer.getHighwaysOutputDir(), proba);
+      llDiff = plausibility_params.getScore() - initialLL;
+    }
+
     if (llDiff > 0.01) {
       auto parameters = optimizeSingleHighway(evaluator, highway, proba, 1e10);
       auto llDiff = parameters.getScore() - initialLL;
@@ -228,7 +236,7 @@ void Highways::filterCandidateHighwaysFast(
         Logger::timed << "Rejecting candidate: ";
       }
       Logger::info << highway.src->label << "->" << highway.dest->label
-                   << " ll diff = " << llDiff << std::endl;
+                   << " ll diff = " << llDiff << " best proba = " << highway.proba << std::endl;
     }
   }
   for (auto &highway : filteredHighways) {
