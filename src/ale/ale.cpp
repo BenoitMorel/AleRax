@@ -495,10 +495,10 @@ void run(AleArguments &args) {
     family.ccp = FileSystem::joinPaths(ccpDir, family.name + ".ccp");
   }
   unsigned int sample_size = 1000 * families.size();
+  sample_size = generateCCPs(families, args.ccpRooting, args.sampleFrequency,
+               ccpDimensionFile);
+  filterFamilies(args, families);
   if (!checkpointDetected) {
-    sample_size = generateCCPs(families, args.ccpRooting, args.sampleFrequency,
-                 ccpDimensionFile);
-    filterFamilies(args, families);
     initStartingSpeciesTree(args, families);
     checkCCPAndSpeciesTree(families, args.speciesTree);
   } else {
