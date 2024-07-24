@@ -290,7 +290,7 @@ double AleEvaluator::optimizeModelRates(bool thorough) {
   if (_optimizeRates) {
     settings.strategy = _info.recOpt;
     settings.verbose = _optimizeVerbose;
-    settings.use_for_ll();
+    settings.factr = LBFGSBPrecision::MEDIUM;
     ll = computeLikelihood();
     Logger::timed << "[Species search] Optimizing model rates ";
     if (thorough) {

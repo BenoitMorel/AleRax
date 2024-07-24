@@ -81,7 +81,7 @@ static Parameters testHighways(AleEvaluator &evaluator,
     settings.strategy = evaluator.getRecModelInfo().recOpt;
     settings.minAlpha = parser.getValue("optimizer.minAlpha", 0.001);
     settings.epsilon = parser.getValue("optimizer.epsilon", 0.000001);
-    settings.use_for_ll();
+    settings.factr = LBFGSBPrecision::MEDIUM;
     settings.onlyIndividualOpt = false;
     // settings.verbose = true;
     if (thorough) {
@@ -116,7 +116,7 @@ static Parameters optimizeSingleHighway(AleEvaluator &evaluator,
   settings.epsilon = parser.getValue("optimizer.epsilon", 0.000001);
   // settings.verbose = true;
   settings.required_ll = required_ll;
-  settings.use_for_ll();
+  settings.factr = LBFGSBPrecision::LOW;
   auto res =
   DTLOptimizer::optimizeParameters(f, startingProbabilities, settings);
   // res.constrain(MIN_PH, MAX_PH);
@@ -210,6 +210,7 @@ void Highways::filterCandidateHighwaysFast(
                    << highway.dest->label << std::endl;
       continue;
     }
+    Logger::timed << "Testing candidate: " << highway.src->label << "->" << highway.dest->label << " with p = " << proba << std::endl;
     auto plausibility_params = testHighwayFast(evaluator, highway, optimizer.getHighwaysOutputDir(), proba);
     auto llDiff = plausibility_params.getScore() - initialLL;
     if (llDiff < 0.01) {
@@ -229,11 +230,13 @@ void Highways::filterCandidateHighwaysFast(
         highway.proba = parameters[0];
         filteredHighways.push_back(ScoredHighway(highway, -llDiff));
       } else {
-        Logger::timed << "Rejecting candidate: ";
+        Logger::timed << "Rejecting (BIC) candidate: ";
       }
-      Logger::info << highway.src->label << "->" << highway.dest->label
-                   << " ll diff = " << llDiff << " best proba = " << highway.proba << std::endl;
+    } else {
+        Logger::timed << "Rejecting (noImprov) candidate: ";
     }
+    Logger::info << highway.src->label << "->" << highway.dest->label
+                 << " ll diff = " << llDiff << " best proba = " << highway.proba << std::endl;
   }
   for (auto &highway : filteredHighways) {
     (void)(highway);
