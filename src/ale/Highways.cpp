@@ -161,7 +161,21 @@ void Highways::getCandidateHighways(AleOptimizer &optimizer,
     auto prune = speciesTree.getNode(transferMove.prune);
     auto regraft = speciesTree.getNode(transferMove.regraft);
     Highway highway(regraft, prune);
-    scoredHighways.push_back(ScoredHighway(highway, 0.0));
+    auto lca = speciesTree.getTree().getLCA(prune, regraft);
+    unsigned int distance = 0;
+    while (prune != lca) {
+      distance += 1;
+      prune = prune->parent;
+    }
+    while (regraft != lca) {
+      distance += 1;
+      regraft = regraft->parent;
+    }
+    if (distance >= parser.getValue("highways.minDistance", 5)) {
+      scoredHighways.push_back(ScoredHighway(highway, 0.0));
+    } else {
+      Logger::timed << "Rejecting (dist) candidate: " << highway.src->label << "->" << highway.dest->label << " d = " << distance << std::endl;
+    }
     if (scoredHighways.size() >= maxCandidates) {
       break;
     }
