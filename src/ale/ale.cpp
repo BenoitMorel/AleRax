@@ -424,6 +424,7 @@ void runTransferHighwayInference(const AleArguments &args,
   if (!args.highways) {
     return;
   }
+  Logger::info << "Highway BIC sample size = " << sample_size << std::endl;
   auto highwaysOutputDir = FileSystem::joinPaths(args.output, "highways");
   FileSystem::mkdir(highwaysOutputDir, true);
   // let's infer highways of transfers!
