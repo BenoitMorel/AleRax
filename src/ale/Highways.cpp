@@ -201,6 +201,11 @@ std::vector<ScoredHighway> Highways::getSortedCandidatesFromList(AleOptimizer &o
       scoredHighways.push_back(ScoredHighway(highway, 0.0));
     }
   }
+  for (const auto &highway : candidateHighways) {
+    if (std::find(scoredHighways.begin(), scoredHighways.end(), highway) == scoredHighways.end()) {
+      scoredHighways.push_back(ScoredHighway(highway, 0.0));
+    }
+  }
   return scoredHighways;
 }
 
