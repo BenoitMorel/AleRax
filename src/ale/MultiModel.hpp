@@ -79,7 +79,8 @@ public:
 
   virtual void onSpeciesDatesChange() {}
 
-  virtual void onSpeciesTreeChange(const std::unordered_set<corax_rnode_t *> *)  {
+  virtual void onSpeciesTreeChange(const std::unordered_set<corax_rnode_t *> *nodesToInvalidate) {
+    BaseReconciliationModel::onSpeciesTreeChange(nodesToInvalidate);
     updateSpeciesToPrunedNode();
   }
 
