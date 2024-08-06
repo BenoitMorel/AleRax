@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import os
 import sys
 import subprocess
@@ -108,9 +108,11 @@ def run_alerax(test_data, test_output, families_file, model, heterogeneity, core
   command.append("--rec-model")
   command.append(model)
   if (heterogeneity == "species"):
-      command.append("--per-species-rates")
+      command.append("--model-parametrization")
+      command.append("PER-SPECIES")
   if (heterogeneity == "families"):
-      command.append("--per-family-rates")
+      command.append("--model-parametrization")
+      command.append("PER-FAMILY")
   command.append("-p")
   command.append(os.path.join(test_output, "alerax"))
   logs_file_path = os.path.join(test_output, "tests_logs.txt")
