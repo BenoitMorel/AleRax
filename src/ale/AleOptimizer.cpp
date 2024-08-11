@@ -252,7 +252,7 @@ static void saveStr(const std::string &str, const std::string &path) {
 
 void AleOptimizer::saveRatesAndLL()
 {
-  
+ 
   // save per-family likelihood
   auto perFamilyLikelihoodPath = FileSystem::joinPaths(_outputDir, "per_fam_likelihoods.txt");
   std::vector<unsigned int> indices;
@@ -282,6 +282,7 @@ void AleOptimizer::saveRatesAndLL()
   auto parameterNames = Enums::parameterNames(_info.model); 
   auto ratesDir = FileSystem::joinPaths(_outputDir, "model_parameters");
   FileSystem::mkdir(ratesDir, true);
+  ParallelContext::barrier();
   if (_info.perFamilyRates) {
     for (unsigned int i = 0; i < _geneTrees.getTrees().size(); ++i) {
       auto &geneTree = _geneTrees.getTrees()[i];
@@ -302,12 +303,14 @@ void AleOptimizer::saveRatesAndLL()
   } else {
     auto globalRatesPath = FileSystem::joinPaths(ratesDir, "model_parameters.txt");
     ParallelOfstream ratesOs(globalRatesPath, true);
-    for (auto node: getSpeciesTree().getTree().getNodes()) {
-      ratesOs << node->label;
-      for (unsigned int rate = 0; rate < getModelParameters()[0].getParamTypeNumber(); ++rate) {
-        ratesOs << " " << getModelParameters()[0].getParameter(node->node_index, rate);
+    if (getModelParameters().size() > 0) { // avoid segfault if #cores > #families
+      for (auto node: getSpeciesTree().getTree().getNodes()) {
+        ratesOs << node->label;
+        for (unsigned int rate = 0; rate < getModelParameters()[0].getParamTypeNumber(); ++rate) {
+          ratesOs << " " << getModelParameters()[0].getParameter(node->node_index, rate);
+        }
+        ratesOs << "\n";
       }
-      ratesOs << "\n";
     }
   }
 }
