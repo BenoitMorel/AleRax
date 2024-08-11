@@ -47,7 +47,8 @@ AleOptimizer::AleOptimizer(
   _info(info),
   _outputDir(outputDir),
   _checkpointDir(getCheckpointDir(outputDir)),
-  _rootLikelihoods(_geneTrees.getTrees().size())
+  _rootLikelihoods(_geneTrees.getTrees().size()),
+  _enableCheckpoints(true)
 {
   
   if (checkpointExists()) {
@@ -564,6 +565,8 @@ bool AleOptimizer::checkpointExists(const std::string &outputDir)
   
 void AleOptimizer::onBetterParametersFoundCallback()
 {
-  saveCheckpoint();
+  if (_enableCheckpoints) {
+    saveCheckpoint();
+  }
 }
 

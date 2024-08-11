@@ -1,5 +1,6 @@
 #pragma once
 
+
 #include "AleState.hpp"
 #include <search/SpeciesRootSearch.hpp>
 #include <trees/SpeciesTree.hpp>
@@ -55,6 +56,10 @@ public:
    *  Optimize the species tree topology
    */
   void optimize();
+
+  void enableCheckpoints(bool enable) {
+    _enableCheckpoints = enable;
+  }
 
   /**
    *  Optize the species tree root
@@ -155,7 +160,7 @@ private:
   std::string _checkpointDir;
   std::unique_ptr<SpeciesSearchState> _speciesTreeSearchState;
   RootLikelihoods _rootLikelihoods;
-  
+  bool _enableCheckpoints;  
   double sprSearch(unsigned int radius);
   double transferSearch();
   std::string saveCurrentSpeciesTreeId(std::string str = "inferred_species_tree.newick", bool masterRankOnly = true);

@@ -362,6 +362,7 @@ double AleEvaluator::optimizeModelRates(bool thorough)
       settings.optimizationMinImprovement = settings.lineSearchMinImprovement;
     }
     if (_info.perFamilyRates) {
+      _optimizer.enableCheckpoints(false); // to avoid MPI issues 
       for (unsigned int family = 0; family < _evaluations.size(); ++family) {
         DTLFamilyParametersOptimizer function(*this, family);
         auto categorizedParameters = getOptimizationClasses().getCompressedParameters(_modelParameters[family].getParameters());
@@ -371,6 +372,7 @@ double AleEvaluator::optimizeModelRates(bool thorough)
               settings);
         function.setParameters(bestParameters);
       }
+      _optimizer.enableCheckpoints(true); // to avoid MPI issues 
       ll = computeLikelihood();
       Logger::timed << "[Species search]   After model rate opt, ll=" << ll << std::endl;
     } else {
