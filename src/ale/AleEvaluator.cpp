@@ -446,6 +446,7 @@ void AleEvaluator::getTransferInformation(SpeciesTree &speciesTree,
   transferFrequencies.idToLabel = idToLabel;
   perSpeciesEvents = PerSpeciesEvents(speciesTree.getTree().getNodeNumber());
   auto infoCopy = _info;
+  infoCopy.model = RecModel::UndatedDTL;
   infoCopy.originationStrategy = OriginationStrategy::UNIFORM;
   infoCopy.transferConstraint = TransferConstaint::PARENTS;
   for (const auto &geneTree: _geneTrees.getTrees()) {

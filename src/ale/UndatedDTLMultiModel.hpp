@@ -63,8 +63,7 @@ public:
 
   virtual void onSpeciesTreeChange(const std::unordered_set<corax_rnode_t *> *nodesToInvalidate) {
     MultiModel::onSpeciesTreeChange(nodesToInvalidate);
-    resetCache(); 
-    recomputeSpeciesProbabilities();
+    resetCache();
   }
 
 

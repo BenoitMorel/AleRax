@@ -16,7 +16,7 @@
 #include <routines/SlavesMain.hpp>
 #include <IO/HighwayCandidateParser.hpp>
 
-const char *version = "AleRax v1.1.1";
+const char *version = "AleRax v1.1.2";
 
 
 /**
