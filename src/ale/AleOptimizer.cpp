@@ -304,14 +304,12 @@ void AleOptimizer::saveRatesAndLL()
   } else {
     auto globalRatesPath = FileSystem::joinPaths(ratesDir, "model_parameters.txt");
     ParallelOfstream ratesOs(globalRatesPath, true);
-    if (getModelParameters().size() > 0) { // avoid segfault if #cores > #families
-      for (auto node: getSpeciesTree().getTree().getNodes()) {
-        ratesOs << node->label;
-        for (unsigned int rate = 0; rate < getModelParameters()[0].getParamTypeNumber(); ++rate) {
-          ratesOs << " " << getModelParameters()[0].getParameter(node->node_index, rate);
-        }
-        ratesOs << "\n";
+    for (auto node: getSpeciesTree().getTree().getNodes()) {
+      ratesOs << node->label;
+      for (unsigned int rate = 0; rate < getModelParameters()[0].getParamTypeNumber(); ++rate) {
+        ratesOs << " " << getModelParameters()[0].getParameter(node->node_index, rate);
       }
+      ratesOs << "\n";
     }
   }
 }
