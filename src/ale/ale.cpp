@@ -328,7 +328,11 @@ void filterFamilies(const AleArguments &args, Families &families)
   trimFamilies(families, args.minCoveredSpecies, args.trimFamilyRatio,
      args.maxCladeSplitRatio);
   if (families.size() == 0) {
-    Logger::info << "No valid family, aborting" << std::endl;
+    Logger::info << "/nError: No valid family, aborting/n" << std::endl;
+    ParallelContext::abort(0);
+  }
+  if (families.size() < ParallelContext::getSize()) {
+    Logger::info << "/nError: More MPI ranks set than valid families, aborting/n" << std::endl;
     ParallelContext::abort(0);
   }
 }

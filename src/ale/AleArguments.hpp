@@ -4,7 +4,6 @@
 #include <string>
 #include "IO/ArgumentsHelper.hpp"
 
-  
 /**
  *  Parse and store the program arguments
  */
@@ -19,25 +18,31 @@ public:
    *  Print AleRax' help message
    */
   void printHelp();
-  
+
   /**
    *  Print the command line used to call the AleRax' executable
    */
   void printCommand() const;
 
   /**
-   *  Write a user-friendly summary of the most important 
+   *  Write a user-friendly summary of the most important
    *  parameters set by the user
    */
   void printSummary() const;
 
   /**
-   *  Check that the arguments are compatible with each other
+   *  Print warnings if some of the arguments used are valid, but
+   *  still might result in undesirable behaviour
+   */
+  void printWarning() const;
+
+  /**
+   *  Check that the arguments are compatible with each other.
    *  If not, terminates the program with an explicit error message
    */
   void checkValid();
+
 public:
- 
   // the parameters of the main() function
   int argc;
   char ** argv;
@@ -46,7 +51,7 @@ public:
   std::string families;
   std::string speciesTree;
   std::string reconciliationModelStr;
-  
+
   // model
   TransferConstaint transferConstraint;
   OriginationStrategy originationStrategy;
@@ -90,9 +95,10 @@ public:
 
   // random seed
   int seed;
-  
+
   // experimental
   bool randomSpeciesRoot;
   bool verboseOptRates;
 };
+
 

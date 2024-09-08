@@ -270,18 +270,16 @@ public:
   {}
 
   virtual double evaluate(Parameters &parameters) {
-    if (0 != parameters.dimensions()) { // happens if no family is assigned to this core
-      parameters.ensurePositivity();
-      auto fullParameters = _evaluator.getOptimizationClasses().getFullParameters(parameters);
-      for (unsigned int i = 0; i < _evaluator.getLocalFamilyNumber(); ++i) {
-        _evaluator.setFamilyParameters(i, fullParameters);
-      }
+    parameters.ensurePositivity();
+    auto fullParameters = _evaluator.getOptimizationClasses().getFullParameters(parameters);
+    for (unsigned int i = 0; i < _evaluator.getLocalFamilyNumber(); ++i) {
+      _evaluator.setFamilyParameters(i, fullParameters);
     }
     auto res = _evaluator.computeLikelihood();
     parameters.setScore(res);
     return res;
-
   }
+
 private:
   AleEvaluator &_evaluator;
 };
@@ -378,14 +376,7 @@ double AleEvaluator::optimizeModelRates(bool thorough)
     } else {
       Logger::timed << "Free parameters: " << _optimizationClasses.getFreeParameters() << std::endl;
       DTLParametersOptimizerGlobal function(*this);
-
-      // fake parameters, in case there are no family assigned to this core
-      // we can't use empty parameter vector, otherwise the optimizer returns
-      // and this creates inconsistancy between MPI nodes
-      Parameters categorizedParameters(3);
-      if (!_modelParameters.empty()) {
-        categorizedParameters = getOptimizationClasses().getCompressedParameters(_modelParameters[0].getParameters());
-      }
+      auto categorizedParameters = getOptimizationClasses().getCompressedParameters(_modelParameters[0].getParameters());
       ParallelContext::barrier();
       auto bestParameters = DTLOptimizer::optimizeParameters(
           function, 
