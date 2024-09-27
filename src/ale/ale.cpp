@@ -18,7 +18,7 @@
 #include <util/RecModelInfo.hpp>
 #include <util/enums.hpp>
 
-const char *version = "AleRax v1.1.1";
+const char *version = "AleRax v1.1.2";
 
 /**
  *  Check the validity of each gene family:

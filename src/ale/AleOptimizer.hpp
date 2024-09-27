@@ -51,6 +51,10 @@ public:
    */
   void optimize();
 
+  void enableCheckpoints(bool enable) {
+    _enableCheckpoints = enable;
+  }
+
   /**
    *  Optize the species tree root
    */
@@ -155,7 +159,7 @@ private:
   std::string _checkpointDir;
   std::unique_ptr<SpeciesSearchState> _speciesTreeSearchState;
   RootLikelihoods _rootLikelihoods;
-
+  bool _enableCheckpoints;
   double sprSearch(unsigned int radius);
   double transferSearch();
   std::string

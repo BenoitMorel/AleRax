@@ -27,17 +27,25 @@ static bool testAndSwap(size_t &hash1, size_t &hash2) {
   return hash1 != hash2;
 }
 
-AleOptimizer::AleOptimizer(const std::string speciesTreeFile,
-                           const Families &families, const RecModelInfo &info,
-                           ModelParametrization modelParametrization,
-                           const Parameters &startingRates, bool optimizeRates,
-                           bool optimizeVerbose,
-                           const std::string &optimizationClassFile,
-                           const std::string &outputDir)
-    : _state(speciesTreeFile), _families(families),
-      _geneTrees(families, false, true), _info(info), _outputDir(outputDir),
-      _checkpointDir(getCheckpointDir(outputDir)),
-      _rootLikelihoods(_geneTrees.getTrees().size()) {
+AleOptimizer::AleOptimizer(
+    const std::string speciesTreeFile,
+    const Families &families,
+    const RecModelInfo &info,
+    ModelParametrization modelParametrization,
+    const Parameters &startingRates,
+    bool optimizeRates,
+    bool optimizeVerbose,
+    const std::string &optimizationClassFile,
+    const std::string &outputDir):
+  _state(speciesTreeFile),
+  _families(families),
+  _geneTrees(families, false, true),
+  _info(info),
+  _outputDir(outputDir),
+  _checkpointDir(getCheckpointDir(outputDir)),
+  _rootLikelihoods(_geneTrees.getTrees().size()),
+  _enableCheckpoints(true)
+{
 
   if (checkpointExists()) {
     Logger::info << "Loading checkpoint information..." << std::endl;
@@ -209,7 +217,8 @@ static void saveStr(const std::string &str, const std::string &path) {
   os << str;
 }
 
-void AleOptimizer::saveRatesAndLL() {
+void AleOptimizer::saveRatesAndLL()
+{
 
   // save per-family likelihood
   auto perFamilyLikelihoodPath =
@@ -242,6 +251,7 @@ void AleOptimizer::saveRatesAndLL() {
   auto parameterNames = Enums::parameterNames(_info.model);
   auto ratesDir = FileSystem::joinPaths(_outputDir, "model_parameters");
   FileSystem::mkdir(ratesDir, true);
+  ParallelContext::barrier();
   if (_info.perFamilyRates) {
     for (unsigned int i = 0; i < _geneTrees.getTrees().size(); ++i) {
       auto &geneTree = _geneTrees.getTrees()[i];
@@ -265,14 +275,14 @@ void AleOptimizer::saveRatesAndLL() {
     auto globalRatesPath =
         FileSystem::joinPaths(ratesDir, "model_parameters.txt");
     ParallelOfstream ratesOs(globalRatesPath, true);
-    for (auto node : getSpeciesTree().getTree().getNodes()) {
-      ratesOs << node->label;
-      for (unsigned int rate = 0;
-           rate < getModelParameters()[0].getParamTypeNumber(); ++rate) {
-        ratesOs << " "
-                << getModelParameters()[0].getParameter(node->node_index, rate);
+    if (getModelParameters().size() > 0) { // avoid segfault if #cores > #families
+      for (auto node: getSpeciesTree().getTree().getNodes()) {
+        ratesOs << node->label;
+        for (unsigned int rate = 0; rate < getModelParameters()[0].getParamTypeNumber(); ++rate) {
+          ratesOs << " " << getModelParameters()[0].getParameter(node->node_index, rate);
+        }
+        ratesOs << "\n";
       }
-      ratesOs << "\n";
     }
   }
 }
@@ -514,6 +524,13 @@ void AleOptimizer::loadCheckpoint() {
 
 bool AleOptimizer::checkpointExists(const std::string &outputDir) {
   return dirExists(getCheckpointDir(outputDir));
+}
+
+void AleOptimizer::onBetterParametersFoundCallback()
+{
+  if (_enableCheckpoints) {
+    saveCheckpoint();
+  }
 }
 
 void AleOptimizer::onBetterParametersFoundCallback() { saveCheckpoint(); }
