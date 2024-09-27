@@ -252,6 +252,7 @@ void Highways::filterCandidateHighwaysFast(
         Logger::timed << "Accepting candidate: ";
         highway.proba = parameters[0];
         filteredHighways.push_back(ScoredHighway(highway, -llDiff));
+        evaluator.saveSnapshotPerFamilyLL();
       } else {
         Logger::timed << "Rejecting (BIC) candidate: ";
       }
