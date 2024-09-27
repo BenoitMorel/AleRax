@@ -1,6 +1,5 @@
 #include "Highways.hpp"
 
-#include "IO/IniParser.h"
 #include <IO/FileSystem.hpp>
 #include <IO/Logger.hpp>
 #include <cmath>
@@ -76,13 +75,11 @@ static Parameters testHighways(AleEvaluator &evaluator,
   assert(highways.size() == startingProbabilities.dimensions());
   HighwayFunction f(evaluator, highways);
   if (optimize) {
-    IniParser &parser = IniParser::getInstance();
     OptimizationSettings settings;
     settings.strategy = evaluator.getRecModelInfo().recOpt;
-    settings.minAlpha = parser.getValue("optimizer.minAlpha", 0.001);
-    settings.epsilon = parser.getValue("optimizer.epsilon", 0.000001);
+    settings.minAlpha = 0.001;
+    settings.epsilon = 0.000001;
     settings.factr = LBFGSBPrecision::MEDIUM;
-    settings.onlyIndividualOpt = false;
     // settings.verbose = true;
     if (thorough) {
       settings.individualParamOpt = true;
@@ -109,11 +106,10 @@ static Parameters optimizeSingleHighway(AleEvaluator &evaluator,
   HighwayFunction f(evaluator, highways);
   Parameters startingProbabilities(1);
   startingProbabilities[0] = startingProbability;
-  IniParser &parser = IniParser::getInstance();
   OptimizationSettings settings;
   settings.strategy = RecOpt::LBFGSB;
-  settings.minAlpha = parser.getValue("optimizer.minAlpha", 0.001);
-  settings.epsilon = parser.getValue("optimizer.epsilon", 0.000001);
+  settings.minAlpha = 0.001;
+  settings.epsilon = 0.000001;
   // settings.verbose = true;
   settings.required_ll = required_ll;
   settings.factr = LBFGSBPrecision::LOW;
@@ -148,9 +144,8 @@ static bool isHighwayCompatible(Highway &highway, const RecModelInfo &info,
 void Highways::getCandidateHighways(AleOptimizer &optimizer,
                                     std::vector<ScoredHighway> &scoredHighways,
                                     unsigned int maxCandidates) {
-  IniParser &parser = IniParser::getInstance();
   auto &speciesTree = optimizer.getSpeciesTree();
-  unsigned int minTransfers = parser.getValue("highways.minTransfers", 2);
+  unsigned int minTransfers = 2;
   MovesBlackList blacklist;
   std::vector<TransferMove> transferMoves;
   SpeciesTransferSearch::getSortedTransferList(
@@ -171,7 +166,7 @@ void Highways::getCandidateHighways(AleOptimizer &optimizer,
       distance += 1;
       regraft = regraft->parent;
     }
-    if (distance >= parser.getValue("highways.minDistance", 5)) {
+    if (distance >= 5) {
       scoredHighways.push_back(ScoredHighway(highway, 0.0));
     } else {
       Logger::timed << "Rejecting (dist) candidate: " << highway.src->label << "->" << highway.dest->label << " d = " << distance << std::endl;
