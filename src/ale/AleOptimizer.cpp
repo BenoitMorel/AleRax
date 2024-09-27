@@ -526,5 +526,3 @@ void AleOptimizer::onBetterParametersFoundCallback() {
     saveCheckpoint();
   }
 }
-
-void AleOptimizer::onBetterParametersFoundCallback() { saveCheckpoint(); }
