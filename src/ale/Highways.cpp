@@ -98,8 +98,7 @@ static Parameters testHighways(AleEvaluator &evaluator,
 
 static Parameters optimizeSingleHighway(AleEvaluator &evaluator,
                                         Highway &highway,
-                                        double startingProbability,
-                                        double required_ll) {
+                                        double startingProbability) {
   std::vector<Highway *> highways;
   auto copy = highway;
   highways.push_back(&copy);
@@ -111,7 +110,6 @@ static Parameters optimizeSingleHighway(AleEvaluator &evaluator,
   settings.minAlpha = 0.001;
   settings.epsilon = 0.000001;
   // settings.verbose = true;
-  settings.required_ll = required_ll;
   settings.factr = LBFGSBPrecision::LOW;
   auto res =
       DTLOptimizer::optimizeParameters(f, startingProbabilities, settings);
@@ -244,7 +242,7 @@ void Highways::filterCandidateHighwaysFast(
     }
 
     if (llDiff > 0.01) {
-      auto parameters = optimizeSingleHighway(evaluator, highway, proba, 1e10);
+      auto parameters = optimizeSingleHighway(evaluator, highway, proba);
       auto llDiff = parameters.getScore() - initialLL;
       if (2 * llDiff > log(sample_size)) {
         evaluator.addHighway(highway);
