@@ -97,9 +97,9 @@ static Parameters testHighways(AleEvaluator &evaluator,
 }
 
 static Parameters optimizeSingleHighway(AleEvaluator &evaluator,
-                               Highway &highway,
-                               double startingProbability,
-                               double required_ll) {
+                                        Highway &highway,
+                                        double startingProbability,
+                                        double required_ll) {
   std::vector<Highway *> highways;
   auto copy = highway;
   highways.push_back(&copy);
@@ -114,7 +114,7 @@ static Parameters optimizeSingleHighway(AleEvaluator &evaluator,
   settings.required_ll = required_ll;
   settings.factr = LBFGSBPrecision::LOW;
   auto res =
-  DTLOptimizer::optimizeParameters(f, startingProbabilities, settings);
+      DTLOptimizer::optimizeParameters(f, startingProbabilities, settings);
   // res.constrain(MIN_PH, MAX_PH);
   return res;
 }
@@ -169,7 +169,9 @@ void Highways::getCandidateHighways(AleOptimizer &optimizer,
     if (distance >= 5) {
       scoredHighways.push_back(ScoredHighway(highway, 0.0));
     } else {
-      Logger::timed << "Rejecting (dist) candidate: " << highway.src->label << "->" << highway.dest->label << " d = " << distance << std::endl;
+      Logger::timed << "Rejecting (dist) candidate: " << highway.src->label
+                    << "->" << highway.dest->label << " d = " << distance
+                    << std::endl;
     }
     if (scoredHighways.size() >= maxCandidates) {
       break;
@@ -177,27 +179,30 @@ void Highways::getCandidateHighways(AleOptimizer &optimizer,
   }
 }
 
-std::vector<ScoredHighway> Highways::getSortedCandidatesFromList(AleOptimizer &optimizer,
-                                                                 std::vector<Highway> &candidateHighways) {
+std::vector<ScoredHighway>
+Highways::getSortedCandidatesFromList(AleOptimizer &optimizer,
+                                      std::vector<Highway> &candidateHighways) {
   auto &speciesTree = optimizer.getSpeciesTree();
   unsigned int minTransfers = 1;
   MovesBlackList blacklist;
   std::vector<ScoredHighway> scoredHighways;
   std::vector<TransferMove> transferMoves;
   SpeciesTransferSearch::getSortedTransferList(
-    speciesTree, optimizer.getEvaluator(), minTransfers, blacklist,
-    transferMoves);
+      speciesTree, optimizer.getEvaluator(), minTransfers, blacklist,
+      transferMoves);
 
   for (const auto &transferMove : transferMoves) {
     auto prune = speciesTree.getNode(transferMove.prune);
     auto regraft = speciesTree.getNode(transferMove.regraft);
     Highway highway(regraft, prune);
-    if (std::find(candidateHighways.begin(), candidateHighways.end(), highway) != candidateHighways.end()) {
+    if (std::find(candidateHighways.begin(), candidateHighways.end(),
+                  highway) != candidateHighways.end()) {
       scoredHighways.push_back(ScoredHighway(highway, 0.0));
     }
   }
   for (const auto &highway : candidateHighways) {
-    if (std::find(scoredHighways.begin(), scoredHighways.end(), highway) == scoredHighways.end()) {
+    if (std::find(scoredHighways.begin(), scoredHighways.end(), highway) ==
+        scoredHighways.end()) {
       scoredHighways.push_back(ScoredHighway(highway, 0.0));
     }
   }
@@ -206,12 +211,11 @@ std::vector<ScoredHighway> Highways::getSortedCandidatesFromList(AleOptimizer &o
 
 void Highways::filterCandidateHighwaysFast(
     AleOptimizer &optimizer, const std::vector<ScoredHighway> &highways,
-    std::vector<ScoredHighway> &filteredHighways,
-    size_t sample_size) {
+    std::vector<ScoredHighway> &filteredHighways, size_t sample_size) {
   auto &evaluator = optimizer.getEvaluator();
   auto &speciesTree = optimizer.getSpeciesTree();
-  Logger::timed << "Filering " << highways.size()
-                << " candidate highways" << std::endl;
+  Logger::timed << "Filering " << highways.size() << " candidate highways"
+                << std::endl;
   double initialLL = evaluator.computeLikelihood();
   Logger::timed << "initial ll=" << initialLL << std::endl;
   evaluator.saveSnapshotPerFamilyLL();
@@ -224,13 +228,18 @@ void Highways::filterCandidateHighwaysFast(
                    << highway.dest->label << std::endl;
       continue;
     }
-    Logger::timed << "Testing candidate: " << highway.src->label << "->" << highway.dest->label << " with p = " << proba << std::endl;
-    auto plausibility_params = testHighwayFast(evaluator, highway, optimizer.getHighwaysOutputDir(), proba);
+    Logger::timed << "Testing candidate: " << highway.src->label << "->"
+                  << highway.dest->label << " with p = " << proba << std::endl;
+    auto plausibility_params = testHighwayFast(
+        evaluator, highway, optimizer.getHighwaysOutputDir(), proba);
     auto llDiff = plausibility_params.getScore() - initialLL;
     if (llDiff < 0.01) {
       proba = 0.1;
-      Logger::timed << "No improvement with small probability! Trying again with p = " << proba << std::endl;
-      plausibility_params = testHighwayFast(evaluator, highway, optimizer.getHighwaysOutputDir(), proba);
+      Logger::timed
+          << "No improvement with small probability! Trying again with p = "
+          << proba << std::endl;
+      plausibility_params = testHighwayFast(
+          evaluator, highway, optimizer.getHighwaysOutputDir(), proba);
       llDiff = plausibility_params.getScore() - initialLL;
     }
 
@@ -247,10 +256,11 @@ void Highways::filterCandidateHighwaysFast(
         Logger::timed << "Rejecting (BIC) candidate: ";
       }
     } else {
-        Logger::timed << "Rejecting (noImprov) candidate: ";
+      Logger::timed << "Rejecting (noImprov) candidate: ";
     }
     Logger::info << highway.src->label << "->" << highway.dest->label
-                 << " ll diff = " << llDiff << " best proba = " << highway.proba << std::endl;
+                 << " ll diff = " << llDiff << " best proba = " << highway.proba
+                 << std::endl;
   }
   for (auto &highway : filteredHighways) {
     (void)(highway);

@@ -10,10 +10,10 @@ class PLLRootedTree;
 struct RecModelInfo;
 
 /**
- *  Describes which DTLO parameters should be shared among which species branches
- *  An optimization class is a set of pairs of (parameter type, species node index)
- *  that share the same value when optimizing the model parameters. Each optimization
- *  class adds one free parameter in the whole model.
+ *  Describes which DTLO parameters should be shared among which species
+ * branches An optimization class is a set of pairs of (parameter type, species
+ * node index) that share the same value when optimizing the model parameters.
+ * Each optimization class adds one free parameter in the whole model.
  */
 class OptimizationClasses {
 public:

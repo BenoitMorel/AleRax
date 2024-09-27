@@ -84,8 +84,8 @@ getSortedIndices(const std::vector<unsigned int> &values) {
  *
  */
 unsigned int generateCCPs(const Families &families, CCPRooting ccpRooting,
-                  unsigned int sampleFrequency,
-                  const std::string ccpDimensionFile) {
+                          unsigned int sampleFrequency,
+                          const std::string ccpDimensionFile) {
   ParallelContext::barrier();
   Logger::timed << "Generating ccp files..." << std::endl;
   auto N = families.size();
@@ -420,7 +420,8 @@ void runDateOptimization(const AleArguments &args,
 }
 
 void runTransferHighwayInference(const AleArguments &args,
-                                 AleOptimizer &speciesTreeOptimizer, size_t sample_size) {
+                                 AleOptimizer &speciesTreeOptimizer,
+                                 size_t sample_size) {
   if (!args.highways) {
     return;
   }
@@ -438,7 +439,8 @@ void runTransferHighwayInference(const AleArguments &args,
         args.highwayCandidateFile,
         speciesTreeOptimizer.getSpeciesTree().getTree());
 
-    candidateHighways = Highways::getSortedCandidatesFromList(speciesTreeOptimizer, highways);
+    candidateHighways =
+        Highways::getSortedCandidatesFromList(speciesTreeOptimizer, highways);
   } else {
     // automatically search for candidates
     Highways::getCandidateHighways(speciesTreeOptimizer, candidateHighways,
@@ -497,7 +499,7 @@ void run(AleArguments &args) {
   }
   unsigned int sample_size = 1000 * families.size();
   sample_size = generateCCPs(families, args.ccpRooting, args.sampleFrequency,
-               ccpDimensionFile);
+                             ccpDimensionFile);
   filterFamilies(args, families);
   if (!checkpointDetected) {
     initStartingSpeciesTree(args, families);

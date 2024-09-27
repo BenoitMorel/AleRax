@@ -229,9 +229,12 @@ public:
       : _evaluator(evaluator) {}
 
   virtual double evaluate(Parameters &parameters) {
-    if (0 != parameters.dimensions()) { // happens if no family is assigned to this core
+    if (0 !=
+        parameters
+            .dimensions()) { // happens if no family is assigned to this core
       parameters.ensurePositivity();
-      auto fullParameters = _evaluator.getOptimizationClasses().getFullParameters(parameters);
+      auto fullParameters =
+          _evaluator.getOptimizationClasses().getFullParameters(parameters);
       for (unsigned int i = 0; i < _evaluator.getLocalFamilyNumber(); ++i) {
         _evaluator.setFamilyParameters(i, fullParameters);
       }
@@ -339,7 +342,9 @@ double AleEvaluator::optimizeModelRates(bool thorough) {
       // and this creates inconsistancy between MPI nodes
       Parameters categorizedParameters(3);
       if (!_modelParameters.empty()) {
-        categorizedParameters = getOptimizationClasses().getCompressedParameters(_modelParameters[0].getParameters());
+        categorizedParameters =
+            getOptimizationClasses().getCompressedParameters(
+                _modelParameters[0].getParameters());
       }
       ParallelContext::barrier();
       auto bestParameters = DTLOptimizer::optimizeParameters(
@@ -495,7 +500,7 @@ void AleEvaluator::savePerFamilyLikelihoodDiff(const std::string &output) {
         ScoredString(family.name, ll - _snapshotPerFamilyLL[i]));
   }
   std::sort(scoredFamilies.begin(), scoredFamilies.end());
-  for (const auto &scoredFamily: scoredFamilies) {
+  for (const auto &scoredFamily : scoredFamilies) {
     os << scoredFamily.score << " " << scoredFamily.str << std::endl;
   }
 }

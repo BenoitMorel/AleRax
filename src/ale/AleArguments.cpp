@@ -315,7 +315,8 @@ void AleArguments::printHelp() {
   Logger::info
       << "\t-r --rec-model <reconciliationModel>  {UndatedDL, UndatedDTL}"
       << std::endl;
-  Logger::info << "\t---rec-opt <optimizer>  {Simplex, LBFGSB, Gradient}" << std::endl;
+  Logger::info << "\t---rec-opt <optimizer>  {Simplex, LBFGSB, Gradient}"
+               << std::endl;
   Logger::info << "\t--transfer-constraint {NONE, PARENTS, RELDATED}"
                << std::endl;
   Logger::info << "\t--prune-species-tree" << std::endl;

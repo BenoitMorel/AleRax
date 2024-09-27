@@ -51,9 +51,7 @@ public:
    */
   void optimize();
 
-  void enableCheckpoints(bool enable) {
-    _enableCheckpoints = enable;
-  }
+  void enableCheckpoints(bool enable) { _enableCheckpoints = enable; }
 
   /**
    *  Optize the species tree root
