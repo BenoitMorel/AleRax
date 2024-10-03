@@ -1,6 +1,7 @@
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Wextra")
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 macro(add_program program_name program_sources)
   if (ALERAX_BUILD_AS_LIBRARY)
@@ -9,7 +10,7 @@ macro(add_program program_name program_sources)
     add_executable(${program_name} ${program_sources})
   endif()
   target_sources(${program_name} PRIVATE ${program_sources})
-  target_link_libraries(${program_name} 
+  target_link_libraries(${program_name}
     PRIVATE
     generaxcore
     ${CORAX_LIB_TARGET}
@@ -25,11 +26,11 @@ macro(add_program program_name program_sources)
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
     )
-  set_target_properties(${program_name} 
+  set_target_properties(${program_name}
     PROPERTIES
     COMPILE_FLAGS "-g ${MPI_COMPILE_FLAGS}"
     )
-  set_target_properties(${program_name} 
+  set_target_properties(${program_name}
     PROPERTIES
     LINK_FLAGS "${MPI_LINK_FLAGS}"
     )
@@ -45,7 +46,7 @@ macro(add_program_corax program_name program_sources)
   else()
     add_executable(${program_name} ${program_sources})
   endif()
-  target_link_libraries(${program_name} 
+  target_link_libraries(${program_name}
     generaxcore
     ${CORAX_LIB_TARGET}
     ${MPI_LIBRARIES}
@@ -60,11 +61,11 @@ macro(add_program_corax program_name program_sources)
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
     )
-  set_target_properties(${program_name} 
+  set_target_properties(${program_name}
     PROPERTIES
     COMPILE_FLAGS "-g ${MPI_COMPILE_FLAGS}"
     )
-  set_target_properties(${program_name} 
+  set_target_properties(${program_name}
     PROPERTIES
     LINK_FLAGS "${MPI_LINK_FLAGS}"
     )
@@ -78,4 +79,3 @@ endmacro()
 
 add_subdirectory(tools)
 add_subdirectory(ale)
-

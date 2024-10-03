@@ -1,81 +1,74 @@
 #pragma once
 
-
+#include "AleEvaluator.hpp"
 #include "AleState.hpp"
-#include <search/SpeciesRootSearch.hpp>
-#include <trees/SpeciesTree.hpp>
-#include <IO/FamiliesFileParser.hpp>
-#include <IO/FileSystem.hpp>
 #include "UndatedDLMultiModel.hpp"
 #include "UndatedDTLMultiModel.hpp"
-#include <trees/PLLRootedTree.hpp>
-#include <parallelization/PerCoreGeneTrees.hpp>
-#include <memory>
-#include <vector>
+#include <IO/FamiliesFileParser.hpp>
+#include <IO/FileSystem.hpp>
 #include <maths/ModelParameters.hpp>
-#include "AleEvaluator.hpp"
+#include <memory>
 #include <optimizers/DTLOptimizer.hpp>
+#include <parallelization/PerCoreGeneTrees.hpp>
+#include <search/SpeciesRootSearch.hpp>
+#include <trees/PLLRootedTree.hpp>
+#include <trees/SpeciesTree.hpp>
+#include <vector>
 
 struct ScoredHighway {
-  ScoredHighway() 
-  {}
+  ScoredHighway() {}
 
-  
-  ScoredHighway(const Highway &highway, double score = 0.0, double scoreDiff = 0.0):
-    highway(highway),
-    score(score),
-    scoreDiff(scoreDiff)
-  {}
+  ScoredHighway(const Highway &highway, double score = 0.0,
+                double scoreDiff = 0.0)
+      : highway(highway), score(score), scoreDiff(scoreDiff) {}
 
   Highway highway;
   double score;
   double scoreDiff;
-  bool operator < (const ScoredHighway &other) const {
+  bool operator<(const ScoredHighway &other) const {
     return score < other.score;
+  }
+  bool operator==(const Highway &other) const {
+    return highway.src == other.src && highway.dest == other.dest;
   }
 };
 
 bool cmpHighwayByProbability(const ScoredHighway &a, const ScoredHighway &b);
 
-
-class AleOptimizer: public SpeciesTree::Listener, 
-  public SpeciesSearchState::Listener, 
-  public DTLOptimizerListener {
+class AleOptimizer : public SpeciesTree::Listener,
+                     public SpeciesSearchState::Listener,
+                     public DTLOptimizerListener {
 public:
-  AleOptimizer(const std::string speciesTreeFile, 
-      const Families &families, 
-      const RecModelInfo &info,
-      ModelParametrization modelParametrization,
-      const Parameters &startingRates,
-      bool optimizeRates,
-      bool optimizeVerbose,
-      const std::string &optimizationClassFile,
-      const std::string &outputDir);
+  AleOptimizer(const std::string speciesTreeFile, const Families &families,
+               const RecModelInfo &info,
+               ModelParametrization modelParametrization,
+               const Parameters &startingRates, bool optimizeRates,
+               bool optimizeVerbose, const std::string &optimizationClassFile,
+               const std::string &outputDir);
 
   /**
    *  Optimize the species tree topology
    */
   void optimize();
 
-  void enableCheckpoints(bool enable) {
-    _enableCheckpoints = enable;
-  }
+  void enableCheckpoints(bool enable) { _enableCheckpoints = enable; }
 
   /**
    *  Optize the species tree root
    */
   double rootSearch(unsigned int maxDepth, bool thorough = false);
- 
+
   /**
    *  Callback called when the species tree topology changes
    */
-  void onSpeciesTreeChange(const std::unordered_set<corax_rnode_t *> *nodesToInvalidate);
-    
+  void onSpeciesTreeChange(
+      const std::unordered_set<corax_rnode_t *> *nodesToInvalidate);
+
   /**
    *  Callback called when the species tree improves (the likelihood)
    */
   virtual void betterTreeCallback();
-    
+
   /**
    *  Callback called when better model parameters have been found
    */
@@ -95,7 +88,6 @@ public:
    *  Optimize the relative order of speciation events
    */
   void optimizeDates(bool thorough = true);
-
 
   /**
    *  Randomly pick a branch in the species tree and reroot it
@@ -121,35 +113,40 @@ public:
   /**
    *  Accessor
    */
-  AleEvaluator &getEvaluator() {return *_evaluator;}
-  
-  /**
-   *  Accessor
-   */
-  SpeciesTree &getSpeciesTree() {return *_state.speciesTree;}
- 
-  /**
-   *  Accessor
-   */
-  std::vector<AleModelParameters> &getModelParameters() {return _state.perFamilyModelParameters;}
-  const std::vector<AleModelParameters> &getModelParameters() const {return _state.perFamilyModelParameters;}
+  AleEvaluator &getEvaluator() { return *_evaluator; }
 
-  const RecModelInfo &getRecModelInfo() const {return _info;}
+  /**
+   *  Accessor
+   */
+  SpeciesTree &getSpeciesTree() { return *_state.speciesTree; }
+
+  /**
+   *  Accessor
+   */
+  std::vector<AleModelParameters> &getModelParameters() {
+    return _state.perFamilyModelParameters;
+  }
+  const std::vector<AleModelParameters> &getModelParameters() const {
+    return _state.perFamilyModelParameters;
+  }
+
+  const RecModelInfo &getRecModelInfo() const { return _info; }
 
   void saveBestHighways(const std::vector<ScoredHighway> &highways,
-      const std::string &output);
+                        const std::string &output);
   void saveRELLSupports();
   std::string getHighwaysOutputDir() const;
 
   void saveCheckpoint() const;
   void loadCheckpoint();
-  bool checkpointExists() const {return checkpointExists(_outputDir);}
+  bool checkpointExists() const { return checkpointExists(_outputDir); }
   static bool checkpointExists(const std::string &outputDir);
   static std::string getCheckpointDir(const std::string &outputDir) {
     return FileSystem::joinPaths(outputDir, "checkpoint");
   }
-  AleStep getCurrentStep() const {return _state.currentStep;} 
-  void setCurrentStep(AleStep step) {_state.currentStep = step;} 
+  AleStep getCurrentStep() const { return _state.currentStep; }
+  void setCurrentStep(AleStep step) { _state.currentStep = step; }
+
 private:
   AleState _state;
   const Families &_families;
@@ -160,12 +157,12 @@ private:
   std::string _checkpointDir;
   std::unique_ptr<SpeciesSearchState> _speciesTreeSearchState;
   RootLikelihoods _rootLikelihoods;
-  bool _enableCheckpoints;  
+  bool _enableCheckpoints;
   double sprSearch(unsigned int radius);
   double transferSearch();
-  std::string saveCurrentSpeciesTreeId(std::string str = "inferred_species_tree.newick", bool masterRankOnly = true);
-  void saveCurrentSpeciesTreePath(const std::string &str, bool masterRankOnly = true);
+  std::string
+  saveCurrentSpeciesTreeId(std::string str = "inferred_species_tree.newick",
+                           bool masterRankOnly = true);
+  void saveCurrentSpeciesTreePath(const std::string &str,
+                                  bool masterRankOnly = true);
 };
-
-
-

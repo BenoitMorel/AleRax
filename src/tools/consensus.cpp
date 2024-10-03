@@ -1,9 +1,8 @@
-#include <trees/PLLUnrootedTree.hpp>
-#include <iostream>
 #include <fstream>
+#include <iostream>
+#include <trees/PLLUnrootedTree.hpp>
 
-std::vector<std::string> getLines(const std::string path)
-{
+std::vector<std::string> getLines(const std::string path) {
   std::ifstream is(path);
   std::string line;
   std::vector<std::string> res;
@@ -15,12 +14,11 @@ std::vector<std::string> getLines(const std::string path)
   return res;
 }
 
-
-int main(int argc, char** argv)
-{
+int main(int argc, char **argv) {
   if (argc != 4) {
     std::cerr << "Error, syntax is:" << std::endl;
-    std::cerr << "consensus input_trees threshold output_consensus" << std::endl;
+    std::cerr << "consensus input_trees threshold output_consensus"
+              << std::endl;
     return 1;
   }
   std::string input(argv[1]);
@@ -35,6 +33,3 @@ int main(int argc, char** argv)
 
   return 0;
 }
-
-
-
