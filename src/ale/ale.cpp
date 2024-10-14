@@ -7,8 +7,10 @@
 #include <IO/FileSystem.hpp>
 #include <IO/HighwayCandidateParser.hpp>
 #include <IO/Logger.hpp>
+#include <algorithm>
 #include <ccp/ConditionalClades.hpp>
 #include <cstdio>
+#include <numeric>
 #include <parallelization/ParallelContext.hpp>
 #include <routines/Routines.hpp>
 #include <routines/SlavesMain.hpp>
@@ -16,7 +18,7 @@
 #include <util/RecModelInfo.hpp>
 #include <util/enums.hpp>
 
-const char *version = "AleRax v1.1.1";
+const char *version = "AleRax v1.2.0";
 
 /**
  *  Check the validity of each gene family:
@@ -81,9 +83,9 @@ getSortedIndices(const std::vector<unsigned int> &values) {
  *  @param ccpDimensionFile Output file with the per-family ccp sizes
  *
  */
-void generateCCPs(const Families &families, CCPRooting ccpRooting,
-                  unsigned int sampleFrequency,
-                  const std::string ccpDimensionFile) {
+unsigned int generateCCPs(const Families &families, CCPRooting ccpRooting,
+                          unsigned int sampleFrequency,
+                          const std::string ccpDimensionFile) {
   ParallelContext::barrier();
   Logger::timed << "Generating ccp files..." << std::endl;
   auto N = families.size();
@@ -91,6 +93,7 @@ void generateCCPs(const Families &families, CCPRooting ccpRooting,
   std::vector<unsigned int> familyIndices;
   std::vector<unsigned int> treeSizes;
   std::vector<unsigned int> ccpSizes;
+  unsigned int numTrees = 0;
   for (auto i = ParallelContext::getBegin(N); i < ParallelContext::getEnd(N);
        i++) {
     // Read and seralize the ccps
@@ -108,6 +111,7 @@ void generateCCPs(const Families &families, CCPRooting ccpRooting,
     familyIndices.push_back(i);
     treeSizes.push_back(ccp.getLeafNumber());
     ccpSizes.push_back(ccp.getCladesNumber());
+    numTrees += ccp.getInputTreesNumber();
   }
   ParallelContext::barrier();
   // Gather the family ccp dimensions from all MPI ranks
@@ -115,6 +119,7 @@ void generateCCPs(const Families &families, CCPRooting ccpRooting,
                                                         familyIndices);
   ParallelContext::concatenateHetherogeneousUIntVectors(treeSizes, treeSizes);
   ParallelContext::concatenateHetherogeneousUIntVectors(ccpSizes, ccpSizes);
+  ParallelContext::sumUInt(numTrees);
   // Output the families and there cpp sizes, from the largest to the smallest
   ParallelOfstream os(ccpDimensionFile);
   assert(familyIndices.size() == families.size());
@@ -126,6 +131,7 @@ void generateCCPs(const Families &families, CCPRooting ccpRooting,
   }
 
   ParallelContext::barrier();
+  return numTrees;
 }
 
 /**
@@ -414,10 +420,12 @@ void runDateOptimization(const AleArguments &args,
 }
 
 void runTransferHighwayInference(const AleArguments &args,
-                                 AleOptimizer &speciesTreeOptimizer) {
+                                 AleOptimizer &speciesTreeOptimizer,
+                                 size_t sample_size) {
   if (!args.highways) {
     return;
   }
+  Logger::info << "Highway BIC sample size = " << sample_size << std::endl;
   auto highwaysOutputDir = FileSystem::joinPaths(args.output, "highways");
   FileSystem::mkdir(highwaysOutputDir, true);
   // let's infer highways of transfers!
@@ -430,9 +438,9 @@ void runTransferHighwayInference(const AleArguments &args,
     auto highways = HighwayCandidateParser::parse(
         args.highwayCandidateFile,
         speciesTreeOptimizer.getSpeciesTree().getTree());
-    for (const auto &highway : highways) {
-      candidateHighways.push_back(ScoredHighway(highway));
-    }
+
+    candidateHighways =
+        Highways::getSortedCandidatesFromList(speciesTreeOptimizer, highways);
   } else {
     // automatically search for candidates
     Highways::getCandidateHighways(speciesTreeOptimizer, candidateHighways,
@@ -443,7 +451,7 @@ void runTransferHighwayInference(const AleArguments &args,
   // We also sort the highways per likelihood
   std::vector<ScoredHighway> filteredHighways;
   Highways::filterCandidateHighwaysFast(speciesTreeOptimizer, candidateHighways,
-                                        filteredHighways);
+                                        filteredHighways, sample_size);
   filteredHighways.resize(
       std::min(filteredHighways.size(), size_t(args.highwayCandidatesStep2)));
   // now optimize all highways together
@@ -451,7 +459,7 @@ void runTransferHighwayInference(const AleArguments &args,
       FileSystem::joinPaths(highwaysOutputDir, "highway_accepted_highways.txt");
   std::vector<ScoredHighway> acceptedHighways;
   Highways::optimizeAllHighways(speciesTreeOptimizer, filteredHighways,
-                                acceptedHighways, false);
+                                acceptedHighways, true);
   speciesTreeOptimizer.saveBestHighways(acceptedHighways,
                                         acceptedHighwayOutput);
 }
@@ -489,10 +497,11 @@ void run(AleArguments &args) {
   for (auto &family : families) {
     family.ccp = FileSystem::joinPaths(ccpDir, family.name + ".ccp");
   }
+  unsigned int sample_size = 1000 * families.size();
+  sample_size = generateCCPs(families, args.ccpRooting, args.sampleFrequency,
+                             ccpDimensionFile);
+  filterFamilies(args, families);
   if (!checkpointDetected) {
-    generateCCPs(families, args.ccpRooting, args.sampleFrequency,
-                 ccpDimensionFile);
-    filterFamilies(args, families);
     initStartingSpeciesTree(args, families);
     checkCCPAndSpeciesTree(families, args.speciesTree);
   } else {
@@ -539,7 +548,7 @@ void run(AleArguments &args) {
     speciesTreeOptimizer.saveCheckpoint();
   }
   if (speciesTreeOptimizer.getCurrentStep() <= AleStep::Highways) {
-    runTransferHighwayInference(args, speciesTreeOptimizer);
+    runTransferHighwayInference(args, speciesTreeOptimizer, sample_size);
     speciesTreeOptimizer.setCurrentStep(AleStep::ModelRateOpt2);
     speciesTreeOptimizer.saveCheckpoint();
   }

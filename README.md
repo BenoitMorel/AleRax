@@ -13,7 +13,7 @@ We are also working on the following features:
 * Relative order of speciation event (relative dating) from HGT constraints
 * Inference of highways of transfers (pairs of species that exchanged many genes via HGT)
 
-We will publish a manuscript on bioarxiv very soon!
+When using AleRax, please cite: [https://academic.oup.com/bioinformatics/article/40/4/btae162/7633408](https://academic.oup.com/bioinformatics/article/40/4/btae162/7633408)
 
 ## Requirement
 
@@ -28,7 +28,7 @@ We will publish a manuscript on bioarxiv very soon!
 To download AleRax, please use git,  and clone with --recursive!!!
 
 ```
-git clone --recursive https://github.com/noahares/AleRax
+git clone --recursive https://github.com/BenoitMorel/AleRax
 ```
 
 For some reason, cloning coraxlib (one of the dependencies) sometimes fails:

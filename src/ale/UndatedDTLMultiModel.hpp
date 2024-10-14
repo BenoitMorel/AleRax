@@ -64,7 +64,6 @@ public:
       const std::unordered_set<corax_rnode_t *> *nodesToInvalidate) {
     MultiModel::onSpeciesTreeChange(nodesToInvalidate);
     resetCache();
-    recomputeSpeciesProbabilities();
   }
 
 protected:
@@ -210,7 +209,6 @@ template <class REAL> void UndatedDTLMultiModel<REAL>::updateCLV(CID cid) {
       for (size_t c = 0; c < _gammaCatNumber; ++c) {
         auto parent = speciesNode;
         auto ec = e * _gammaCatNumber + c;
-        // printf("%f, %f\n", _PD[ec], _PL[ec]);
         while (parent) {
           correctionNorm[ec] -= 1.0;
           auto p = parent->node_index;
@@ -331,22 +329,17 @@ double UndatedDTLMultiModel<REAL>::computeLogLikelihood() {
   for (auto speciesNode : this->getPrunedSpeciesNodes()) {
     auto e = speciesNode->node_index;
     for (size_t c = 0; c < _gammaCatNumber; ++c) {
-      // printf("%d, %f\n", e, _dtlclvs[rootCID]._uq[e * _gammaCatNumber + c] *
-      // _OP[e] * double(this->getPrunedSpeciesNodeNumber()));
       categoryLikelihoods[c] +=
           _dtlclvs[rootCID]._uq[e * _gammaCatNumber + c] * _OP[e];
     }
   }
   // condition on survival
-  // printf("rootsum: %f\n", categoryLikelihoods[0]);
   for (unsigned int c = 0; c < _gammaCatNumber; ++c) {
     categoryLikelihoods[c] /= getLikelihoodFactor(c);
   }
   // sum over the categories
   REAL res = std::accumulate(categoryLikelihoods.begin(),
                              categoryLikelihoods.end(), REAL());
-  // printf("survival: %f\n", getLikelihoodFactor(0));
-  // printf("n_branches: %d\n", this->getPrunedSpeciesNodeNumber());
   // normalize by the number of categories
   res /= double(_gammaCatNumber);
   // ths root correction makes sure that UndatedDTLMultiModel and
@@ -357,7 +350,6 @@ double UndatedDTLMultiModel<REAL>::computeLogLikelihood() {
   auto rootCorrection = double(this->getPrunedSpeciesNodeNumber());
   res *= rootCorrection;
   auto ret = log(res);
-  // printf("ll: %f\n", ret);
   _llCache[hash] = ret;
   if (this->_memorySavings) {
     deallocateMemory();
@@ -382,8 +374,7 @@ bool UndatedDTLMultiModel<REAL>::sampleTransferEvent(
     max = survivingTransferSum[c];
     break;
   case TransferConstaint::PARENTS:
-    max =
-        survivingTransferSum[c] - correctionSum[ec];
+    max = survivingTransferSum[c] - correctionSum[ec];
     break;
   case TransferConstaint::RELDATED:
     max = correctionSum[ec] * static_cast<REAL>(N);

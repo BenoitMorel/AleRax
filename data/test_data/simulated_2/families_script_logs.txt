@@ -1,1 +1,1 @@
-Output families file/home/benoit/github/AleRax/tests/outputs/simulated_2_UndatedDTL_species_3/families.txt
+Output families file/home/benoit/github/AleRax/tests/outputs/simulated_2_UndatedDL_families_3/families.txt

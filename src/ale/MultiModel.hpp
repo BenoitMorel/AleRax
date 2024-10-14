@@ -76,8 +76,9 @@ public:
 
   virtual void onSpeciesDatesChange() {}
 
-  virtual void
-  onSpeciesTreeChange(const std::unordered_set<corax_rnode_t *> *) {
+  virtual void onSpeciesTreeChange(
+      const std::unordered_set<corax_rnode_t *> *nodesToInvalidate) {
+    BaseReconciliationModel::onSpeciesTreeChange(nodesToInvalidate);
     updateSpeciesToPrunedNode();
   }
 
@@ -294,7 +295,7 @@ bool MultiModelTemplate<REAL>::backtrace(unsigned int cid,
   }
   bool addEvent = true;
   if ((recCell.event.type == ReconciliationEventType::EVENT_TL &&
-      recCell.event.pllDestSpeciesNode == nullptr) || 
+       recCell.event.pllDestSpeciesNode == nullptr) ||
       recCell.event.type == ReconciliationEventType::EVENT_DL) {
     addEvent = false;
   }

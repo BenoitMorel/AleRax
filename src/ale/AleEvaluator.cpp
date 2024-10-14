@@ -229,11 +229,15 @@ public:
       : _evaluator(evaluator) {}
 
   virtual double evaluate(Parameters &parameters) {
-    parameters.ensurePositivity();
-    auto fullParameters =
-        _evaluator.getOptimizationClasses().getFullParameters(parameters);
-    for (unsigned int i = 0; i < _evaluator.getLocalFamilyNumber(); ++i) {
-      _evaluator.setFamilyParameters(i, fullParameters);
+    if (0 !=
+        parameters
+            .dimensions()) { // happens if no family is assigned to this core
+      parameters.ensurePositivity();
+      auto fullParameters =
+          _evaluator.getOptimizationClasses().getFullParameters(parameters);
+      for (unsigned int i = 0; i < _evaluator.getLocalFamilyNumber(); ++i) {
+        _evaluator.setFamilyParameters(i, fullParameters);
+      }
     }
     auto res = _evaluator.computeLikelihood();
     parameters.setScore(res);
@@ -290,6 +294,7 @@ double AleEvaluator::optimizeModelRates(bool thorough) {
   if (_optimizeRates) {
     settings.strategy = _info.recOpt;
     settings.verbose = _optimizeVerbose;
+    settings.factr = LBFGSBPrecision::MEDIUM;
     ll = computeLikelihood();
     Logger::timed << "[Species search] Optimizing model rates ";
     if (thorough) {
@@ -313,6 +318,7 @@ double AleEvaluator::optimizeModelRates(bool thorough) {
       settings.optimizationMinImprovement = settings.lineSearchMinImprovement;
     }
     if (_info.perFamilyRates) {
+      _optimizer.enableCheckpoints(false); // to avoid MPI issues
       for (unsigned int family = 0; family < _evaluations.size(); ++family) {
         DTLFamilyParametersOptimizer function(*this, family);
         auto categorizedParameters =
@@ -322,6 +328,7 @@ double AleEvaluator::optimizeModelRates(bool thorough) {
             function, categorizedParameters, settings);
         function.setParameters(bestParameters);
       }
+      _optimizer.enableCheckpoints(true); // to avoid MPI issues
       ll = computeLikelihood();
       Logger::timed << "[Species search]   After model rate opt, ll=" << ll
                     << std::endl;
@@ -329,9 +336,17 @@ double AleEvaluator::optimizeModelRates(bool thorough) {
       Logger::timed << "Free parameters: "
                     << _optimizationClasses.getFreeParameters() << std::endl;
       DTLParametersOptimizerGlobal function(*this);
-      auto categorizedParameters =
-          getOptimizationClasses().getCompressedParameters(
-              _modelParameters[0].getParameters());
+
+      // fake parameters, in case there are no family assigned to this core
+      // we can't use empty parameter vector, otherwise the optimizer returns
+      // and this creates inconsistancy between MPI nodes
+      Parameters categorizedParameters(3);
+      if (!_modelParameters.empty()) {
+        categorizedParameters =
+            getOptimizationClasses().getCompressedParameters(
+                _modelParameters[0].getParameters());
+      }
+      ParallelContext::barrier();
       auto bestParameters = DTLOptimizer::optimizeParameters(
           function, categorizedParameters, settings);
       function.evaluate(bestParameters); // set the parameters
@@ -396,6 +411,7 @@ void AleEvaluator::getTransferInformation(
   transferFrequencies.idToLabel = idToLabel;
   perSpeciesEvents = PerSpeciesEvents(speciesTree.getTree().getNodeNumber());
   auto infoCopy = _info;
+  infoCopy.model = RecModel::UndatedDTL;
   infoCopy.originationStrategy = OriginationStrategy::UNIFORM;
   infoCopy.transferConstraint = TransferConstaint::PARENTS;
   for (const auto &geneTree : _geneTrees.getTrees()) {
@@ -484,7 +500,7 @@ void AleEvaluator::savePerFamilyLikelihoodDiff(const std::string &output) {
         ScoredString(family.name, ll - _snapshotPerFamilyLL[i]));
   }
   std::sort(scoredFamilies.begin(), scoredFamilies.end());
-  for (const auto scoredFamily : scoredFamilies) {
+  for (const auto &scoredFamily : scoredFamilies) {
     os << scoredFamily.score << " " << scoredFamily.str << std::endl;
   }
 }

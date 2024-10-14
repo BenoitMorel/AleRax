@@ -28,6 +28,9 @@ struct ScoredHighway {
   bool operator<(const ScoredHighway &other) const {
     return score < other.score;
   }
+  bool operator==(const Highway &other) const {
+    return highway.src == other.src && highway.dest == other.dest;
+  }
 };
 
 bool cmpHighwayByProbability(const ScoredHighway &a, const ScoredHighway &b);
@@ -47,6 +50,8 @@ public:
    *  Optimize the species tree topology
    */
   void optimize();
+
+  void enableCheckpoints(bool enable) { _enableCheckpoints = enable; }
 
   /**
    *  Optize the species tree root
@@ -152,7 +157,7 @@ private:
   std::string _checkpointDir;
   std::unique_ptr<SpeciesSearchState> _speciesTreeSearchState;
   RootLikelihoods _rootLikelihoods;
-
+  bool _enableCheckpoints;
   double sprSearch(unsigned int radius);
   double transferSearch();
   std::string
