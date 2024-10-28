@@ -9,19 +9,17 @@ class AleOptimizer;
 struct ScoredHighway {
   ScoredHighway()
   {}
-  ScoredHighway(const Highway &highway, double score = 0.0, double scoreDiff = 0.0):
+  ScoredHighway(const Highway &highway, double score = 0.0):
     highway(highway),
-    score(score),
-    scoreDiff(scoreDiff)
+    score(score)
   {}
   Highway highway;
   double score;
-  double scoreDiff;
   bool operator < (const ScoredHighway &other) const {
     return score < other.score;
   }
   bool operator == (const Highway &other) const {
-    return highway.src == other.src && highway.dest == other.dest;
+    return (highway.src == other.src) && (highway.dest == other.dest);
   }
 };
 

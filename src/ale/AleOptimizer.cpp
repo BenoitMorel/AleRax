@@ -270,7 +270,7 @@ void AleOptimizer::saveSpeciesTree()
   }
   auto out = _speciesTreeSearchState->pathToBestSpeciesTree;
   getSpeciesTree().saveToFile(out, true);
-  Logger::info << "save species tree to " << out << std::endl;
+  //Logger::info << "save species tree to " << out << std::endl;
   ParallelContext::barrier();
 }
 
@@ -334,7 +334,7 @@ void AleOptimizer::saveRatesAndLL()
     }
     llOs.close();
   }
-  Logger::info << "save per-family likelihoods to " << perFamilyLikelihoodPath << std::endl;
+  //Logger::info << "save per-family likelihoods to " << perFamilyLikelihoodPath << std::endl;
   // save the DTL rates
   auto parameterNames = Enums::parameterNames(_info.model);
   auto ratesDir = FileSystem::joinPaths(_outputDir, "model_parameters");
@@ -345,31 +345,40 @@ void AleOptimizer::saveRatesAndLL()
       auto familyRatesPath = FileSystem::joinPaths(ratesDir,
           _geneTrees.getTrees()[i].name + "_rates.txt");
       std::ofstream ratesOs(familyRatesPath);
-      ratesOs << "# ";
-      for (auto names: parameterNames) {
-        ratesOs << names << " ";
+      ratesOs << "#";
+      for (auto name: parameterNames) {
+        ratesOs << " " << name;
       }
       ratesOs << std::endl;
-      auto parameters = getModelParameters()[i].getParameters();
-      assert(getModelParameters()[i].getParamTypeNumber() == parameterNames.size());
-      for (unsigned int j = 0; j < getModelParameters()[i].getParamTypeNumber(); ++j) {
-        ratesOs << parameters[j] << " ";
+      const auto &parameters = getModelParameters()[i];
+      assert(parameters.getParamTypeNumber() == parameterNames.size());
+      for (unsigned int rate = 0; rate < parameterNames.size(); ++rate) {
+        if (rate != 0) ratesOs << " ";
+        ratesOs << parameters.getParameter(0, rate);
       }
+      ratesOs << std::endl;
       ratesOs.close();
     }
   } else {
     auto globalRatesPath = FileSystem::joinPaths(ratesDir, "model_parameters.txt");
     ParallelOfstream ratesOs(globalRatesPath, true);
+    ratesOs << "# node";
+    for (auto name: parameterNames) {
+      ratesOs << " " << name;
+    }
+    ratesOs << std::endl;
+    const auto &parameters = getModelParameters()[0];
+    assert(parameters.getParamTypeNumber() == parameterNames.size());
     for (auto node: getSpeciesTree().getTree().getNodes()) {
       ratesOs << node->label;
-      for (unsigned int rate = 0; rate < getModelParameters()[0].getParamTypeNumber(); ++rate) {
-        ratesOs << " " << getModelParameters()[0].getParameter(node->node_index, rate);
+      for (unsigned int rate = 0; rate < parameterNames.size(); ++rate) {
+        ratesOs << " " << parameters.getParameter(node->node_index, rate);
       }
-      ratesOs << "\n";
+      ratesOs << std::endl;
     }
     ratesOs.close();
   }
-  Logger::info << "save model rates to " << ratesDir << std::endl;
+  //Logger::info << "save model rates to " << ratesDir << std::endl;
   ParallelContext::barrier();
 }
 
@@ -413,13 +422,14 @@ void AleOptimizer::saveFamiliesTakingHighway(const Highway &highway,
     }
     std::sort(scoredFamilies.rbegin(), scoredFamilies.rend());
     auto outputFile = FileSystem::joinPaths(directory,
-        std::string("families_highway_") + highway.src->label + "_to_" + highway.dest->label + ".txt");
+        std::string("highway_") + highway.src->label + "_to_" + highway.dest->label + ".txt");
     std::ofstream os(outputFile);
+    os << "fam, transfers" << std::endl;
     for (const auto &sf: scoredFamilies) {
       if (sf.score == 0.0) {
         break;
       }
-      os << sf.score << " " << sf.familyName << std::endl;
+      os << sf.familyName << ", " << sf.score << std::endl;
     }
     os.close();
   }
@@ -444,7 +454,7 @@ void AleOptimizer::reconcile(unsigned int samples)
   auto originsDir = FileSystem::joinPaths(recDir, "origins");
   FileSystem::mkdir(originsDir, true);
   auto highwaysOutputDir = FileSystem::joinPaths(_outputDir, "highways");
-  auto highwayFamiliesOutputDir = FileSystem::joinPaths(highwaysOutputDir, "families");
+  auto highwayFamiliesOutputDir = FileSystem::joinPaths(highwaysOutputDir, "accepted_transfers");
   if (FileSystem::dirExists(highwaysOutputDir)) {
     FileSystem::mkdir(highwayFamiliesOutputDir, true);
   }
@@ -473,17 +483,17 @@ void AleOptimizer::reconcile(unsigned int samples)
     allScenarios.insert(allScenarios.end(), scenarios.begin(), scenarios.end());
     assert(scenarios.size() == samples);
     // writing in the reconciliations/all/ dir
-    auto geneTreesPath = FileSystem::joinPaths(allRecDir, localFamilies[i].name + std::string(".newick"));
+    auto geneTreesPath = FileSystem::joinPaths(allRecDir, localFamilies[i].name + std::string("_samples.newick"));
     ParallelOfstream geneTreesOs(geneTreesPath, false);
-    auto geneTreesAlePath = FileSystem::joinPaths(allRecDir, localFamilies[i].name + std::string(".rec_uml"));
+    auto geneTreesAlePath = FileSystem::joinPaths(allRecDir, localFamilies[i].name + std::string("_samples.alerec"));
     ParallelOfstream geneTreesAleOs(geneTreesAlePath, false);
     for (unsigned int sample = 0; sample < samples; ++sample) {
       auto out = FileSystem::joinPaths(allRecDir,
-          localFamilies[i].name + std::string("_") + std::to_string(sample) + ".xml");
+          localFamilies[i].name + std::string("_sample_") + std::to_string(sample) + ".xml");
       auto eventCountsFile = FileSystem::joinPaths(allRecDir,
-          localFamilies[i].name + std::string("_eventcount_") + std::to_string(sample) + ".txt");
+          localFamilies[i].name + std::string("_eventCounts_") + std::to_string(sample) + ".txt");
       auto perSpeciesEventCountsFile = FileSystem::joinPaths(allRecDir,
-          localFamilies[i].name + std::string("_perspecies_eventcount_") + std::to_string(sample) + ".txt");
+          localFamilies[i].name + std::string("_speciesEventCounts_") + std::to_string(sample) + ".txt");
       auto transferFile = FileSystem::joinPaths(allRecDir,
           localFamilies[i].name + std::string("_transfers_") + std::to_string(sample) + ".txt");
       perSpeciesEventCountsFiles.push_back(perSpeciesEventCountsFile);
@@ -491,7 +501,6 @@ void AleOptimizer::reconcile(unsigned int samples)
       auto &scenario = *scenarios[sample];
       scenario.saveReconciliation(out, ReconciliationFormat::RecPhyloXML, false);
       scenario.saveReconciliation(geneTreesOs, ReconciliationFormat::NewickEvents);
-      geneTreesOs << "\n";
       scenario.saveReconciliation(geneTreesAleOs, ReconciliationFormat::ALE);
       scenario.saveEventsCounts(eventCountsFile, false);
       scenario.savePerSpeciesEventsCounts(perSpeciesEventCountsFile, false);
@@ -512,13 +521,13 @@ void AleOptimizer::reconcile(unsigned int samples)
     saveGeneConsensusTree(geneTreesPath,
         consensusFile);
     auto perSpeciesEventCountsFile = FileSystem::joinPaths(summariesDir, localFamilies[i].name +
-        std::string("_perspecies_eventcount.txt"));
+        std::string("_meanSpeciesEventCounts.txt"));
     Scenario::mergePerSpeciesEventCounts(getSpeciesTree().getTree(),
         perSpeciesEventCountsFile,
         perSpeciesEventCountsFiles, false, true);
     summaryPerSpeciesEventCountsFiles.push_back(perSpeciesEventCountsFile);
     auto transferFile = FileSystem::joinPaths(summariesDir, localFamilies[i].name +
-        std::string("_transfers.txt"));
+        std::string("_meanTransfers.txt"));
     Scenario::mergeTransfers(getSpeciesTree().getTree(),
         transferFile,
         transferFiles, false, true);
@@ -528,7 +537,7 @@ void AleOptimizer::reconcile(unsigned int samples)
   ParallelContext::makeRandConsistent();
   Logger::timed << "[Reconciliation] Exporting reconciliation summaries" << std::endl;
   // export total per-branch event counts
-  auto totalPerSpeciesEventCountsFile = FileSystem::joinPaths(recDir, "perspecies_eventcount.txt");
+  auto totalPerSpeciesEventCountsFile = FileSystem::joinPaths(recDir, "totalSpeciesEventCounts.txt");
   Scenario::mergePerSpeciesEventCounts(getSpeciesTree().getTree(),
       totalPerSpeciesEventCountsFile,
       summaryPerSpeciesEventCountsFiles,
@@ -536,7 +545,7 @@ void AleOptimizer::reconcile(unsigned int samples)
   // export origins
   Scenario::saveOriginsGlobal(getSpeciesTree().getTree(), allScenarios, samples, originsDir);
   // export total pairwise transfer counts
-  auto totalTransferFile = FileSystem::joinPaths(recDir, "transfers.txt");
+  auto totalTransferFile = FileSystem::joinPaths(recDir, "totalTransfers.txt");
   Scenario::mergeTransfers(getSpeciesTree().getTree(),
       totalTransferFile,
       summaryTransferFiles,
@@ -552,14 +561,15 @@ void AleOptimizer::reconcile(unsigned int samples)
 void AleOptimizer::saveBestHighways(const std::vector<ScoredHighway> &scoredHighways,
     const std::string &outputFile)
 {
-  Logger::info << "save highways to " << outputFile << std::endl;
+  //Logger::info << "save highways to " << outputFile << std::endl;
   assert(scoredHighways.size());
   ParallelOfstream os(outputFile, true);
+  os << "src, dest, proba, llDiff" << std::endl;
   for (const auto &scoredHighway: scoredHighways) {
-    os << scoredHighway.highway.proba << ", ";
-    os << scoredHighway.highway.src->label << ",";
-    os << scoredHighway.highway.dest->label << ", ";
-    os << scoredHighway.scoreDiff << std::endl;
+    os << scoredHighway.highway.src->label << ", "
+       << scoredHighway.highway.dest->label << ", "
+       << scoredHighway.highway.proba << ", "
+       << scoredHighway.score << std::endl;
   }
   os.close();
   ParallelContext::barrier();
@@ -574,7 +584,7 @@ void AleOptimizer::inferHighways(const std::string &highwayCandidateFile,
   auto highwaysOutputDir = getHighwaysOutputDir();
   // Step 1: select initial candidates
   auto candidateHighwayOutput = FileSystem::joinPaths(highwaysOutputDir,
-      "highway_best_candidates.txt");
+      "candidate_highways.txt");
   std::vector<ScoredHighway> candidateHighways;
   if (highwayCandidateFile.size()) {
     // the user sets the candidates
@@ -609,7 +619,7 @@ void AleOptimizer::inferHighways(const std::string &highwayCandidateFile,
   }
   // Step 3: optimize all the filtered highways together
   auto acceptedHighwayOutput = FileSystem::joinPaths(highwaysOutputDir,
-      "highway_accepted_highways.txt");
+      "accepted_highways.txt");
   std::vector<ScoredHighway> acceptedHighways;
   Highways::optimizeAllHighways(*this,
       filteredHighways,

@@ -66,16 +66,16 @@ static bool isHighwayCompatible(const Highway &highway,
 
 static double testHighwayFast(AleEvaluator &evaluator,
     const Highway &highway,
-    const std::string &highwaysOutputDir,
+    const std::string &directory,
     double highwayProba)
 {
   auto highwayCopy = highway;
   highwayCopy.proba = highwayProba;
   evaluator.addHighway(highwayCopy);
   double ll = evaluator.computeLikelihood();
-  auto out = FileSystem::joinPaths(highwaysOutputDir,
-      std::string("transferll_") + std::string(highway.src->label) +
-      std::string("_") + std::string(highway.dest->label));
+  auto out = FileSystem::joinPaths(directory,
+      std::string("transferll_") + highway.src->label +
+      "_to_" + highway.dest->label + ".txt");
   evaluator.savePerFamilyLikelihoodDiff(out);
   evaluator.removeHighway();
   return ll;
@@ -96,9 +96,9 @@ static Parameters optimizeSingleHighwayProba(AleEvaluator &evaluator,
   settings.factr = LBFGSBPrecision::LOW;
   ParallelContext::barrier();
   auto bestParameters = DTLOptimizer::optimizeParameters(
-        function,
-        startingHighwayProbas,
-        settings);
+      function,
+      startingHighwayProbas,
+      settings);
   return bestParameters;
 }
 
@@ -123,9 +123,9 @@ static Parameters optimizeHighwayProbas(AleEvaluator &evaluator,
     }
     ParallelContext::barrier();
     auto bestParameters = DTLOptimizer::optimizeParameters(
-          function,
-          startingHighwayProbas,
-          settings);
+        function,
+        startingHighwayProbas,
+        settings);
     return bestParameters;
   } else {
     // like testHighwayFast, but for several highways
@@ -235,6 +235,9 @@ void Highways::filterCandidateHighways(AleOptimizer &optimizer,
   double proba2 = 0.1; // higher hardcoded highway proba
   double minDiff = 0.01; // min ll increase to keep the candidate
   auto sampleSize = evaluator.getInputTreesNumber(); // input data size for BIC calculation
+  auto testPath = FileSystem::joinPaths(optimizer.getHighwaysOutputDir(), "candidate_tests");
+  FileSystem::mkdir(testPath, true);
+  ParallelContext::barrier();
   Logger::timed << "[Highway search] Filtering candidate highways that increase LL by more than "
                 << minDiff << std::endl;
   double initialLL = evaluator.computeLikelihood();
@@ -255,14 +258,14 @@ void Highways::filterCandidateHighways(AleOptimizer &optimizer,
     // add the highway to test;
     // compute the new total LL after adding the highway and save the new per-family LLs to a file;
     // remove the highway
-    double withHighwayLL = testHighwayFast(evaluator, highway, optimizer.getHighwaysOutputDir(), proba);
+    double withHighwayLL = testHighwayFast(evaluator, highway, testPath, proba);
     double llDiff = withHighwayLL - initialLL;
     if (llDiff < minDiff) {
       proba = proba2;
       Logger::timed << "  No improvement with the small highway proba! Trying again with p="
                     << proba << std::endl;
       // ditto, but with higher highway proba
-      withHighwayLL = testHighwayFast(evaluator, highway, optimizer.getHighwaysOutputDir(), proba);
+      withHighwayLL = testHighwayFast(evaluator, highway, testPath, proba);
       llDiff = withHighwayLL - initialLL;
     }
     // reject the highway if adding it hasn't increased the LL significantly

@@ -63,7 +63,7 @@ void checkEnoughFamilies(const Families &families)
  */
 void filterInvalidFamilies(const AleArguments &args, Families &families)
 {
-  if (args.skipFamilyFiltering) {
+  if (!args.skipFamilyFiltering) {
     return;
   }
   Logger::timed << "Checking families..." << std::endl;
@@ -158,11 +158,12 @@ void generateCCPs(const AleArguments &args,
   assert(familyIndices.size() == families.size());
   // output the families and their cpp sizes, from the largest to the smallest
   auto sortedIndices = getSortedIndices(ccpSizes);
-  ParallelOfstream os(ccpDimensionFile);
+  ParallelOfstream os(ccpDimensionFile, true);
+  os << "fam, leaves, ccps" << std::endl;
   for (unsigned int i = 0; i < familyIndices.size(); ++i) {
     auto j = sortedIndices[i];
-    os << families[familyIndices[j]].name << ",";
-    os << treeSizes[j] << "," << ccpSizes[j] << std::endl;
+    os << families[familyIndices[j]].name << ", "
+       << treeSizes[j] << ", " << ccpSizes[j] << std::endl;
   }
   os.close();
   ParallelContext::barrier();
@@ -287,6 +288,11 @@ void initStartingSpeciesTree(AleArguments &args,
   if (ParallelContext::getRank() == 0) {
     // read the starting tree and save it as the current tree
     SpeciesTree currentTree(startingSpeciesTree);
+    if (args.transferConstraint != TransferConstaint::RELDATED) {
+      // the branch lengths of the starting tree are meaningless
+      // unless it is dated, so we set all branch lengths to 1.0
+      currentTree.getTree().equalizeBranchLengths();
+    }
     currentTree.getTree().save(args.speciesTree);
   }
   ParallelContext::barrier();
@@ -304,7 +310,7 @@ void initSpeciesTreeFromCheckpoint(AleArguments &args,
       "inferred_species_tree.newick");
   // read the checkpointed tree and save it as the current tree
   auto newick = AleState::readCheckpointSpeciesTree(ckpDir);
-  ParallelOfstream os(args.speciesTree);
+  ParallelOfstream os(args.speciesTree, true);
   os << newick << std::endl;
   os.close();
   ParallelContext::barrier();
@@ -549,7 +555,7 @@ void run(AleArguments &args)
   }
   checkCCPAndSpeciesTree(families, args.speciesTree);
   auto coverageFile = FileSystem::joinPaths(args.output, "perSpeciesCoverage.txt");
-  auto fractionMissingFile = FileSystem::joinPaths(args.output, "fractionMissing.txt");
+  auto fractionMissingFile = FileSystem::joinPaths(args.output, "perSpeciesMissing.txt");
   Family::printStats(families, args.speciesTree, coverageFile, fractionMissingFile);
   // initializing the optimizer
   auto info = buildRecModelInfo(args);
