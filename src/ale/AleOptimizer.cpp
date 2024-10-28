@@ -43,7 +43,7 @@ AleOptimizer::AleOptimizer(
   } else {
     for (unsigned int i = 0; i < getLocalFamilyNumber(); ++i) {
       _state.localFamilyNames.push_back(_geneTrees.getTrees()[i].name);
-      _state.perFamilyModelParameters.push_back(AleModelParameters(startingRates,
+      _state.perLocalFamilyModelParams.push_back(AleModelParameters(startingRates,
           getSpeciesTree().getTree().getNodeNumber()));
     }
   }
@@ -62,7 +62,9 @@ AleOptimizer::AleOptimizer(
       getRecModelInfo(),
       modelParametrization,
       optimizationClassFile,
+      getMixtureAlpha(),
       getModelParameters(),
+      getTransferHighways(),
       optimizeRates,
       optimizeVerbose,
       families,
@@ -73,6 +75,7 @@ AleOptimizer::AleOptimizer(
 
 void AleOptimizer::randomizeRoot()
 {
+  assert(getCurrentStep() == AleStep::SpeciesTreeOpt);
   auto &tree = getSpeciesTree().getDatedTree();
   unsigned int N = tree.getOrderedSpeciations().size();
   for (unsigned int i = 0; i < N; ++i) {
@@ -85,6 +88,7 @@ void AleOptimizer::randomizeRoot()
 
 void AleOptimizer::optimize()
 {
+  assert(getCurrentStep() == AleStep::SpeciesTreeOpt);
   size_t hash1 = 0;
   size_t hash2 = 0;
   unsigned int index = 0;
@@ -120,6 +124,7 @@ void AleOptimizer::optimize()
 
 void AleOptimizer::reroot()
 {
+  assert(getCurrentStep() == AleStep::SpeciesTreeOpt);
   PerFamLL initialPerFamLL;
   auto ll = getEvaluator().computeLikelihood(&initialPerFamLL);
   _speciesTreeSearchState->bestLL = ll;
@@ -199,6 +204,7 @@ double AleOptimizer::optimizeModelRates(bool thorough)
 
 void AleOptimizer::optimizeDates(bool thorough)
 {
+  assert(getCurrentStep() == AleStep::RelDating);
   if (!_info.isDated()) {
     return;
   }
@@ -233,7 +239,6 @@ void AleOptimizer::optimizeDates(bool thorough)
   DatedSpeciesTreeSearch::optimizeDates(getSpeciesTree(),
       getEvaluator(),
       *_speciesTreeSearchState,
-      bestLL,
       thorough);
   saveCheckpoint();
   saveSpeciesTree();
@@ -423,6 +428,7 @@ void AleOptimizer::saveFamiliesTakingHighway(const Highway &highway,
 
 void AleOptimizer::reconcile(unsigned int samples)
 {
+  assert(getCurrentStep() == AleStep::Reconciliation);
   if (samples == 0) {
     return;
   }
@@ -548,7 +554,7 @@ void AleOptimizer::saveBestHighways(const std::vector<ScoredHighway> &scoredHigh
 {
   Logger::info << "save highways to " << outputFile << std::endl;
   assert(scoredHighways.size());
-  ParallelOfstream os(outputFile);
+  ParallelOfstream os(outputFile, true);
   for (const auto &scoredHighway: scoredHighways) {
     os << scoredHighway.highway.proba << ", ";
     os << scoredHighway.highway.src->label << ",";
@@ -564,6 +570,7 @@ void AleOptimizer::inferHighways(const std::string &highwayCandidateFile,
     unsigned int highwayCandidatesStep2)
 {
   // let's infer highways of transfers!
+  assert(getCurrentStep() == AleStep::Highways);
   auto highwaysOutputDir = getHighwaysOutputDir();
   // Step 1: select initial candidates
   auto candidateHighwayOutput = FileSystem::joinPaths(highwaysOutputDir,
@@ -608,24 +615,29 @@ void AleOptimizer::inferHighways(const std::string &highwayCandidateFile,
       filteredHighways,
       acceptedHighways,
       true);
-  assert(acceptedHighways.size()); // there must be some since we get here
+  assert(acceptedHighways.size()); // there must be some since we can get here
   saveBestHighways(acceptedHighways, acceptedHighwayOutput);
   Logger::timed << "Highway output directory: " << highwaysOutputDir << std::endl;
 }
 
-void AleOptimizer::saveCheckpoint() const
+void AleOptimizer::saveCheckpoint()
 {
+  if (_info.isDated()) {
+    // We rescale the branch lengths because relative dates will be
+    // unserialized from the branch lengths
+    getSpeciesTree().getDatedTree().rescaleBranchLengths();
+  }
   _state.serialize(_checkpointDir);
 }
 
 void AleOptimizer::loadCheckpoint()
 {
   assert(checkpointExists());
-  std::vector<std::string> perFamilyNames;
-  for (const auto &family: _geneTrees.getTrees()) {
-    perFamilyNames.push_back(family.name);
+  std::vector<std::string> localFamilyNames;
+  for (unsigned int i = 0; i < getLocalFamilyNumber(); ++i) {
+    localFamilyNames.push_back(_geneTrees.getTrees()[i].name);
   }
-  _state.unserialize(_checkpointDir, perFamilyNames);
+  _state.unserialize(_checkpointDir, localFamilyNames);
 }
 
 bool AleOptimizer::checkpointExists(const std::string &outputDir)

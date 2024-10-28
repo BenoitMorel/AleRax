@@ -92,7 +92,7 @@ public:
   /**
    *  Functions to handle checkpoints
    */
-  void saveCheckpoint() const;
+  void saveCheckpoint();
   void loadCheckpoint();
   bool checkpointExists() const {return checkpointExists(_outputDir);}
   static bool checkpointExists(const std::string &outputDir);
@@ -113,8 +113,9 @@ public:
    *  Accessors
    */
   SpeciesTree &getSpeciesTree() {return *_state.speciesTree;}
-  std::vector<AleModelParameters> &getModelParameters() {return _state.perFamilyModelParameters;}
-  const std::vector<AleModelParameters> &getModelParameters() const {return _state.perFamilyModelParameters;}
+  double &getMixtureAlpha() {return _state.mixtureAlpha;}
+  std::vector<AleModelParameters> &getModelParameters() {return _state.perLocalFamilyModelParams;}
+  std::vector<Highway> &getTransferHighways() {return _state.transferHighways;}
   unsigned int getLocalFamilyNumber() const {return _geneTrees.getTrees().size();}
   const RecModelInfo &getRecModelInfo() const {return _info;}
   AleEvaluator &getEvaluator() {return *_evaluator;}

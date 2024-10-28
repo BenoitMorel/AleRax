@@ -49,11 +49,13 @@ public:
   /**
    *  Constructor
    *  @param optimizer
-   *  @param speciesTree Instance of the species tree
+   *  @param speciesTree Reference to the current AleState species tree
    *  @param info Description of the reconciliation model
    *  @param modelParametrization Describes how parameters should be optimized
    *  @param optimizationClassFile Path to the file defining parameter optimization classes
-   *  @param modelParameters Instance of the model parameters
+   *  @param mixtureAlpha Reference to the current AleState model alpha
+   *  @param perLocalFamilyModelParams Reference to the current AleState model parameters
+   *  @param transferHighways Reference to the current AleState transfer highways
    *  @param optimizeRates If set to false, model parameter optimization will be skipped
    *  @param optimizeVerbose If set to true, the optimization routines will print more logs
    *  @param families List of all gene families
@@ -65,7 +67,9 @@ public:
       const RecModelInfo &info,
       const ModelParametrization &modelParametrization,
       const std::string &optimizationClassFile,
-      std::vector<AleModelParameters> &modelParameters,
+      double &mixtureAlpha,
+      std::vector<AleModelParameters> &perLocalFamilyModelParams,
+      std::vector<Highway> &transferHighways,
       bool optimizeRates,
       bool optimizeVerbose,
       const Families &families,
@@ -149,7 +153,7 @@ public:
   void removeHighway();
   void saveSnapshotPerFamilyLL();
   void savePerFamilyLikelihoodDiff(const std::string &outputFile);
-  unsigned int getInputTreesNumber();
+  unsigned int getInputTreesNumber() const;
 
   /**
    *  Is the recmodel dated?
@@ -162,11 +166,15 @@ public:
   virtual bool pruneSpeciesTree() const {return _info.pruneSpeciesTree;}
 
   /**
+   *  Should the optimization routines print verbose logs?
+   */
+  virtual bool isVerbose() const {return _optimizeVerbose;}
+
+  /**
    *  Accessors
    */
   const RecModelInfo &getRecModelInfo() const {return _info;}
   std::vector<AleModelParameters> &getModelParameters() {return _modelParameters;}
-  bool isVerbose() const {return _optimizeVerbose;}
   const std::vector<Highway> &getHighways() const {return _highways;}
   MultiModel &getEvaluation(unsigned int i) {return *_evaluations[i];}
   unsigned int getLocalFamilyNumber() const {return _geneTrees.getTrees().size();}
@@ -192,10 +200,11 @@ private:
   // All parameters that belong to the same optimization class share
   // the same value
   const OptimizationClasses _optimizationClasses;
+  double &_mixtureAlpha;
   std::vector<AleModelParameters> &_modelParameters;
+  std::vector<Highway> &_highways;
   bool _optimizeRates;
   bool _optimizeVerbose;
-  std::vector<Highway> _highways;
   // global families
   const Families &_families;
   // local families

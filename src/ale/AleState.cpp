@@ -10,7 +10,7 @@ void AleState::writeCheckpointCmd(const std::string &currentCmd,
     const std::string &checkpointDir)
 {
   auto cmdPath = FileSystem::joinPaths(checkpointDir, "args.txt");
-  ParallelOfstream os(cmdPath);
+  ParallelOfstream os(cmdPath, true);
   os << "mpiRanks:" << std::endl;
   os << ParallelContext::getSize() << std::endl;
   os << "command:" << std::endl;
@@ -58,7 +58,7 @@ void AleState::writeCheckpointFamilies(const Families &families,
     const std::string &checkpointDir)
 {
   auto famPath = FileSystem::joinPaths(checkpointDir, "fams.txt");
-  ParallelOfstream os(famPath);
+  ParallelOfstream os(famPath, true);
   for (const auto &family: families) {
     os << family.name << std::endl;
   }
@@ -97,25 +97,29 @@ void AleState::filterCheckpointFamilies(Families &families,
 void AleState::serialize(const std::string &checkpointDir) const
 {
   ParallelContext::barrier();
-  if (ParallelContext::getRank() == 0) {
-    auto checkpointPath = FileSystem::joinPaths(checkpointDir, "mainCheckpoint.txt");
-    std::ofstream os(checkpointPath);
-    // current step
-    os << static_cast<unsigned int>(currentStep) << std::endl;
-    // dated species tree
-    // We rescale the branch lengths because the relative dates will be
-    // unserialized from the branch lengths
-    speciesTree->getDatedTree().rescaleBranchLengths();
-    os << speciesTree->getTree().getNewickString() << std::endl;
-    os.close();
+  auto checkpointPath = FileSystem::joinPaths(checkpointDir, "mainCheckpoint.txt");
+  ParallelOfstream os(checkpointPath, true);
+  // current step
+  os << static_cast<unsigned int>(currentStep) << std::endl;
+  // dated species tree
+  os << speciesTree->getTree().getNewickString() << std::endl;
+  // mixture alpha
+  os << mixtureAlpha << std::endl;
+  // transfer highways
+  for (const auto &highway: transferHighways) {
+    os << highway.src->label << " "
+       << highway.dest->label << " "
+       << highway.proba << std::endl;
   }
-  assert(perFamilyModelParameters.size() == localFamilyNames.size());
+  os.close();
+  ParallelContext::barrier();
+  assert(perLocalFamilyModelParams.size() == localFamilyNames.size());
   for (unsigned int f = 0; f < localFamilyNames.size(); ++f) {
     // param vectors
     const auto &family = localFamilyNames[f];
-    const auto &mp = perFamilyModelParameters[f];
-    auto paramsPath = FileSystem::joinPaths(checkpointDir, family + ".txt");
-    std::ofstream os(paramsPath);
+    const auto &mp = perLocalFamilyModelParams[f];
+    auto paramPath = FileSystem::joinPaths(checkpointDir, family + ".txt");
+    std::ofstream os(paramPath);
     os << mp.getParamTypeNumber() << " " << mp.getSpeciesBranchNumber() << std::endl;
     for (unsigned int i = 0; i < mp.getParameters().dimensions(); ++i) {
       os << mp.getParameters()[i] << " ";
@@ -137,9 +141,8 @@ void AleState::unserialize(const std::string &checkpointDir,
     Logger::error << "Error: cannot read checkpoint file " << checkpointPath << std::endl;
     ParallelContext::abort(32);
   }
-  unsigned int bufferUint = 0;
-  std::string bufferStr;
   // current step
+  unsigned int bufferUint = 0;
   is >> bufferUint;
   currentStep = static_cast<AleStep>(bufferUint);
   if (currentStep == AleStep::End) {
@@ -148,15 +151,37 @@ void AleState::unserialize(const std::string &checkpointDir,
     ParallelContext::abort(0);
   }
   // dated species tree
+  std::string bufferStr;
   is >> bufferStr;
   speciesTree = std::make_unique<SpeciesTree>(bufferStr, false);
+  // mixture alpha
+  is >> mixtureAlpha;
+  // transfer highways
+  auto labelToNode = speciesTree->getTree().getLabelToNode(false);
+  is >> std::ws;
+  std::string line;
+  while (std::getline(is, line)) {
+    if (line.size()) {
+      std::string src;
+      std::string dest;
+      double proba;
+      std::stringstream iss(line);
+      iss >> src;
+      iss >> dest;
+      iss >> proba;
+      Highway highway(labelToNode.find(src)->second,
+          labelToNode.find(dest)->second);
+      highway.proba = proba;
+      transferHighways.push_back(highway);
+    }
+  }
   is.close();
   // param vectors
   for (const auto &family: localFamilyNames) {
-    auto paramsPath = FileSystem::joinPaths(checkpointDir, family + ".txt");
-    std::ifstream is(paramsPath);
+    auto paramPath = FileSystem::joinPaths(checkpointDir, family + ".txt");
+    std::ifstream is(paramPath);
     if (!is.good()) {
-      Logger::error << "Error: cannot read parameter checkpoint file " << paramsPath << std::endl;
+      Logger::error << "Error: cannot read parameter checkpoint file " << paramPath << std::endl;
       ParallelContext::abort(32);
     }
     unsigned int paramTypeNumber = 0;
@@ -168,9 +193,9 @@ void AleState::unserialize(const std::string &checkpointDir,
       is >> mp.getParameters()[i];
     }
     is.close();
-    perFamilyModelParameters.push_back(mp);
+    perLocalFamilyModelParams.push_back(mp);
   }
-  assert(perFamilyModelParameters.size() == perCoreFamilyNames.size());
+  assert(perLocalFamilyModelParams.size() == perCoreFamilyNames.size());
   ParallelContext::barrier();
 }
 

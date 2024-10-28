@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <IO/Families.hpp>
+#include <IO/HighwayCandidateParser.hpp>
 #include <trees/SpeciesTree.hpp>
 
 #include "AleModelParameters.hpp"
@@ -25,7 +26,6 @@ enum class AleStep {
 };
 
 
-
 /**
  *  Stores all information about the current state of an AleRax run:
  *  - the current step in the pipeline
@@ -40,7 +40,8 @@ struct AleState {
    */
   AleState(const std::string &speciesTreePath):
     currentStep(AleStep::Init),
-    speciesTree(std::make_unique<SpeciesTree>(speciesTreePath))
+    speciesTree(std::make_unique<SpeciesTree>(speciesTreePath)),
+    mixtureAlpha(1.0)
   {}
 
   /**
@@ -94,7 +95,9 @@ struct AleState {
   // respective families
   std::vector<std::string> localFamilyNames;
   // the current model parameters
-  std::vector<AleModelParameters> perFamilyModelParameters;
+  double mixtureAlpha;
+  std::vector<AleModelParameters> perLocalFamilyModelParams;
+  std::vector<Highway> transferHighways;
 
 };
 

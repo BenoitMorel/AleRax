@@ -12,6 +12,7 @@
 static std::shared_ptr<MultiModel> createModel(SpeciesTree &speciesTree,
     const FamilyInfo &family,
     const RecModelInfo &info,
+    const double alpha,
     const AleModelParameters &modelParameters,
     const std::vector<Highway> &highways,
     bool highPrecision)
@@ -53,6 +54,7 @@ static std::shared_ptr<MultiModel> createModel(SpeciesTree &speciesTree,
   default:
     assert(false);
   }
+  model->setAlpha(alpha);
   RatesVector rates;
   modelParameters.getRateVector(rates);
   model->setRates(rates);
@@ -66,7 +68,9 @@ AleEvaluator::AleEvaluator(
     const RecModelInfo &info,
     const ModelParametrization &modelParametrization,
     const std::string &optimizationClassFile,
-    std::vector<AleModelParameters> &modelParameters,
+    double &mixtureAlpha,
+    std::vector<AleModelParameters> &perLocalFamilyModelParams,
+    std::vector<Highway> &transferHighways,
     bool optimizeRates,
     bool optimizeVerbose,
     const Families &families,
@@ -76,7 +80,9 @@ AleEvaluator::AleEvaluator(
   _speciesTree(speciesTree),
   _info(info),
   _optimizationClasses(_speciesTree.getTree(), modelParametrization, optimizationClassFile, _info),
-  _modelParameters(modelParameters),
+  _mixtureAlpha(mixtureAlpha),
+  _modelParameters(perLocalFamilyModelParams),
+  _highways(transferHighways),
   _optimizeRates(optimizeRates),
   _optimizeVerbose(optimizeVerbose),
   _families(families),
@@ -115,6 +121,7 @@ void AleEvaluator::resetEvaluation(unsigned int i, bool highPrecision)
   _evaluations[i] = createModel(_speciesTree,
       _families[famIndex],
       _info,
+      _mixtureAlpha,
       _modelParameters[i],
       _highways,
       highPrecision);
@@ -219,8 +226,9 @@ double AleEvaluator::computeFamilyLikelihood(unsigned int i)
 
 void AleEvaluator::setAlpha(double alpha)
 {
+  _mixtureAlpha = alpha;
   for (auto &evaluation: _evaluations) {
-    evaluation->setAlpha(alpha);
+    evaluation->setAlpha(_mixtureAlpha);
   }
 }
 
@@ -286,31 +294,28 @@ private:
 
 double AleEvaluator::optimizeModelRates(bool thorough)
 {
-  double ll = 0.0;
-  OptimizationSettings settings;
-  settings.listeners.push_back(&_optimizer);
+  auto ll = computeLikelihood();
   if (_optimizeRates) {
-    ll = computeLikelihood();
-    settings.strategy = _info.recOpt;
-    settings.verbose = _optimizeVerbose;
-    settings.factr = LBFGSBPrecision::MEDIUM;
     Logger::timed << "[Species search] Optimizing model rates ";
+    OptimizationSettings settings;
+    settings.listeners.push_back(&_optimizer);
+    settings.verbose = _optimizeVerbose;
+    settings.strategy = _info.recOpt;
+    settings.lineSearchMinImprovement = std::max(0.1, -ll / 10000.0);
     if (!thorough) {
-      Logger::info << "(light)" << std::endl;
-      settings.lineSearchMinImprovement = std::max(0.1, ll / 10000.0);
+      Logger::info << "(light), ll=" << ll << std::endl;
       settings.minAlpha = 0.01;
       settings.startingAlpha = 0.5;
-      settings.optimizationMinImprovement = settings.lineSearchMinImprovement;
     } else {
-      Logger::info << "(thorough)" << std::endl;
-      settings.lineSearchMinImprovement = std::max(0.1, ll / 10000.0);
-      if (ll < 100.0) {
+      Logger::info << "(thorough), ll=" << ll << std::endl;
+      if (-ll < 100.0) {
         settings.lineSearchMinImprovement = 0.01;
       }
       settings.minAlpha = 0.005;
       settings.startingAlpha = 0.01;
-      settings.optimizationMinImprovement = settings.lineSearchMinImprovement;
     }
+    settings.optimizationMinImprovement = settings.lineSearchMinImprovement;
+    settings.factr = LBFGSBPrecision::MEDIUM;
     if (_info.perFamilyRates) {
       Logger::timed << "[Species search]   Free parameters: "
                     << _optimizationClasses.getFreeParameters() << " per family" << std::endl;
@@ -320,9 +325,9 @@ double AleEvaluator::optimizeModelRates(bool thorough)
         auto categorizedParameters = getOptimizationClasses().getCompressedParameters(
             _modelParameters[family].getParameters());
         auto bestParameters = DTLOptimizer::optimizeParameters(
-              function,
-              categorizedParameters,
-              settings);
+            function,
+            categorizedParameters,
+            settings);
         // set the found best parameters to the family
         function.setParameters(bestParameters);
       }
@@ -362,35 +367,40 @@ static double callback(void *p, double x)
 
 double AleEvaluator::optimizeGammaRates()
 {
-  auto gammaCategories = _info.gammaCategories;
   auto ll = computeLikelihood();
-  if (gammaCategories == 1) {
+  if (_info.gammaCategories == 1) {
     return ll;
   }
+  Logger::timed << "[Species search] Optimizing gamma categories" << std::endl;
   double minAlpha = CORAX_OPT_MIN_ALPHA;
   double maxAlpha = CORAX_OPT_MAX_ALPHA;
-  double startingAlpha = 1.0;
+  double startingAlpha = _mixtureAlpha;
   double tolerance = 0.1;
+  double fx = -ll;
   double f2x = 1.0;
+  ParallelContext::barrier();
   double alpha = corax_opt_minimize_brent(minAlpha,
                                   startingAlpha,
                                   maxAlpha,
                                   tolerance,
-                                  &ll,
+                                  &fx,
                                   &f2x,
                                   (void *)this,
                                   &callback);
+  ll = -fx;
   setAlpha(alpha);
   std::vector<double> categories(_info.gammaCategories);
   corax_compute_gamma_cats(alpha, categories.size(), &categories[0],
       CORAX_GAMMA_RATES_MEAN);
   Logger::timed << "[Species search]   After gamma cat  opt, ll=" << ll << std::endl;
-  Logger::info << "alpha = " << alpha << std::endl;
-  Logger::info << "rate categories: ";
-  for (auto c: categories) {
-    Logger::info << c << " ";
+  if (_optimizeVerbose) {
+    Logger::info << "alpha=" << alpha << std::endl;
+    Logger::info << "speciation rate categories: ";
+    for (auto c: categories) {
+      Logger::info << c << " ";
+    }
+    Logger::info << std::endl;
   }
-  Logger::info << std::endl;
   return ll;
 }
 
@@ -543,7 +553,7 @@ void AleEvaluator::savePerFamilyLikelihoodDiff(const std::string &outputFile)
   ParallelContext::barrier();
 }
 
-unsigned int AleEvaluator::getInputTreesNumber()
+unsigned int AleEvaluator::getInputTreesNumber() const
 {
   unsigned int totalInputTrees = 0;
   for (auto &evaluation: _evaluations) {
