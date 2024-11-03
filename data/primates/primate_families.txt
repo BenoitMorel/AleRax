@@ -16,11 +16,10 @@ gene_tree = data/primates/family_2855/gene_trees/mrbayes.newick
 mapping = data/primates/family_2855/mappings/treerecs_mapping.link
 - family_497
 gene_tree = data/primates/family_497/gene_trees/mrbayes.newick
-mapping = data/primates/family_794/mappings/treerecs_mapping.link
+mapping = data/primates/family_497/mappings/treerecs_mapping.link
 - family_5579
 gene_tree = data/primates/family_5579/gene_trees/mrbayes.newick
 mapping = data/primates/family_5579/mappings/treerecs_mapping.link
 - family_381
 gene_tree = data/primates/family_381/gene_trees/mrbayes.newick
 mapping = data/primates/family_381/mappings/treerecs_mapping.link
-

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "util/enums.hpp"
 #include <IO/HighwayCandidateParser.hpp>
 #include <IO/LibpllParsers.hpp>
 #include <ccp/ConditionalClades.hpp>
@@ -292,6 +293,7 @@ bool MultiModelTemplate<REAL>::backtrace(unsigned int cid,
     recCell.event.rightGeneIndex = rightGeneNode->node_index;
     leftGeneNode->length = recCell.blLeft;
     rightGeneNode->length = recCell.blRight;
+    recCell.event.previous_event_type = scenario.getLastEventType();
   }
   bool addEvent = true;
   if ((recCell.event.type == ReconciliationEventType::EVENT_TL &&
@@ -308,20 +310,24 @@ bool MultiModelTemplate<REAL>::backtrace(unsigned int cid,
   std::string label;
   auto c = category;
 
+  scenario.setLastEventType(recCell.event.type);
   switch (recCell.event.type) {
   case ReconciliationEventType::EVENT_S:
     ok &= backtrace(leftCid, this->getSpeciesLeft(speciesNode), leftGeneNode, c,
                     scenario, stochastic);
+    scenario.setLastEventType(recCell.event.type);
     ok &= backtrace(rightCid, this->getSpeciesRight(speciesNode), rightGeneNode,
                     c, scenario, stochastic);
     break;
   case ReconciliationEventType::EVENT_D:
     ok &=
         backtrace(leftCid, speciesNode, leftGeneNode, c, scenario, stochastic);
+    scenario.setLastEventType(recCell.event.type);
     ok &= backtrace(rightCid, speciesNode, rightGeneNode, c, scenario,
                     stochastic);
     break;
   case ReconciliationEventType::EVENT_DL:
+    scenario.setLastEventType(ReconciliationEventType::EVENT_S);
     ok &= backtrace(cid, speciesNode, geneNode, c, scenario, stochastic);
     break;
   case ReconciliationEventType::EVENT_SL:
@@ -330,17 +336,21 @@ bool MultiModelTemplate<REAL>::backtrace(unsigned int cid,
     break;
   case ReconciliationEventType::EVENT_T:
     // source species
+    scenario.setLastEventType(ReconciliationEventType::EVENT_S);
     ok &=
         backtrace(leftCid, speciesNode, leftGeneNode, c, scenario, stochastic);
     // dest species
+    scenario.setLastEventType(ReconciliationEventType::EVENT_T);
     ok &= backtrace(rightCid, recCell.event.pllDestSpeciesNode, rightGeneNode,
                     c, scenario, stochastic);
     break;
   case ReconciliationEventType::EVENT_TL:
     if (recCell.event.pllDestSpeciesNode == nullptr) {
       // the gene was lost in the recieving species, we resample again
+      scenario.setLastEventType(ReconciliationEventType::EVENT_S);
       ok &= backtrace(cid, speciesNode, geneNode, c, scenario, stochastic);
     } else {
+      scenario.setLastEventType(ReconciliationEventType::EVENT_TL);
       ok &= backtrace(cid, recCell.event.pllDestSpeciesNode, geneNode, c,
                       scenario, stochastic);
     }

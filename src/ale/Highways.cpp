@@ -24,7 +24,7 @@ public:
       _evaluator.addHighway(highwayCopy);
     }
     auto res = _evaluator.computeLikelihood();
-    for (auto highway: _highways) {
+    for (const auto &highway: _highways) {
       (void)(highway);
       _evaluator.removeHighway();
     }
@@ -273,8 +273,8 @@ void Highways::filterCandidateHighways(AleOptimizer &optimizer,
       // optimize the highway proba
       auto bestParameters = optimizeSingleHighwayProba(evaluator, highway, proba);
       highway.proba = bestParameters[0];
-      double withHighwayLL = bestParameters.getScore();
-      double llDiff = withHighwayLL - initialLL;
+      withHighwayLL = bestParameters.getScore();
+      llDiff = withHighwayLL - initialLL;
       // if BIC < 0, accept the highway and add it to the recmodel for a while
       if (2.0 * llDiff > log(sampleSize)) {
         Logger::timed << "  Accepting the candidate: ";
@@ -292,8 +292,8 @@ void Highways::filterCandidateHighways(AleOptimizer &optimizer,
                  << std::endl;
   }
   // remove all the temporarily added highways from the recmodel
-  for (auto highway: filteredHighways) {
-    (void)(highway);
+  for (const auto &candidate: filteredHighways) {
+    (void)(candidate);
     evaluator.removeHighway();
   }
   // keep only the highways resulting in higher LL increase
@@ -315,19 +315,19 @@ void Highways::optimizeAllHighways(AleOptimizer &optimizer,
   // jointly optimize highway probas of the filtered highways
   std::vector<Highway> highways;
   Parameters startingProbas;
-  for (const auto candidate: filteredHighways) {
+  for (const auto &candidate: filteredHighways) {
     highways.push_back(candidate.highway);
     startingProbas.addValue(candidate.highway.proba);
   }
-  auto parameters = optimizeHighwayProbas(evaluator, highways, startingProbas, true, thorough);
+  auto bestParameters = optimizeHighwayProbas(evaluator, highways, startingProbas, true, thorough);
   Logger::timed << "[Highway search] After highway proba opt, probas and ll:\n"
-                << parameters << std::endl;
+                << bestParameters << std::endl;
   // keep only the highways with optimized proba no less than minProba and
   // permanently add these highways to the recmodel
   for (unsigned int i = 0; i < filteredHighways.size(); ++i) {
-    if (parameters[i] >= minProba) {
+    if (bestParameters[i] >= minProba) {
       auto accepted = filteredHighways[i];
-      accepted.highway.proba = parameters[i];
+      accepted.highway.proba = bestParameters[i];
       acceptedHighways.push_back(accepted);
       evaluator.addHighway(accepted.highway);
     }
