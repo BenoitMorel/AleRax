@@ -1,148 +1,318 @@
-#include "AleArguments.hpp"
-#include "AleOptimizer.hpp"
-#include "Highways.hpp"
-#include "TrimFamilies.hpp"
-#include <IO/Families.hpp>
+#include <cstdio>
+#include <DistanceMethods/MiniNJ.hpp>
 #include <IO/FamiliesFileParser.hpp>
 #include <IO/FileSystem.hpp>
-#include <IO/HighwayCandidateParser.hpp>
 #include <IO/Logger.hpp>
-#include <algorithm>
+#include <IO/ParallelOfstream.hpp>
 #include <ccp/ConditionalClades.hpp>
-#include <cstdio>
-#include <numeric>
 #include <parallelization/ParallelContext.hpp>
-#include <routines/Routines.hpp>
-#include <routines/SlavesMain.hpp>
 #include <util/Paths.hpp>
 #include <util/RecModelInfo.hpp>
 #include <util/enums.hpp>
 
-const char *version = "AleRax v1.2.0";
+#include "AleArguments.hpp"
+#include "AleOptimizer.hpp"
+#include "TrimFamilies.hpp"
+
+const char *version = "AleRax v1.2.1";
+
+
+/**
+ *  Create AleRax top directories
+ */
+void initAleRaxDirectories(const AleArguments &args,
+    const std::string &ccpDir)
+{
+  FileSystem::mkdir(args.output, true);
+  FileSystem::mkdir(args.output + "/species_trees", true);
+  FileSystem::mkdir(ccpDir, true);
+  ParallelContext::barrier();
+}
+
+/**
+ *  Print AleRax version, the command line and a summary of
+ *  the parameters
+ */
+void printInitialMessage(const AleArguments &args)
+{
+  Logger::initFileOutput(FileSystem::joinPaths(args.output, "alerax"));
+  Logger::timed << version << std::endl;
+  args.printCommand();
+  args.printSummary();
+}
+
+/**
+ *  Check that there are enough gene families
+ */
+void checkEnoughFamilies(const Families &families)
+{
+  if (families.size() == 0) {
+    Logger::info << "\nError: No valid families, aborting\n" << std::endl;
+    ParallelContext::abort(0);
+  }
+  if (families.size() < ParallelContext::getSize()) {
+    Logger::info << "\nError: More MPI ranks set than valid families, aborting\n" << std::endl;
+    ParallelContext::abort(0);
+  }
+}
 
 /**
  *  Check the validity of each gene family:
  *  - check that the gene tree files exist
  *  - if set, check that the mapping files exist
  */
-void filterInvalidFamilies(Families &families) {
-  Logger::timed << "Filtering families" << std::endl;
+void filterInvalidFamilies(const AleArguments &args, Families &families)
+{
+  if (!args.skipFamilyFiltering) {
+    return;
+  }
+  Logger::timed << "Checking families..." << std::endl;
   Families validFamilies;
-  for (const auto &family : families) {
+  for (const auto &family: families) {
     // check that the gene tree distribution file exists
     std::ifstream is(family.startingGeneTree);
     if (!is || is.peek() == std::ifstream::traits_type::eof()) {
-      Logger::error << "Can't open input gene trees for family " << family.name
-                    << std::endl;
+      Logger::info << "Excluding family " << family.name
+                   << ": cannot open the gene tree distribution file!" << std::endl;
       continue;
     }
     if (family.mappingFile.size()) {
       // check that the mapping file exists if it is set
       std::ifstream isMap(family.mappingFile);
       if (!isMap || isMap.peek() == std::ifstream::traits_type::eof()) {
-        Logger::error << "Can't open the mapping file for family "
-                      << family.name << std::endl;
+        Logger::info << "Excluding family " << family.name
+                     << ": cannot open the mapping file!" << std::endl;
         continue;
       }
     }
+    is.close();
     validFamilies.push_back(family);
   }
   families = validFamilies;
+  checkEnoughFamilies(families);
+  ParallelContext::barrier();
 }
 
 /**
- * Callback for getSortedIndices
+ *  Callback for getSortedIndices
  */
-bool compare(unsigned int a, unsigned int b,
-             const std::vector<unsigned int> &data) {
+bool compare(unsigned int a, unsigned int b, const std::vector<unsigned int> &data)
+{
   return data[a] < data[b];
 }
 
 /**
  *  Return the indices of the input vector, sorted in descending order
  */
-std::vector<unsigned int>
-getSortedIndices(const std::vector<unsigned int> &values) {
+std::vector<unsigned int> getSortedIndices(const std::vector<unsigned int> &values)
+{
   std::vector<unsigned int> indices(values.size());
   std::iota(std::begin(indices), std::end(indices), 0);
-  std::sort(
-      std::rbegin(indices), std::rend(indices),
+  std::sort(std::rbegin(indices), std::rend(indices),
       std::bind(compare, std::placeholders::_1, std::placeholders::_2, values));
   return indices;
 }
 
 /**
  *  Read the gene tree distribution files (or the .ale files), compute
- *  the corresponding CCP objects, and serialize them to a binary file
+ *  the corresponding CCP objects and serialize them to a binary file.
  *  Each MPI rank will run this function on a subset of the families
  *
  *  @param families The gene families to process
  *  @param ccpRooting Mode to decide how to deal with rooted gene trees
- *  @param sampleFrequency Number used to subsample the gene trees (if set to 2,
- * we only use half)
+ *  @param sampleFrequency Number used to subsample the gene trees (if set to 2, we only use half)
  *  @param ccpDimensionFile Output file with the per-family ccp sizes
- *
  */
-unsigned int generateCCPs(const Families &families, CCPRooting ccpRooting,
-                          unsigned int sampleFrequency,
-                          const std::string ccpDimensionFile) {
+void generateCCPs(const AleArguments &args,
+    const Families &families,
+    const std::string &ccpDimensionFile)
+{
   ParallelContext::barrier();
   Logger::timed << "Generating ccp files..." << std::endl;
   auto N = families.size();
-
-  std::vector<unsigned int> familyIndices;
-  std::vector<unsigned int> treeSizes;
-  std::vector<unsigned int> ccpSizes;
-  unsigned int numTrees = 0;
-  for (auto i = ParallelContext::getBegin(N); i < ParallelContext::getEnd(N);
-       i++) {
-    // Read and seralize the ccps
-    ConditionalClades ccp(families[i].startingGeneTree,
-                          families[i].likelihoodFile, ccpRooting,
-                          sampleFrequency);
+  std::vector<unsigned int> localFamilyIndices;
+  std::vector<unsigned int> localTreeSizes;
+  std::vector<unsigned int> localCcpSizes;
+  for (auto i = ParallelContext::getBegin(N); i < ParallelContext::getEnd(N); i++) {
+    // read and seralize the ccps
+    ConditionalClades ccp(families[i].startingGeneTree, families[i].likelihoodFile,
+        args.ccpRooting, args.sampleFrequency);
     if (!ccp.isValid()) {
-      Logger::error << "Invalid CCP for family " << families[i].name
-                    << std::endl;
-      Logger::error << "Aborting" << std::endl;
+      Logger::error << "Error: invalid CCP for family " << families[i].name << std::endl;
       ParallelContext::abort(1);
     }
     ccp.serialize(families[i].ccp);
-    // record the dimensions for subsequent sorting
-    familyIndices.push_back(i);
-    treeSizes.push_back(ccp.getLeafNumber());
-    ccpSizes.push_back(ccp.getCladesNumber());
-    numTrees += ccp.getInputTreesNumber();
+    // record the dimensions for the subsequent sorting
+    localFamilyIndices.push_back(i);
+    localTreeSizes.push_back(ccp.getLeafNumber());
+    localCcpSizes.push_back(ccp.getCladesNumber());
   }
   ParallelContext::barrier();
-  // Gather the family ccp dimensions from all MPI ranks
-  ParallelContext::concatenateHetherogeneousUIntVectors(familyIndices,
-                                                        familyIndices);
-  ParallelContext::concatenateHetherogeneousUIntVectors(treeSizes, treeSizes);
-  ParallelContext::concatenateHetherogeneousUIntVectors(ccpSizes, ccpSizes);
-  ParallelContext::sumUInt(numTrees);
-  // Output the families and there cpp sizes, from the largest to the smallest
-  ParallelOfstream os(ccpDimensionFile);
+  // gather the family ccp dimensions from all MPI ranks
+  std::vector<unsigned int> familyIndices;
+  std::vector<unsigned int> treeSizes;
+  std::vector<unsigned int> ccpSizes;
+  ParallelContext::concatenateHetherogeneousUIntVectors(localFamilyIndices, familyIndices);
+  ParallelContext::concatenateHetherogeneousUIntVectors(localTreeSizes, treeSizes);
+  ParallelContext::concatenateHetherogeneousUIntVectors(localCcpSizes, ccpSizes);
   assert(familyIndices.size() == families.size());
+  // output the families and their cpp sizes, from the largest to the smallest
   auto sortedIndices = getSortedIndices(ccpSizes);
+  ParallelOfstream os(ccpDimensionFile, true);
+  os << "fam, leaves, ccps" << std::endl;
   for (unsigned int i = 0; i < familyIndices.size(); ++i) {
     auto j = sortedIndices[i];
-    os << families[familyIndices[j]].name << ",";
-    os << treeSizes[j] << "," << ccpSizes[j] << std::endl;
+    os << families[familyIndices[j]].name << ", "
+       << treeSizes[j] << ", " << ccpSizes[j] << std::endl;
   }
-
+  os.close();
   ParallelContext::barrier();
-  return numTrees;
 }
 
 /**
  *  Remove the serialized CCP files to free some disk space
  */
-void cleanupCCPs(Families &families) {
+void cleanupCCPs(const Families &families)
+{
   ParallelContext::barrier();
   Logger::timed << "Cleaning up ccp files..." << std::endl;
-  for (const auto &family : families) {
+  for (const auto &family: families) {
     std::remove(family.ccp.c_str());
   }
+  ParallelContext::barrier();
+}
+
+/**
+ *  Exclude families that:
+ *  - cover too few species
+ *  - are too large (optional)
+ *  - have too much uncertainty (optional)
+ */
+void trimFamilies(const AleArguments &args, Families &families)
+{
+  Logger::timed << "Families: " << families.size() << std::endl;
+  int minSpecies = args.minCoveredSpecies;
+  double trimRatio = args.trimFamilyRatio;
+  double maxCladeSplitRatio = args.maxCladeSplitRatio;
+  if (minSpecies != -1) {
+    Logger::timed << "Trimming families covering less than "<< minSpecies
+                  << " species..." << std::endl;
+    TrimFamilies::trimMinSpeciesCoverage(families, minSpecies);
+    Logger::timed << "Remaining families: " << families.size() << std::endl;
+  }
+  if (trimRatio > 0.0) {
+    Logger::timed << "Trimming (at least) " << trimRatio * 100.0 << "\% top families "
+                  << "sorted by the number of observed clades..." << std::endl;
+    TrimFamilies::trimHighCladesNumber(families, (1.0 - trimRatio));
+    Logger::timed << "Remaining families: " << families.size() << std::endl;
+  }
+  if (maxCladeSplitRatio > 1.0) {
+    Logger::timed << "Trimming families with a ratio (observed clades)/(gene nodes) > "
+                  << maxCladeSplitRatio << "..." << std::endl;
+    TrimFamilies::trimCladeSplitRatio(families, maxCladeSplitRatio);
+    Logger::timed << "Remaining families: " << families.size() << std::endl;
+  }
+  checkEnoughFamilies(families);
+  ParallelContext::barrier();
+}
+
+/**
+ *  Compute an initial species tree from
+ *  the given gene families and save it to a file
+ */
+void computeInitialSpeciesTree(const Families &families,
+    const SpeciesTreeAlgorithm &algo,
+    const std::string &outputFile)
+{
+  switch (algo) {
+  case SpeciesTreeAlgorithm::MiniNJ:
+    MiniNJ::runMiniNJ(families)->save(outputFile);
+    break;
+  case SpeciesTreeAlgorithm::Random:
+    std::make_unique<SpeciesTree>(families)->getTree().save(outputFile);
+    break;
+  case SpeciesTreeAlgorithm::User:
+    assert(false);
+    break;
+  default:
+    Logger::info << "\nError: The specified species tree building algorithm "
+                 << "is not implemented in AleRax\n" << std::endl;
+    ParallelContext::abort(0);
+  }
+}
+
+/**
+ *  Generate or read the starting species tree and
+ *  use it to initialize the current species tree
+ *
+ *  The tree can be either:
+ *  - random
+ *  - user-defined
+ *  - computed with MiniNJ
+ *
+ *  @param args The program arguments
+ *  @param families The gene family descriptions
+ */
+void initStartingSpeciesTree(AleArguments &args,
+    const Families &families)
+{
+  Logger::timed << "Initializing starting species tree..." << std::endl;
+  // set the starting tree path
+  auto startingSpeciesTree = Paths::getSpeciesTreeFile(args.output,
+      "starting_species_tree.newick");
+  if (args.speciesTreeAlgorithm == SpeciesTreeAlgorithm::User) {
+    // ensure the initial tree file is readable
+    if (ParallelContext::getRank() == 0) {
+      try {
+        SpeciesTree reader(args.speciesTree);
+      } catch (const std::exception &e) {
+        Logger::error << "Error while trying to parse the species tree:" << std::endl;
+        Logger::info << e.what() << std::endl;
+        ParallelContext::abort(153);
+      }
+    }
+    ParallelContext::barrier();
+    // read the initial tree, provide it with internal node labels
+    // and save it as the starting tree
+    PLLRootedTree::labelRootedTree(args.speciesTree, startingSpeciesTree);
+  } else {
+    // compute the initial tree and save it as the starting tree
+    computeInitialSpeciesTree(families,
+        args.speciesTreeAlgorithm,
+        startingSpeciesTree);
+  }
+  ParallelContext::barrier();
+  // set the current tree path for the further steps
+  args.speciesTree = Paths::getSpeciesTreeFile(args.output,
+      "inferred_species_tree.newick");
+  if (ParallelContext::getRank() == 0) {
+    // read the starting tree and save it as the current tree
+    SpeciesTree currentTree(startingSpeciesTree);
+    if (args.transferConstraint != TransferConstaint::RELDATED) {
+      // the branch lengths of the starting tree are meaningless
+      // unless it is dated, so we set all branch lengths to 1.0
+      currentTree.getTree().equalizeBranchLengths();
+    }
+    currentTree.getTree().save(args.speciesTree);
+  }
+  ParallelContext::barrier();
+}
+
+/**
+ *  Initialize the current species tree from the checkpoint
+ */
+void initSpeciesTreeFromCheckpoint(AleArguments &args,
+    const std::string &ckpDir)
+{
+  Logger::timed << "Initializing species tree from the checkpoint..." << std::endl;
+  // set the current tree path for the further steps
+  args.speciesTree = Paths::getSpeciesTreeFile(args.output,
+      "inferred_species_tree.newick");
+  // read the checkpointed tree and save it as the current tree
+  auto newick = AleState::readCheckpointSpeciesTree(ckpDir);
+  ParallelOfstream os(args.speciesTree, true);
+  os << newick << std::endl;
+  os.close();
   ParallelContext::barrier();
 }
 
@@ -150,25 +320,26 @@ void cleanupCCPs(Families &families) {
  *  Check that a family conditional clade probability object
  *  is valid: check that the mapping gene <-> species is bijective
  */
-bool checkCCP(FamilyInfo &family, ConditionalClades &ccp,
-              std::unordered_set<std::string> &allSpecies) {
+bool checkCCP(const FamilyInfo &family,
+    const ConditionalClades &ccp,
+    const std::unordered_set<std::string> &allSpecies)
+{
   GeneSpeciesMapping mapping;
   mapping.fill(family.mappingFile, family.startingGeneTree);
   auto m = mapping.getMap();
-  for (auto pair : ccp.getCidToLeaves()) {
+  for (const auto &pair: ccp.getCidToLeaves()) {
     auto gene = pair.second;
     auto it = m.find(gene);
     if (it == m.end()) {
-      Logger::error << "Gene " << gene << " not mapped to any species "
-                    << "in family " << family.name << std::endl;
+      Logger::error << "Error: gene " << gene << " from family " << family.name
+                    << " is not mapped to any species" << std::endl;
       return false;
     }
     auto species = it->second;
     if (allSpecies.find(species) == allSpecies.end()) {
-      Logger::error << "Gene " << gene << " from family " << family.name
+      Logger::error << "Error: gene " << gene << " from family " << family.name
                     << " is mapped to species " << species
-                    << " but this species is not in the species tree"
-                    << std::endl;
+                    << ", but this species is not in the species tree" << std::endl;
       return false;
     }
   }
@@ -178,185 +349,50 @@ bool checkCCP(FamilyInfo &family, ConditionalClades &ccp,
 /**
  *  Run checkCCP on all gene families
  */
-void checkCCPAndSpeciesTree(Families &families,
-                            const std::string &speciesTreePath) {
-  Logger::timed << "Checking that ccp and mappings are valid..." << std::endl;
+void checkCCPAndSpeciesTree(const Families &families,
+    const std::string &speciesTreePath)
+{
+  Logger::timed << "Checking that ccps and mappings are valid..." << std::endl;
   PLLRootedTree speciesTree(speciesTreePath);
   auto labels = speciesTree.getLabels(true);
   auto N = families.size();
   bool ok = true;
-  for (auto i = ParallelContext::getBegin(N); i < ParallelContext::getEnd(N);
-       i++) {
+  for (auto i = ParallelContext::getBegin(N); i < ParallelContext::getEnd(N); i++) {
     ConditionalClades ccp;
     ccp.unserialize(families[i].ccp);
     ok &= checkCCP(families[i], ccp, labels);
   }
   ParallelContext::barrier();
+  ParallelContext::parallelAnd(ok);
   if (!ok) {
-    ParallelContext::abort(4);
-  }
-}
-
-/**
- *  Exclude families that are too large or with too much uncertainty
- *
- *  @param families The set of families to trim
- *  @param minSpecies Species that cover less than minSpecies species will be
- * trimmed
- *  @param trimRatio Proportion of families to trim, starting from the largest
- * ones
- *  @param maxCladeSplitRatio Trim families with (ccp size) / (gene tree size) <
- * maxCladeSplitRatio
- */
-void trimFamilies(Families &families, int minSpecies, double trimRatio,
-                  double maxCladeSplitRatio) {
-  Logger::timed << "Families: " << families.size() << std::endl;
-  if (minSpecies != -1) {
-    Logger::timed << "Triming families covering less than " << minSpecies
-                  << " species " << std::endl;
-    TrimFamilies::trimMinSpeciesCoverage(families, minSpecies);
-    Logger::timed << "Remaining families: " << families.size() << std::endl;
-  }
-  if (trimRatio > 0.0) {
-    Logger::timed << "Trimming families with too many clades (keeping "
-                  << (1.0 - trimRatio) * 100.0 << "\% of the families) "
-                  << std::endl;
-    TrimFamilies::trimHighCladesNumber(families, (1.0 - trimRatio));
-    Logger::timed << "Remaining families: " << families.size() << std::endl;
-  }
-  if (maxCladeSplitRatio > 0) {
-    Logger::timed << "Triming families with a ratio clades/nodes > "
-                  << maxCladeSplitRatio << std::endl;
-    TrimFamilies::trimCladeSplitRatio(families, maxCladeSplitRatio);
-    Logger::timed << "Remaining families: " << families.size() << std::endl;
-  }
-}
-
-/**
- *  @brief Generate or read the initial species tree
- *
- *  Can be either:
- *  - random
- *  - use-defined
- *  - computed with MiniNJ
- *
- *  @brief args The program arguments
- *  @brief families The gene family descriptions
- */
-void initStartingSpeciesTree(AleArguments &args, Families &families) {
-  Logger::timed << "Initializing starting species tree..." << std::endl;
-  auto startingSpeciesTree =
-      Paths::getSpeciesTreeFile(args.output, "starting_species_tree.newick");
-  std::unique_ptr<PLLRootedTree> speciesTree(nullptr);
-  if (args.speciesTreeAlgorithm == SpeciesTreeAlgorithm::User) {
-    unsigned int canRead = 1;
-    if (ParallelContext::getRank() == 0) {
-      try {
-        SpeciesTree reader(args.speciesTree);
-      } catch (const std::exception &e) {
-        Logger::info << "Error while trying to parse the species tree:"
-                     << std::endl;
-        Logger::info << e.what() << std::endl;
-        canRead = 0;
-      }
-    }
-    ParallelContext::broadcastUInt(0, canRead);
-    if (!canRead) {
-      ParallelContext::abort(153);
-    }
-    // add labels to internal nodes
-    PLLRootedTree::labelRootedTree(args.speciesTree, startingSpeciesTree);
-  } else {
-    Routines::computeInitialSpeciesTree(families, args.output,
-                                        args.speciesTreeAlgorithm)
-        ->save(startingSpeciesTree);
-  }
-  ParallelContext::barrier();
-  args.speciesTree =
-      Paths::getSpeciesTreeFile(args.output, "inferred_species_tree.newick");
-  if (ParallelContext::getRank() == 0) {
-    SpeciesTree copy(startingSpeciesTree);
-    copy.getTree().save(args.speciesTree);
-  }
-  ParallelContext::barrier();
-  Logger::timed << "Finished starting species tree initialization" << std::endl;
-}
-
-/**
- *  If --per-species-rate is set, we generate the file that lists
- *  the species categories (here, each species has its own category)
- *  that share the same DTL parameters
- */
-void generatePerSpeciesRateFile(const std::string &perSpeciesRatesFile,
-                                const std::string &speciesTreePath,
-                                const RecModelInfo &info) {
-  PLLRootedTree speciesTree(speciesTreePath);
-  ParallelOfstream os(perSpeciesRatesFile);
-  for (auto label : speciesTree.getLabels(false)) {
-    os << label << " ";
-    for (auto p : info.getParamTypes()) {
-      os << p;
-    }
-    os << "\n";
-  }
-  os.close();
-  ParallelContext::barrier();
-}
-
-/**
- *  Create AleRax top directories and set ccpDir
- */
-void initAleRaxDirectories(const AleArguments &args, const std::string ccpDir) {
-  FileSystem::mkdir(args.output, true);
-  FileSystem::mkdir(args.output + "/species_trees", true);
-  FileSystem::mkdir(ccpDir, true);
-  Logger::initFileOutput(FileSystem::joinPaths(args.output, "alerax"));
-}
-
-/**
- *  Print AleRax version, the command line, and a summary of
- *  the parameters
- */
-void printInitialMessage(const AleArguments &args) {
-  Logger::timed << version << std::endl;
-  args.printCommand();
-  args.printSummary();
-}
-
-/**
- *  Compute all information about the different gene families
- *  Filter the families according to the different filtering
- *  and trimming options
- */
-void filterFamilies(const AleArguments &args, Families &families) {
-  if (!args.skipFamilyFiltering) {
-    filterInvalidFamilies(families);
-  }
-  trimFamilies(families, args.minCoveredSpecies, args.trimFamilyRatio,
-               args.maxCladeSplitRatio);
-  if (families.size() == 0) {
-    Logger::info << "No valid family, aborting" << std::endl;
+    Logger::info << "\nProblems with CCPs, aborting." << std::endl;
+    Logger::info << "Please check the files mentioned above\n" << std::endl;
     ParallelContext::abort(0);
   }
 }
 
-RecModelInfo buildRecModelInfo(const AleArguments &args) {
-  return RecModelInfo(
-      ArgumentsHelper::strToRecModel(args.reconciliationModelStr), args.recOpt,
-      (args.modelParametrization ==
-       ModelParametrization::PER_FAMILY), // per family rates
-      args.gammaCategories, args.originationStrategy, args.pruneSpeciesTree,
-      false, // rooted gene tree
-      false, // force gene tree root
-      false, // mad rooting
-      -1.0,  // branch length threshold
+RecModelInfo buildRecModelInfo(const AleArguments &args)
+{
+  return RecModelInfo(ArgumentsHelper::strToRecModel(args.reconciliationModelStr),
+      args.recOpt,
+      (args.modelParametrization == ModelParametrization::PER_FAMILY), // per family rates
+      args.gammaCategories,
+      args.originationStrategy,
+      args.pruneSpeciesTree,
+      false, // rooted gene tree (option specific to GeneRax)
+      false, // force gene tree root (option specific to GeneRax)
+      false, // mad rooting (option specific to GeneRax)
+      -1.0, // branch length threshold
       args.transferConstraint,
-      false, // no dup
-      args.noTL, args.fractionMissingFile, args.memorySavings);
+      false, // no dup (option specific to GeneRax)
+      args.noTL,
+      args.fractionMissingFile,
+      args.memorySavings);
 }
 
 Parameters buildStartingRates(const AleArguments &args,
-                              const RecModelInfo &info) {
+    const RecModelInfo &info)
+{
   Parameters res(info.modelFreeParameters());
   double average = 0.0;
   switch (info.model) {
@@ -375,8 +411,8 @@ Parameters buildStartingRates(const AleArguments &args,
     assert(false);
   }
   if (args.originationStrategy == OriginationStrategy::OPTIMIZE) {
-    // The initial value of the origination probabilities doesn't matter
-    // because they will be normalized in the likelihood computatation.
+    // The initial value of the origination probabilities doesn't matter,
+    // because they will be normalized during the likelihood computation.
     // We set it to the average of the other parameters such that all parameters
     // are in the same range (to facilitate gradient optimization)
     res[res.dimensions() - 1] = average;
@@ -384,9 +420,23 @@ Parameters buildStartingRates(const AleArguments &args,
   return res;
 }
 
+void initCheckpoint(const AleArguments &args,
+    const Families &families,
+    const std::string &ckpDir)
+{
+  FileSystem::mkdir(ckpDir, true);
+  ParallelContext::barrier();
+  AleState::writeCheckpointCmd(args.getCommand(), ckpDir);
+  AleState::writeCheckpointFamilies(families, ckpDir);
+}
+
 void runSpeciesTreeSearch(const AleArguments &args,
-                          AleOptimizer &speciesTreeOptimizer) {
+    AleOptimizer &speciesTreeOptimizer)
+{
+  Logger::info << std::endl;
+  Logger::timed << "Start the species tree optimization..." << std::endl;
   if (args.randomSpeciesRoot) {
+    Logger::info << std::endl;
     Logger::timed << "Random root position!" << std::endl;
     speciesTreeOptimizer.randomizeRoot();
   }
@@ -396,193 +446,190 @@ void runSpeciesTreeSearch(const AleArguments &args,
     speciesTreeOptimizer.optimize();
     break;
   case SpeciesSearchStrategy::REROOT:
-    speciesTreeOptimizer.optimizeModelRates(true);
-    Logger::timed << "First root search, non thorough" << std::endl;
-    speciesTreeOptimizer.rootSearch(5, false);
-    Logger::timed << "Second root search, thorough" << std::endl;
-    speciesTreeOptimizer.rootSearch(2, true);
+    speciesTreeOptimizer.reroot();
     break;
   case SpeciesSearchStrategy::SKIP:
+    Logger::info << std::endl;
+    Logger::timed << "Optimization skipped!" << std::endl;
     break;
   default:
     assert(false); // not implemented yet
     break;
   }
+  Logger::info << std::endl;
+  Logger::timed << "End of the species tree optimization" << std::endl;
+  speciesTreeOptimizer.saveSpeciesTree();
+  Logger::timed << "Final species tree topology: " << args.speciesTree << std::endl;
+}
+
+void runFirstFinalRateOptimization(AleOptimizer &speciesTreeOptimizer)
+{
+  Logger::info << std::endl;
+  Logger::timed << "Final model rate optimization, non-thorough..." << std::endl;
+  speciesTreeOptimizer.optimizeModelRates(false);
 }
 
 void runDateOptimization(const AleArguments &args,
-                         AleOptimizer &speciesTreeOptimizer) {
+    AleOptimizer &speciesTreeOptimizer)
+{
   if (!args.inferSpeciationOrders) {
     return;
   }
+  Logger::info << std::endl;
+  Logger::timed << "Speciation order inference..." << std::endl;
   speciesTreeOptimizer.optimizeDates(true);
-  speciesTreeOptimizer.getEvaluator().computeLikelihood();
 }
 
 void runTransferHighwayInference(const AleArguments &args,
-                                 AleOptimizer &speciesTreeOptimizer,
-                                 size_t sample_size) {
+    AleOptimizer &speciesTreeOptimizer)
+{
   if (!args.highways) {
     return;
   }
-  Logger::info << "Highway BIC sample size = " << sample_size << std::endl;
-  auto highwaysOutputDir = FileSystem::joinPaths(args.output, "highways");
-  FileSystem::mkdir(highwaysOutputDir, true);
-  // let's infer highways of transfers!
-  auto highwayOutput =
-      FileSystem::joinPaths(highwaysOutputDir, "highway_best_candidates.txt");
-  std::vector<ScoredHighway> candidateHighways;
-  // initial candidates
-  if (args.highwayCandidateFile.size()) {
-    // the user sets the candidates
-    auto highways = HighwayCandidateParser::parse(
-        args.highwayCandidateFile,
-        speciesTreeOptimizer.getSpeciesTree().getTree());
+  Logger::info << std::endl;
+  Logger::timed << "Transfer highway inference..." << std::endl;
+  speciesTreeOptimizer.inferHighways(args.highwayCandidateFile,
+      args.highwayCandidatesStep1,
+      args.highwayCandidatesStep2);
+}
 
-    candidateHighways =
-        Highways::getSortedCandidatesFromList(speciesTreeOptimizer, highways);
-  } else {
-    // automatically search for candidates
-    Highways::getCandidateHighways(speciesTreeOptimizer, candidateHighways,
-                                   args.highwayCandidatesStep1);
+void runSecondFinalRateOptimization(const AleArguments &args,
+    AleOptimizer &speciesTreeOptimizer)
+{
+  if (!args.skipThoroughRates) {
+    Logger::info << std::endl;
+    Logger::timed << "Final model rate optimization, thorough..." << std::endl;
+    speciesTreeOptimizer.optimizeModelRates(true);
   }
-  // first filtering step: we add each highway candidate individually, set a
-  // small highway probability, and keep the highway if the likelihood improves.
-  // We also sort the highways per likelihood
-  std::vector<ScoredHighway> filteredHighways;
-  Highways::filterCandidateHighwaysFast(speciesTreeOptimizer, candidateHighways,
-                                        filteredHighways, sample_size);
-  filteredHighways.resize(
-      std::min(filteredHighways.size(), size_t(args.highwayCandidatesStep2)));
-  // now optimize all highways together
-  auto acceptedHighwayOutput =
-      FileSystem::joinPaths(highwaysOutputDir, "highway_accepted_highways.txt");
-  std::vector<ScoredHighway> acceptedHighways;
-  Highways::optimizeAllHighways(speciesTreeOptimizer, filteredHighways,
-                                acceptedHighways, true);
-  speciesTreeOptimizer.saveBestHighways(acceptedHighways,
-                                        acceptedHighwayOutput);
+  speciesTreeOptimizer.saveRatesAndLL();
+  auto finalLL = speciesTreeOptimizer.getEvaluator().computeLikelihood();
+  Logger::timed << "Final species tree likelihood: ll=" << finalLL << std::endl;
 }
 
-void initStartingSpeciesTreeFromCheckpoint(AleArguments &args) {
-  auto checkpointPath = AleOptimizer::getCheckpointDir(args.output);
-  auto newick = AleState::readSpeciesTreeNewick(checkpointPath);
-  args.speciesTree =
-      Paths::getSpeciesTreeFile(args.output, "inferred_species_tree.newick");
-  ParallelOfstream os(args.speciesTree);
-  os << newick;
-  os.close();
-  ParallelContext::barrier();
+void runReconciliationInference(const AleArguments &args,
+    AleOptimizer &speciesTreeOptimizer)
+{
+  if (!args.geneTreeSamples) {
+    return;
+  }
+  Logger::info << std::endl;
+  Logger::timed << "Reconciling gene trees with the species tree..." << std::endl;
+  speciesTreeOptimizer.reconcile(args.geneTreeSamples);
 }
+
+
 
 /**
  * Main function of AleRax once the arguments have been parsed
  *
  * @param args The program arguments
  */
-void run(AleArguments &args) {
+void run(AleArguments &args)
+{
   Random::setSeed(static_cast<unsigned int>(args.seed));
+  // initializing the output dir, ccp files, species tree, model info, etc.
   bool checkpointDetected = AleOptimizer::checkpointExists(args.output);
+  auto ckpDir = AleOptimizer::getCheckpointDir(args.output);
   if (checkpointDetected) {
     Logger::info << "Checkpoint detected" << std::endl;
+    AleState::checkCheckpointCmd(args.getCommand(), ckpDir);
   }
-
   auto ccpDir = FileSystem::joinPaths(args.output, "ccps");
   if (!checkpointDetected) {
     initAleRaxDirectories(args, ccpDir);
   }
   printInitialMessage(args);
+  auto ccpDimensionFile = FileSystem::joinPaths(ccpDir, "ccpdim.txt");
   auto families = FamiliesFileParser::parseFamiliesFile(args.families);
-  auto ccpDimensionFile = FileSystem::joinPaths(args.output, "ccpdim.txt");
-  for (auto &family : families) {
+  for (auto &family: families) {
     family.ccp = FileSystem::joinPaths(ccpDir, family.name + ".ccp");
   }
-  unsigned int sample_size = 1000 * families.size();
-  sample_size = generateCCPs(families, args.ccpRooting, args.sampleFrequency,
-                             ccpDimensionFile);
-  filterFamilies(args, families);
   if (!checkpointDetected) {
+    filterInvalidFamilies(args, families);
+    generateCCPs(args, families, ccpDimensionFile);
+    trimFamilies(args, families);
     initStartingSpeciesTree(args, families);
-    checkCCPAndSpeciesTree(families, args.speciesTree);
   } else {
-    initStartingSpeciesTreeFromCheckpoint(args);
+    AleState::filterCheckpointFamilies(families, ckpDir);
+    initSpeciesTreeFromCheckpoint(args, ckpDir);
   }
+  checkCCPAndSpeciesTree(families, args.speciesTree);
+  auto coverageFile = FileSystem::joinPaths(args.output, "perSpeciesCoverage.txt");
+  auto fractionMissingFile = FileSystem::joinPaths(args.output, "perSpeciesMissing.txt");
+  Family::printStats(families, args.speciesTree, coverageFile, fractionMissingFile);
+  // initializing the optimizer
   auto info = buildRecModelInfo(args);
   auto startingRates = buildStartingRates(args, info);
-  /*
-  if (args.perSpeciesRates) {
-    generatePerSpeciesRateFile(args.optimizationClassFile, args.speciesTree,
-  info);
-  }
-  */
-  std::string coverageFile(
-      FileSystem::joinPaths(args.output, "fractionMissing.txt"));
-  std::string fractionMissingFile(
-      FileSystem::joinPaths(args.output, "perSpeciesCoverage.txt"));
-  Family::printStats(families, args.speciesTree, coverageFile,
-                     fractionMissingFile);
-  AleOptimizer speciesTreeOptimizer(args.speciesTree, families, info,
-                                    args.modelParametrization, startingRates,
-                                    !args.fixRates, args.verboseOptRates,
-                                    args.optimizationClassFile, args.output);
-
+  AleOptimizer speciesTreeOptimizer(
+      args.speciesTree,
+      families,
+      info,
+      args.modelParametrization,
+      args.optimizationClassFile,
+      startingRates,
+      !args.fixRates,
+      args.optVerbose,
+      args.output);
   if (!checkpointDetected) {
+    initCheckpoint(args, families, ckpDir);
     speciesTreeOptimizer.setCurrentStep(AleStep::SpeciesTreeOpt);
     speciesTreeOptimizer.saveCheckpoint();
   }
-
+  // species tree search
   if (speciesTreeOptimizer.getCurrentStep() <= AleStep::SpeciesTreeOpt) {
     runSpeciesTreeSearch(args, speciesTreeOptimizer);
-    speciesTreeOptimizer.setCurrentStep(AleStep::ModelRateOpt);
+    speciesTreeOptimizer.setCurrentStep(AleStep::ModelRateOpt1);
     speciesTreeOptimizer.saveCheckpoint();
   }
-
-  if (speciesTreeOptimizer.getCurrentStep() <= AleStep::ModelRateOpt) {
-    speciesTreeOptimizer.optimizeModelRates(false);
+  // model parameter optimization on the final species tree topology
+  if (speciesTreeOptimizer.getCurrentStep() <= AleStep::ModelRateOpt1) {
+    runFirstFinalRateOptimization(speciesTreeOptimizer);
     speciesTreeOptimizer.setCurrentStep(AleStep::RelDating);
     speciesTreeOptimizer.saveCheckpoint();
   }
+  // relative species dating on the final species tree topology
   if (speciesTreeOptimizer.getCurrentStep() <= AleStep::RelDating) {
     runDateOptimization(args, speciesTreeOptimizer);
     speciesTreeOptimizer.setCurrentStep(AleStep::Highways);
     speciesTreeOptimizer.saveCheckpoint();
   }
+  // highway search on the final species tree topology
   if (speciesTreeOptimizer.getCurrentStep() <= AleStep::Highways) {
-    runTransferHighwayInference(args, speciesTreeOptimizer, sample_size);
+    runTransferHighwayInference(args, speciesTreeOptimizer);
     speciesTreeOptimizer.setCurrentStep(AleStep::ModelRateOpt2);
     speciesTreeOptimizer.saveCheckpoint();
   }
-
+  // final model parameter optimization
   if (speciesTreeOptimizer.getCurrentStep() <= AleStep::ModelRateOpt2) {
-    if (!args.skipThoroughRates) {
-      speciesTreeOptimizer.optimizeModelRates(true);
-    }
+    runSecondFinalRateOptimization(args, speciesTreeOptimizer);
     speciesTreeOptimizer.setCurrentStep(AleStep::Reconciliation);
     speciesTreeOptimizer.saveCheckpoint();
   }
-
-  Logger::timed << "Sampling reconciled gene trees... (" << args.geneTreeSamples
-                << " samples)" << std::endl;
-  speciesTreeOptimizer.reconcile(args.geneTreeSamples);
-  speciesTreeOptimizer.saveSpeciesTree();
-  speciesTreeOptimizer.saveRatesAndLL();
-  Logger::timed << "Final log likelihood: ll="
-                << speciesTreeOptimizer.getEvaluator().computeLikelihood()
-                << std::endl;
+  // sampling reconciled gene trees
+  if (speciesTreeOptimizer.getCurrentStep() <= AleStep::Reconciliation) {
+    runReconciliationInference(args, speciesTreeOptimizer);
+    speciesTreeOptimizer.setCurrentStep(AleStep::End);
+    speciesTreeOptimizer.saveCheckpoint();
+  }
+  // end of the run
+  Logger::info << std::endl;
   if (args.cleanupCCP) {
     cleanupCCPs(families);
   }
-  Logger::timed << "End of the execution" << std::endl;
+  args.printWarning();
+  Logger::timed << "End of AleRax execution" << std::endl;
 }
 
 /**
- *  This main will be called by the master process and is the entry
+ *  This main will be called by each process and is the entry
  *  point to AleRax. It inits the parallel context, the logger,
  *  reads the arguments, runs AleRax and closes everything.
+ *
  *  If comm is set to nullptr, MPI_Init will be called to initiate the
  *  MPI context
  */
-int alerax_main(int argc, char **argv, void *comm) {
+int alerax_main(int argc, char** argv, void* comm)
+{
   ParallelContext::init(comm);
   Logger::init();
   Logger::timed << version << std::endl;
@@ -594,27 +641,16 @@ int alerax_main(int argc, char **argv, void *comm) {
   return 0;
 }
 
-/**
- *  AleRax "internal" main (can be called  by a scheduler with
- *  an already existing MPI communicator, for instance to spawn
- *  a slave process
- */
-int internal_main(int argc, char **argv, void *comm) {
-  if (SlavesMain::isSlave(argc, argv)) {
-    int slaveComm = -1;
-    return static_scheduled_main(argc, argv, &slaveComm);
-  } else {
-    return alerax_main(argc, argv, comm);
-  }
-}
-
-int main(int argc, char **argv) {
+int main(int argc, char** argv)
+{
 #ifdef WITH_MPI
   // the null communicator signals that we need to call MPI_Init
-  return internal_main(argc, argv, nullptr);
+  return alerax_main(argc, argv, nullptr);
 #else
   // this fake communicator signals that we're not using MPI
   int noMPIComm = -1;
-  return internal_main(argc, argv, &noMPIComm);
+  return alerax_main(argc, argv, &noMPIComm);
 #endif
 }
+
+
