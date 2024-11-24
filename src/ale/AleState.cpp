@@ -102,7 +102,7 @@ void AleState::serialize(const std::string &checkpointDir) const
   // current step
   os << static_cast<unsigned int>(currentStep) << std::endl;
   // dated species tree
-  os << speciesTree->getTree().getNewickString() << std::endl;
+  os << speciesTree->toString() << std::endl;
   // mixture alpha
   os << mixtureAlpha << std::endl;
   // transfer highways
@@ -113,16 +113,23 @@ void AleState::serialize(const std::string &checkpointDir) const
   }
   os.close();
   ParallelContext::barrier();
+  // get the new indexing scheme of the unserialized species tree
+  PLLRootedTree referenceTree(speciesTree->toString(), false);
+  auto spidNewToOld = referenceTree.getNodeIndexMapping(speciesTree->getTree());
+  // param vectors
   assert(perLocalFamilyModelParams.size() == localFamilyNames.size());
   for (unsigned int f = 0; f < localFamilyNames.size(); ++f) {
-    // param vectors
     const auto &family = localFamilyNames[f];
     const auto &mp = perLocalFamilyModelParams[f];
+    auto paramTypeNumber =  mp.getParamTypeNumber();
+    auto speciesBranchNumber = mp.getSpeciesBranchNumber();
     auto paramPath = FileSystem::joinPaths(checkpointDir, family + ".txt");
     std::ofstream os(paramPath);
-    os << mp.getParamTypeNumber() << " " << mp.getSpeciesBranchNumber() << std::endl;
-    for (unsigned int i = 0; i < mp.getParameters().dimensions(); ++i) {
-      os << mp.getParameters()[i] << " ";
+    os << paramTypeNumber << " " << speciesBranchNumber << std::endl;
+    for (unsigned int e = 0; e < speciesBranchNumber; ++e) {
+      for (unsigned int r = 0; r < paramTypeNumber; ++r) {
+        os << mp.getParameter(spidNewToOld[e], r) << " ";
+      }
     }
     os << std::endl;
     os.close();
