@@ -14,7 +14,7 @@
 #include "AleOptimizer.hpp"
 #include "TrimFamilies.hpp"
 
-const char *version = "AleRax v1.2.1";
+const char *version = "AleRax v1.3.0";
 
 
 /**
@@ -652,5 +652,3 @@ int main(int argc, char** argv)
   return alerax_main(argc, argv, &noMPIComm);
 #endif
 }
-
-
