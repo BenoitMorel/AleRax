@@ -2,65 +2,103 @@
 
 #include <string>
 #include <vector>
+#include <IO/Families.hpp>
+#include <IO/HighwayCandidateParser.hpp>
+#include <trees/SpeciesTree.hpp>
 
 #include "AleModelParameters.hpp"
-#include <trees/SpeciesTree.hpp>
+
 
 /**
  *  Represents the current step in the AleRax pipeline,
- *  to restart from the right place after a checkpoint
+ *  to restart from the right place after a checkpoint.
  *  The values should be ordered and contiguous
  */
 enum class AleStep {
   Init = 0,
   SpeciesTreeOpt = 1,
-  ModelRateOpt = 2,
+  ModelRateOpt1 = 2,
   RelDating = 3,
   Highways = 4,
   ModelRateOpt2 = 5,
-  Reconciliation = 6
+  Reconciliation = 6,
+  End = 7
 };
 
+
 /**
- *  Store all information about the current state of an AleRax run:
+ *  Stores all information about the current state of an AleRax run:
  *  - the current step in the pipeline
  *  - the current species tree
  *  - the current model parameters
+ *
+ *  Implements functions to handle checkpoints
  */
 struct AleState {
+  /**
+   *  Constructor
+   */
+  AleState(const std::string &speciesTreePath):
+    currentStep(AleStep::Init),
+    speciesTree(std::make_unique<SpeciesTree>(speciesTreePath)),
+    mixtureAlpha(1.0)
+  {}
 
   /**
-   *  Constructor to build the AleState when not restarting
-   *  from a checkpoint
+   *  Dump the current run arguments to the checkpoint directory
    */
-  AleState(const std::string &speciesTreePath)
-      : currentStep(AleStep::Init),
-        speciesTree(std::make_unique<SpeciesTree>(speciesTreePath)) {}
+  static void writeCheckpointCmd(const std::string &currentCmd,
+      const std::string &checkpointDir);
 
   /**
-   *  Dump the current state to an output directory (checkpoint)
+   *  Make sure the checkpoint used the same arguments as
+   *  the current run
    */
-  void serialize(const std::string &outputDir) const;
+  static void checkCheckpointCmd(const std::string &currentCmd,
+      const std::string &checkpointDir);
 
   /**
-   *  Load the current state from an input directory (checkpoint
+   *  Dump the list of the accepted family names to the checkpoint
+   *  directory
    */
-  void unserialize(const std::string &inputDir,
-                   const std::vector<std::string> &perCoreFamilyNames);
+  static void writeCheckpointFamilies(const Families &families,
+      const std::string &checkpointDir);
+
+  /**
+   *  Retain only the families listed in the checkpoint
+   */
+  static void filterCheckpointFamilies(Families &families,
+      const std::string &checkpointDir);
+
+  /**
+   *  Dump the current state to the checkpoint directory
+   */
+  void serialize(const std::string &checkpointDir) const;
+
+  /**
+   *  Load the current state from the checkpoint directory
+   */
+  void unserialize(const std::string &checkpointDir,
+      const std::vector<std::string> &perCoreFamilyNames);
 
   /**
    *  Read the species tree newick from the dumped current state
    *  (from the checkpoint directory)
    */
-  static std::string readSpeciesTreeNewick(const std::string inputDir);
+  static std::string readCheckpointSpeciesTree(const std::string &checkpointDir);
 
-  // running step
+  // the running step
   AleStep currentStep;
-  // current species tree
+  // the current species tree
   std::unique_ptr<SpeciesTree> speciesTree;
-  // the name of the families, to map the model parameters to their
+  // the names of the families, to map the model parameters to their
   // respective families
-  std::vector<std::string> familyNames;
-  // current model parameters
-  std::vector<AleModelParameters> perFamilyModelParameters;
+  std::vector<std::string> localFamilyNames;
+  // the current model parameters
+  double mixtureAlpha;
+  std::vector<AleModelParameters> perLocalFamilyModelParams;
+  std::vector<Highway> transferHighways;
+
 };
+
+
