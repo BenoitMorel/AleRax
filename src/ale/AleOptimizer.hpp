@@ -1,37 +1,32 @@
 #pragma once
 
-#include <memory>
-#include <vector>
 #include <IO/Families.hpp>
 #include <IO/FileSystem.hpp>
 #include <maths/ModelParameters.hpp>
+#include <memory>
 #include <optimizers/DTLOptimizer.hpp>
 #include <parallelization/PerCoreGeneTrees.hpp>
 #include <trees/PLLRootedTree.hpp>
 #include <trees/SpeciesTree.hpp>
+#include <vector>
 
 #include "AleEvaluator.hpp"
 #include "AleState.hpp"
 #include "Highways.hpp"
 
-
-
-class AleOptimizer: public SpeciesTree::Listener,
-  public SpeciesSearchState::Listener,
-  public DTLOptimizerListener {
+class AleOptimizer : public SpeciesTree::Listener,
+                     public SpeciesSearchState::Listener,
+                     public DTLOptimizerListener {
 public:
   /**
    *  Constructor
    */
-  AleOptimizer(const std::string &speciesTreeFile,
-      const Families &families,
-      const RecModelInfo &info,
-      const ModelParametrization &modelParametrization,
-      const std::string &optimizationClassFile,
-      const Parameters &startingRates,
-      bool optimizeRates,
-      bool optimizeVerbose,
-      const std::string &outputDir);
+  AleOptimizer(const std::string &speciesTreeFile, const Families &families,
+               const RecModelInfo &info,
+               const ModelParametrization &modelParametrization,
+               const std::string &optimizationClassFile,
+               const Parameters &startingRates, bool optimizeRates,
+               bool optimizeVerbose, const std::string &outputDir);
 
   /**
    *  Species tree search functions
@@ -56,7 +51,8 @@ public:
    *  Callback functions
    */
   // Callback called when the species tree topology changes
-  virtual void onSpeciesTreeChange(const std::unordered_set<corax_rnode_t *> *nodesToInvalidate);
+  virtual void onSpeciesTreeChange(
+      const std::unordered_set<corax_rnode_t *> *nodesToInvalidate);
   // Callback called when the species tree improves (the likelihood)
   virtual void betterTreeCallback();
   // Callback called when better model parameters have been found
@@ -83,8 +79,8 @@ public:
    *  Functions to handle transfer highways
    */
   void inferHighways(const std::string &highwayCandidateFile,
-      unsigned int highwayCandidatesStep1,
-      unsigned int highwayCandidatesStep2);
+                     unsigned int highwayCandidatesStep1,
+                     unsigned int highwayCandidatesStep2);
   std::string getHighwaysOutputDir() const {
     return FileSystem::joinPaths(_outputDir, "highways");
   }
@@ -94,41 +90,47 @@ public:
    */
   void saveCheckpoint();
   void loadCheckpoint();
-  bool checkpointExists() const {return checkpointExists(_outputDir);}
+  bool checkpointExists() const { return checkpointExists(_outputDir); }
   static bool checkpointExists(const std::string &outputDir);
   static std::string getCheckpointDir(const std::string &outputDir) {
     return FileSystem::joinPaths(outputDir, "checkpoint");
   }
-  void enableCheckpoints(bool enable) {
-    _enableCheckpoints = enable;
-  }
+  void enableCheckpoints(bool enable) { _enableCheckpoints = enable; }
 
   /**
    *  Functions to interact with the AleRax workflow
    */
-  AleStep getCurrentStep() const {return _state.currentStep;}
-  void setCurrentStep(AleStep step) {_state.currentStep = step;}
+  AleStep getCurrentStep() const { return _state.currentStep; }
+  void setCurrentStep(AleStep step) { _state.currentStep = step; }
 
   /**
    *  Accessors
    */
-  SpeciesTree &getSpeciesTree() {return *_state.speciesTree;}
-  double &getMixtureAlpha() {return _state.mixtureAlpha;}
-  std::vector<AleModelParameters> &getModelParameters() {return _state.perLocalFamilyModelParams;}
-  std::vector<Highway> &getTransferHighways() {return _state.transferHighways;}
-  unsigned int getLocalFamilyNumber() const {return _geneTrees.getTrees().size();}
-  const RecModelInfo &getRecModelInfo() const {return _info;}
-  AleEvaluator &getEvaluator() {return *_evaluator;}
+  SpeciesTree &getSpeciesTree() { return *_state.speciesTree; }
+  double &getMixtureAlpha() { return _state.mixtureAlpha; }
+  std::vector<AleModelParameters> &getModelParameters() {
+    return _state.perLocalFamilyModelParams;
+  }
+  std::vector<Highway> &getTransferHighways() {
+    return _state.transferHighways;
+  }
+  unsigned int getLocalFamilyNumber() const {
+    return _geneTrees.getTrees().size();
+  }
+  const RecModelInfo &getRecModelInfo() const { return _info; }
+  AleEvaluator &getEvaluator() { return *_evaluator; }
 
 private:
   double rootSearch(unsigned int maxDepth, bool thorough = false);
   double transferSearch();
   double sprSearch(unsigned int radius);
-  void saveGeneConsensusTree(const std::string &geneSampleFile, const std::string &outputFile);
+  void saveGeneConsensusTree(const std::string &geneSampleFile,
+                             const std::string &outputFile);
   void saveFamiliesTakingHighway(const Highway &highway,
-      const VectorDouble &perFamilyTransfers,
-      const std::string &directory);
-  void saveBestHighways(const std::vector<ScoredHighway> &highways, const std::string &outputFile);
+                                 const VectorDouble &perFamilyTransfers,
+                                 const std::string &directory);
+  void saveBestHighways(const std::vector<ScoredHighway> &highways,
+                        const std::string &outputFile);
 
 private:
   AleState _state;
@@ -143,7 +145,4 @@ private:
   const std::string _outputDir;
   const std::string _checkpointDir;
   bool _enableCheckpoints;
-
 };
-
-

@@ -1,13 +1,12 @@
 #pragma once
 
-#include <string>
-#include <vector>
 #include <IO/Families.hpp>
 #include <IO/HighwayCandidateParser.hpp>
+#include <string>
 #include <trees/SpeciesTree.hpp>
+#include <vector>
 
 #include "AleModelParameters.hpp"
-
 
 /**
  *  Represents the current step in the AleRax pipeline,
@@ -25,7 +24,6 @@ enum class AleStep {
   End = 7
 };
 
-
 /**
  *  Stores all information about the current state of an AleRax run:
  *  - the current step in the pipeline
@@ -38,37 +36,36 @@ struct AleState {
   /**
    *  Constructor
    */
-  AleState(const std::string &speciesTreePath):
-    currentStep(AleStep::Init),
-    speciesTree(std::make_unique<SpeciesTree>(speciesTreePath)),
-    mixtureAlpha(1.0)
-  {}
+  AleState(const std::string &speciesTreePath)
+      : currentStep(AleStep::Init),
+        speciesTree(std::make_unique<SpeciesTree>(speciesTreePath)),
+        mixtureAlpha(1.0) {}
 
   /**
    *  Dump the current run arguments to the checkpoint directory
    */
   static void writeCheckpointCmd(const std::string &currentCmd,
-      const std::string &checkpointDir);
+                                 const std::string &checkpointDir);
 
   /**
    *  Make sure the checkpoint used the same arguments as
    *  the current run
    */
   static void checkCheckpointCmd(const std::string &currentCmd,
-      const std::string &checkpointDir);
+                                 const std::string &checkpointDir);
 
   /**
    *  Dump the list of the accepted family names to the checkpoint
    *  directory
    */
   static void writeCheckpointFamilies(const Families &families,
-      const std::string &checkpointDir);
+                                      const std::string &checkpointDir);
 
   /**
    *  Retain only the families listed in the checkpoint
    */
   static void filterCheckpointFamilies(Families &families,
-      const std::string &checkpointDir);
+                                       const std::string &checkpointDir);
 
   /**
    *  Dump the current state to the checkpoint directory
@@ -79,13 +76,14 @@ struct AleState {
    *  Load the current state from the checkpoint directory
    */
   void unserialize(const std::string &checkpointDir,
-      const std::vector<std::string> &perCoreFamilyNames);
+                   const std::vector<std::string> &perCoreFamilyNames);
 
   /**
    *  Read the species tree newick from the dumped current state
    *  (from the checkpoint directory)
    */
-  static std::string readCheckpointSpeciesTree(const std::string &checkpointDir);
+  static std::string
+  readCheckpointSpeciesTree(const std::string &checkpointDir);
 
   // the running step
   AleStep currentStep;
@@ -98,7 +96,4 @@ struct AleState {
   double mixtureAlpha;
   std::vector<AleModelParameters> perLocalFamilyModelParams;
   std::vector<Highway> transferHighways;
-
 };
-
-

@@ -1,10 +1,8 @@
 #pragma once
 
-#include <string>
 #include "IO/ArgumentsHelper.hpp"
 #include "util/enums.hpp"
-
-
+#include <string>
 
 /**
  *  Parses and stores the program arguments
@@ -106,7 +104,4 @@ public:
   // experimental
   bool randomSpeciesRoot;
   bool optVerbose;
-
 };
-
-

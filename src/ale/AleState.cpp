@@ -1,14 +1,12 @@
 #include "AleState.hpp"
 
-#include <unordered_set>
 #include <IO/FileSystem.hpp>
 #include <IO/ParallelOfstream.hpp>
 #include <parallelization/ParallelContext.hpp>
-
+#include <unordered_set>
 
 void AleState::writeCheckpointCmd(const std::string &currentCmd,
-    const std::string &checkpointDir)
-{
+                                  const std::string &checkpointDir) {
   auto cmdPath = FileSystem::joinPaths(checkpointDir, "args.txt");
   ParallelOfstream os(cmdPath, true);
   os << "mpiRanks:" << std::endl;
@@ -20,12 +18,12 @@ void AleState::writeCheckpointCmd(const std::string &currentCmd,
 }
 
 void AleState::checkCheckpointCmd(const std::string &currentCmd,
-    const std::string &checkpointDir)
-{
+                                  const std::string &checkpointDir) {
   auto cmdPath = FileSystem::joinPaths(checkpointDir, "args.txt");
   std::ifstream is(cmdPath);
   if (!is.good()) {
-    Logger::error << "Error: cannot read cmd checkpoint file " << cmdPath << std::endl;
+    Logger::error << "Error: cannot read cmd checkpoint file " << cmdPath
+                  << std::endl;
     ParallelContext::abort(32);
   }
   unsigned int currentRanks = ParallelContext::getSize();
@@ -39,27 +37,38 @@ void AleState::checkCheckpointCmd(const std::string &currentCmd,
   std::getline(is, checkpointCmd);
   is.close();
   if (checkpointRanks != currentRanks) {
-    Logger::info << "\nThe number of MPI ranks used to run the program is different from the checkpoint." << std::endl;
-    Logger::info << "To run anew please rename or remove or change the output directory." << std::endl;
-    Logger::info << "To restart from the checkpoint please run the program exactly as given in the "
-                 << cmdPath << " file\n" << std::endl;
+    Logger::info << "\nThe number of MPI ranks used to run the program is "
+                    "different from the checkpoint."
+                 << std::endl;
+    Logger::info
+        << "To run anew please rename or remove or change the output directory."
+        << std::endl;
+    Logger::info << "To restart from the checkpoint please run the program "
+                    "exactly as given in the "
+                 << cmdPath << " file\n"
+                 << std::endl;
     ParallelContext::abort(0);
   }
   if (checkpointCmd != currentCmd) {
-    Logger::info << "\nThe command used to run the program is different from the checkpoint." << std::endl;
-    Logger::info << "To run anew please rename or remove or change the output directory." << std::endl;
-    Logger::info << "To restart from the checkpoint please run the program exactly as given in the "
-                 << cmdPath << " file\n" << std::endl;
+    Logger::info << "\nThe command used to run the program is different from "
+                    "the checkpoint."
+                 << std::endl;
+    Logger::info
+        << "To run anew please rename or remove or change the output directory."
+        << std::endl;
+    Logger::info << "To restart from the checkpoint please run the program "
+                    "exactly as given in the "
+                 << cmdPath << " file\n"
+                 << std::endl;
     ParallelContext::abort(0);
   }
 }
 
 void AleState::writeCheckpointFamilies(const Families &families,
-    const std::string &checkpointDir)
-{
+                                       const std::string &checkpointDir) {
   auto famPath = FileSystem::joinPaths(checkpointDir, "fams.txt");
   ParallelOfstream os(famPath, true);
-  for (const auto &family: families) {
+  for (const auto &family : families) {
     os << family.name << std::endl;
   }
   os.close();
@@ -67,14 +76,14 @@ void AleState::writeCheckpointFamilies(const Families &families,
 }
 
 void AleState::filterCheckpointFamilies(Families &families,
-    const std::string &checkpointDir)
-{
+                                        const std::string &checkpointDir) {
   Families validFamilies;
   std::unordered_set<std::string> checkpointNames;
   auto famPath = FileSystem::joinPaths(checkpointDir, "fams.txt");
   std::ifstream is(famPath);
   if (!is.good()) {
-    Logger::error << "Error: cannot read family checkpoint file " << famPath << std::endl;
+    Logger::error << "Error: cannot read family checkpoint file " << famPath
+                  << std::endl;
     ParallelContext::abort(32);
   }
   std::string name;
@@ -84,7 +93,7 @@ void AleState::filterCheckpointFamilies(Families &families,
     }
   }
   is.close();
-  for (const auto &family: families) {
+  for (const auto &family : families) {
     if (checkpointNames.find(family.name) == checkpointNames.end()) {
       continue;
     }
@@ -94,10 +103,10 @@ void AleState::filterCheckpointFamilies(Families &families,
   ParallelContext::barrier();
 }
 
-void AleState::serialize(const std::string &checkpointDir) const
-{
+void AleState::serialize(const std::string &checkpointDir) const {
   ParallelContext::barrier();
-  auto checkpointPath = FileSystem::joinPaths(checkpointDir, "mainCheckpoint.txt");
+  auto checkpointPath =
+      FileSystem::joinPaths(checkpointDir, "mainCheckpoint.txt");
   ParallelOfstream os(checkpointPath, true);
   // current step
   os << static_cast<unsigned int>(currentStep) << std::endl;
@@ -106,9 +115,8 @@ void AleState::serialize(const std::string &checkpointDir) const
   // mixture alpha
   os << mixtureAlpha << std::endl;
   // transfer highways
-  for (const auto &highway: transferHighways) {
-    os << highway.src->label << " "
-       << highway.dest->label << " "
+  for (const auto &highway : transferHighways) {
+    os << highway.src->label << " " << highway.dest->label << " "
        << highway.proba << std::endl;
   }
   os.close();
@@ -121,7 +129,7 @@ void AleState::serialize(const std::string &checkpointDir) const
   for (unsigned int f = 0; f < localFamilyNames.size(); ++f) {
     const auto &family = localFamilyNames[f];
     const auto &mp = perLocalFamilyModelParams[f];
-    auto paramTypeNumber =  mp.getParamTypeNumber();
+    auto paramTypeNumber = mp.getParamTypeNumber();
     auto speciesBranchNumber = mp.getSpeciesBranchNumber();
     auto paramPath = FileSystem::joinPaths(checkpointDir, family + ".txt");
     std::ofstream os(paramPath);
@@ -138,14 +146,15 @@ void AleState::serialize(const std::string &checkpointDir) const
 }
 
 void AleState::unserialize(const std::string &checkpointDir,
-    const std::vector<std::string> &perCoreFamilyNames)
-{
+                           const std::vector<std::string> &perCoreFamilyNames) {
   ParallelContext::barrier();
   localFamilyNames = perCoreFamilyNames;
-  auto checkpointPath = FileSystem::joinPaths(checkpointDir, "mainCheckpoint.txt");
+  auto checkpointPath =
+      FileSystem::joinPaths(checkpointDir, "mainCheckpoint.txt");
   std::ifstream is(checkpointPath);
   if (!is.good()) {
-    Logger::error << "Error: cannot read checkpoint file " << checkpointPath << std::endl;
+    Logger::error << "Error: cannot read checkpoint file " << checkpointPath
+                  << std::endl;
     ParallelContext::abort(32);
   }
   // current step
@@ -153,8 +162,12 @@ void AleState::unserialize(const std::string &checkpointDir,
   is >> bufferUint;
   currentStep = static_cast<AleStep>(bufferUint);
   if (currentStep == AleStep::End) {
-    Logger::info << "\nThe previous run finished successfully according to the checkpoint." << std::endl;
-    Logger::info << "To run anew please rename or remove or change the output directory\n" << std::endl;
+    Logger::info << "\nThe previous run finished successfully according to the "
+                    "checkpoint."
+                 << std::endl;
+    Logger::info << "To run anew please rename or remove or change the output "
+                    "directory\n"
+                 << std::endl;
     ParallelContext::abort(0);
   }
   // dated species tree
@@ -177,18 +190,19 @@ void AleState::unserialize(const std::string &checkpointDir,
       iss >> dest;
       iss >> proba;
       Highway highway(labelToNode.find(src)->second,
-          labelToNode.find(dest)->second);
+                      labelToNode.find(dest)->second);
       highway.proba = proba;
       transferHighways.push_back(highway);
     }
   }
   is.close();
   // param vectors
-  for (const auto &family: localFamilyNames) {
+  for (const auto &family : localFamilyNames) {
     auto paramPath = FileSystem::joinPaths(checkpointDir, family + ".txt");
     std::ifstream is(paramPath);
     if (!is.good()) {
-      Logger::error << "Error: cannot read parameter checkpoint file " << paramPath << std::endl;
+      Logger::error << "Error: cannot read parameter checkpoint file "
+                    << paramPath << std::endl;
       ParallelContext::abort(32);
     }
     unsigned int paramTypeNumber = 0;
@@ -206,12 +220,14 @@ void AleState::unserialize(const std::string &checkpointDir,
   ParallelContext::barrier();
 }
 
-std::string AleState::readCheckpointSpeciesTree(const std::string &checkpointDir)
-{
-  auto checkpointPath = FileSystem::joinPaths(checkpointDir, "mainCheckpoint.txt");
+std::string
+AleState::readCheckpointSpeciesTree(const std::string &checkpointDir) {
+  auto checkpointPath =
+      FileSystem::joinPaths(checkpointDir, "mainCheckpoint.txt");
   std::ifstream is(checkpointPath);
   if (!is.good()) {
-    Logger::error << "Error: cannot read checkpoint file " << checkpointPath << std::endl;
+    Logger::error << "Error: cannot read checkpoint file " << checkpointPath
+                  << std::endl;
     ParallelContext::abort(32);
   }
   unsigned int bufferUint = 0;
@@ -221,5 +237,3 @@ std::string AleState::readCheckpointSpeciesTree(const std::string &checkpointDir
   is.close();
   return speciesTreeNewick;
 }
-
-

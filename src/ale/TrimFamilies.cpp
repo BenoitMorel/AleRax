@@ -1,21 +1,20 @@
 #include "TrimFamilies.hpp"
 
-#include <algorithm>
-#include <vector>
 #include <IO/GeneSpeciesMapping.hpp>
 #include <IO/Logger.hpp>
+#include <algorithm>
 #include <ccp/ConditionalClades.hpp>
 #include <parallelization/ParallelContext.hpp>
 #include <util/types.hpp>
-
+#include <vector>
 
 void TrimFamilies::trimMinSpeciesCoverage(Families &families,
-    unsigned int minCoverage)
-{
+                                          unsigned int minCoverage) {
   auto N = families.size();
   // filter families in parallel
   std::vector<unsigned int> localToKeep;
-  for (auto i = ParallelContext::getBegin(N); i < ParallelContext::getEnd(N); ++i) {
+  for (auto i = ParallelContext::getBegin(N); i < ParallelContext::getEnd(N);
+       ++i) {
     const auto &family = families[i];
     GeneSpeciesMapping mapping;
     mapping.fill(family.mappingFile, family.startingGeneTree);
@@ -30,20 +29,19 @@ void TrimFamilies::trimMinSpeciesCoverage(Families &families,
   // trim families
   Families familiesCopy = families;
   families.clear();
-  for (auto i: toKeep) {
+  for (auto i : toKeep) {
     assert(ParallelContext::isIntEqual(i));
     families.push_back(familiesCopy[i]);
   }
 }
 
-void TrimFamilies::trimHighCladesNumber(Families &families,
-    double keepRatio)
-{
+void TrimFamilies::trimHighCladesNumber(Families &families, double keepRatio) {
   auto N = families.size();
   // get family observed clade numbers in parallel
   std::vector<unsigned int> localCcpSizes;
   std::vector<unsigned int> localCheck;
-  for (auto i = ParallelContext::getBegin(N); i < ParallelContext::getEnd(N); ++i) {
+  for (auto i = ParallelContext::getBegin(N); i < ParallelContext::getEnd(N);
+       ++i) {
     ConditionalClades ccp;
     ccp.unserialize(families[i].ccp);
     localCcpSizes.push_back(ccp.getCladesNumber());
@@ -53,7 +51,8 @@ void TrimFamilies::trimHighCladesNumber(Families &families,
   // gather family information from all MPI ranks
   std::vector<unsigned int> ccpSizes;
   std::vector<unsigned int> check;
-  ParallelContext::concatenateHetherogeneousUIntVectors(localCcpSizes, ccpSizes);
+  ParallelContext::concatenateHetherogeneousUIntVectors(localCcpSizes,
+                                                        ccpSizes);
   ParallelContext::concatenateHetherogeneousUIntVectors(localCheck, check);
   // sort families by the number of observed clades
   std::vector<PairUInt> sizeToIndex(N);
@@ -71,19 +70,18 @@ void TrimFamilies::trimHighCladesNumber(Families &families,
     assert(ParallelContext::isIntEqual(sizeToIndex[i].second));
     families.push_back(familiesCopy[sizeToIndex[i].second]);
   }
-  Logger::info << "Trimming families with from " << sizeToIndex[cutAfter].first << " to "
-               << sizeToIndex.back().first << " clades" << std::endl;
+  Logger::info << "Trimming families with from " << sizeToIndex[cutAfter].first
+               << " to " << sizeToIndex.back().first << " clades" << std::endl;
 }
 
-void TrimFamilies::trimCladeSplitRatio(Families &families,
-    double maxRatio)
-{
+void TrimFamilies::trimCladeSplitRatio(Families &families, double maxRatio) {
   auto N = families.size();
   // filter families in parallel
   std::vector<unsigned int> localToKeep;
   unsigned int allClades = 0;
   unsigned int filteredClades = 0;
-  for (auto i = ParallelContext::getBegin(N); i < ParallelContext::getEnd(N); ++i) {
+  for (auto i = ParallelContext::getBegin(N); i < ParallelContext::getEnd(N);
+       ++i) {
     ConditionalClades ccp;
     ccp.unserialize(families[i].ccp);
     auto c = ccp.getCladesNumber();
@@ -105,10 +103,8 @@ void TrimFamilies::trimCladeSplitRatio(Families &families,
   // trim families
   Families familiesCopy = families;
   families.clear();
-  for (auto i: toKeep) {
+  for (auto i : toKeep) {
     assert(ParallelContext::isIntEqual(i));
     families.push_back(familiesCopy[i]);
   }
 }
-
-

@@ -1,54 +1,38 @@
 #include "AleOptimizer.hpp"
 
+#include <IO/Logger.hpp>
 #include <algorithm>
 #include <fstream>
 #include <memory>
-#include <IO/Logger.hpp>
 #include <optimizers/DTLOptimizer.hpp>
 #include <parallelization/ParallelContext.hpp>
 #include <search/SpeciesTransferSearch.hpp>
 
-
-static std::shared_ptr<MultiModel> createModel(SpeciesTree &speciesTree,
-    const FamilyInfo &family,
-    const RecModelInfo &info,
-    const double alpha,
-    const AleModelParameters &modelParameters,
-    const std::vector<Highway> &highways,
-    bool highPrecision)
-{
+static std::shared_ptr<MultiModel>
+createModel(SpeciesTree &speciesTree, const FamilyInfo &family,
+            const RecModelInfo &info, const double alpha,
+            const AleModelParameters &modelParameters,
+            const std::vector<Highway> &highways, bool highPrecision) {
   std::shared_ptr<MultiModel> model;
   GeneSpeciesMapping mapping;
   mapping.fill(family.mappingFile, family.startingGeneTree);
   switch (info.model) {
   case RecModel::UndatedDL:
     if (highPrecision) {
-      model = std::make_shared<UndatedDLMultiModel<ScaledValue> >(
-          speciesTree.getTree(),
-          mapping,
-          info,
-          family.ccp);
+      model = std::make_shared<UndatedDLMultiModel<ScaledValue>>(
+          speciesTree.getTree(), mapping, info, family.ccp);
     } else {
-      model = std::make_shared<UndatedDLMultiModel<double> >(
-          speciesTree.getTree(),
-          mapping,
-          info,
-          family.ccp);
+      model = std::make_shared<UndatedDLMultiModel<double>>(
+          speciesTree.getTree(), mapping, info, family.ccp);
     }
     break;
   case RecModel::UndatedDTL:
     if (highPrecision) {
-      model = std::make_shared<UndatedDTLMultiModel<ScaledValue> >(
-          speciesTree.getDatedTree(),
-          mapping,
-          info,
-          family.ccp);
+      model = std::make_shared<UndatedDTLMultiModel<ScaledValue>>(
+          speciesTree.getDatedTree(), mapping, info, family.ccp);
     } else {
-      model = std::make_shared<UndatedDTLMultiModel<double> >(
-          speciesTree.getDatedTree(),
-          mapping,
-          info,
-          family.ccp);
+      model = std::make_shared<UndatedDTLMultiModel<double>>(
+          speciesTree.getDatedTree(), mapping, info, family.ccp);
     }
     break;
   default:
@@ -63,33 +47,21 @@ static std::shared_ptr<MultiModel> createModel(SpeciesTree &speciesTree,
 }
 
 AleEvaluator::AleEvaluator(
-    AleOptimizer &optimizer,
-    SpeciesTree &speciesTree,
-    const RecModelInfo &info,
+    AleOptimizer &optimizer, SpeciesTree &speciesTree, const RecModelInfo &info,
     const ModelParametrization &modelParametrization,
-    const std::string &optimizationClassFile,
-    double &mixtureAlpha,
+    const std::string &optimizationClassFile, double &mixtureAlpha,
     std::vector<AleModelParameters> &perLocalFamilyModelParams,
-    std::vector<Highway> &transferHighways,
-    bool optimizeRates,
-    bool optimizeVerbose,
-    const Families &families,
-    const PerCoreGeneTrees &geneTrees,
-    const std::string &outputDir):
-  _optimizer(optimizer),
-  _speciesTree(speciesTree),
-  _info(info),
-  _optimizationClasses(_speciesTree.getTree(), modelParametrization, optimizationClassFile, _info),
-  _mixtureAlpha(mixtureAlpha),
-  _modelParameters(perLocalFamilyModelParams),
-  _highways(transferHighways),
-  _optimizeRates(optimizeRates),
-  _optimizeVerbose(optimizeVerbose),
-  _families(families),
-  _geneTrees(geneTrees),
-  _highPrecisions(getLocalFamilyNumber(), -1),
-  _outputDir(outputDir)
-{
+    std::vector<Highway> &transferHighways, bool optimizeRates,
+    bool optimizeVerbose, const Families &families,
+    const PerCoreGeneTrees &geneTrees, const std::string &outputDir)
+    : _optimizer(optimizer), _speciesTree(speciesTree), _info(info),
+      _optimizationClasses(_speciesTree.getTree(), modelParametrization,
+                           optimizationClassFile, _info),
+      _mixtureAlpha(mixtureAlpha), _modelParameters(perLocalFamilyModelParams),
+      _highways(transferHighways), _optimizeRates(optimizeRates),
+      _optimizeVerbose(optimizeVerbose), _families(families),
+      _geneTrees(geneTrees), _highPrecisions(getLocalFamilyNumber(), -1),
+      _outputDir(outputDir) {
   Logger::timed << "Initializing ccps and evaluators..." << std::endl;
   _evaluations.resize(getLocalFamilyNumber());
   for (unsigned int i = 0; i < getLocalFamilyNumber(); ++i) {
@@ -98,7 +70,7 @@ AleEvaluator::AleEvaluator(
   ParallelContext::barrier();
   unsigned int totalCladesNumber = 0;
   unsigned int worstFamilyCladesNumber = 0;
-  for (auto &evaluation: _evaluations) {
+  for (auto &evaluation : _evaluations) {
     auto ccpSize = evaluation->getCCP().getCladesNumber();
     totalCladesNumber += ccpSize;
     worstFamilyCladesNumber = std::max(worstFamilyCladesNumber, ccpSize);
@@ -106,25 +78,24 @@ AleEvaluator::AleEvaluator(
   ParallelContext::barrier();
   ParallelContext::sumUInt(totalCladesNumber);
   ParallelContext::maxUInt(worstFamilyCladesNumber);
-  double perCoreCladesNumber = double(totalCladesNumber) / double(ParallelContext::getSize());
-  double loadBalancing = std::min(1.0, double(perCoreCladesNumber) / double(worstFamilyCladesNumber));
-  unsigned int effectiveFamiliesNumber = totalCladesNumber / worstFamilyCladesNumber;
+  double perCoreCladesNumber =
+      double(totalCladesNumber) / double(ParallelContext::getSize());
+  double loadBalancing = std::min(1.0, double(perCoreCladesNumber) /
+                                           double(worstFamilyCladesNumber));
+  unsigned int effectiveFamiliesNumber =
+      totalCladesNumber / worstFamilyCladesNumber;
   Logger::timed << "Initializing ccps finished" << std::endl;
   Logger::timed << "Total number of clades: " << totalCladesNumber << std::endl;
   Logger::timed << "Load balancing: " << loadBalancing << std::endl;
-  Logger::timed << "Recommended maximum number of cores: " << effectiveFamiliesNumber << std::endl;
+  Logger::timed << "Recommended maximum number of cores: "
+                << effectiveFamiliesNumber << std::endl;
 }
 
-void AleEvaluator::resetEvaluation(unsigned int i, bool highPrecision)
-{
+void AleEvaluator::resetEvaluation(unsigned int i, bool highPrecision) {
   auto famIndex = _geneTrees.getTrees()[i].familyIndex;
-  _evaluations[i] = createModel(_speciesTree,
-      _families[famIndex],
-      _info,
-      _mixtureAlpha,
-      _modelParameters[i],
-      _highways,
-      highPrecision);
+  _evaluations[i] =
+      createModel(_speciesTree, _families[famIndex], _info, _mixtureAlpha,
+                  _modelParameters[i], _highways, highPrecision);
   auto ll = _evaluations[i]->computeLogLikelihood();
   if (highPrecision) {
     _highPrecisions[i] = 1;
@@ -136,8 +107,7 @@ void AleEvaluator::resetEvaluation(unsigned int i, bool highPrecision)
   }
 }
 
-void AleEvaluator::resetAllPrecisions()
-{
+void AleEvaluator::resetAllPrecisions() {
   auto llBefore = computeLikelihoodFast();
   for (unsigned int i = 0; i < getLocalFamilyNumber(); ++i) {
     if (_highPrecisions[i] != -1) {
@@ -146,17 +116,17 @@ void AleEvaluator::resetAllPrecisions()
   }
   auto llAfter = computeLikelihoodFast();
   if (fabs(llBefore - llAfter) > 0.1) {
-    Logger::info << "Likelihood changed after lowering the precision: " << std::endl;
+    Logger::info << "Likelihood changed after lowering the precision: "
+                 << std::endl;
     Logger::info << "Before: ll=" << llBefore << std::endl;
     Logger::info << "After:  ll=" << llAfter << std::endl;
   }
 }
 
-void AleEvaluator::printHighPrecisionCount()
-{
+void AleEvaluator::printHighPrecisionCount() {
   unsigned int high = 0;
   unsigned int low = 0;
-  for (auto v: _highPrecisions) {
+  for (auto v : _highPrecisions) {
     if (v >= 0) {
       high++;
     } else {
@@ -170,15 +140,12 @@ void AleEvaluator::printHighPrecisionCount()
                << ", in high-precision mode: " << high << std::endl;
 }
 
-double AleEvaluator::computeLikelihoodFast()
-{
-  //printHighPrecisionCount();
+double AleEvaluator::computeLikelihoodFast() {
+  // printHighPrecisionCount();
   return computeLikelihood();
 }
 
-double AleEvaluator::computeLikelihood(
-    PerFamLL *perFamLL)
-{
+double AleEvaluator::computeLikelihood(PerFamLL *perFamLL) {
   if (perFamLL) {
     perFamLL->clear();
   }
@@ -195,8 +162,7 @@ double AleEvaluator::computeLikelihood(
   return sumLL;
 }
 
-double AleEvaluator::computeFamilyLikelihood(unsigned int i)
-{
+double AleEvaluator::computeFamilyLikelihood(unsigned int i) {
   auto ll = _evaluations[i]->computeLogLikelihood();
   if (_highPrecisions[i] == -1 && !std::isnormal(ll)) {
     // We are in the low precision mode (we use double)
@@ -224,16 +190,15 @@ double AleEvaluator::computeFamilyLikelihood(unsigned int i)
   return ll;
 }
 
-void AleEvaluator::setAlpha(double alpha)
-{
+void AleEvaluator::setAlpha(double alpha) {
   _mixtureAlpha = alpha;
-  for (auto &evaluation: _evaluations) {
+  for (auto &evaluation : _evaluations) {
     evaluation->setAlpha(_mixtureAlpha);
   }
 }
 
-void AleEvaluator::setFamilyParameters(unsigned int family, const Parameters &parameters)
-{
+void AleEvaluator::setFamilyParameters(unsigned int family,
+                                       const Parameters &parameters) {
   RatesVector rateVector;
   _modelParameters[family].setParameters(parameters);
   _modelParameters[family].getRateVector(rateVector);
@@ -243,15 +208,14 @@ void AleEvaluator::setFamilyParameters(unsigned int family, const Parameters &pa
 /**
  *  Optimizes a set of DTL parameters that are shared among gene families
  */
-class DTLGlobalParametersOptimizer: public FunctionToOptimize
-{
+class DTLGlobalParametersOptimizer : public FunctionToOptimize {
 public:
-  DTLGlobalParametersOptimizer(AleEvaluator &evaluator):
-    _evaluator(evaluator)
-  {}
+  DTLGlobalParametersOptimizer(AleEvaluator &evaluator)
+      : _evaluator(evaluator) {}
   void setParameters(Parameters &parameters) {
     parameters.ensurePositivity();
-    auto fullParameters = _evaluator.getOptimizationClasses().getFullParameters(parameters);
+    auto fullParameters =
+        _evaluator.getOptimizationClasses().getFullParameters(parameters);
     for (unsigned int i = 0; i < _evaluator.getLocalFamilyNumber(); ++i) {
       _evaluator.setFamilyParameters(i, fullParameters);
     }
@@ -262,6 +226,7 @@ public:
     parameters.setScore(res);
     return res;
   }
+
 private:
   AleEvaluator &_evaluator;
 };
@@ -269,16 +234,14 @@ private:
 /**
  *  Optimizes DTL parameters for a given family
  */
-class DTLFamilyParametersOptimizer: public FunctionToOptimize
-{
+class DTLFamilyParametersOptimizer : public FunctionToOptimize {
 public:
-  DTLFamilyParametersOptimizer(AleEvaluator &evaluator, unsigned int family):
-    _evaluator(evaluator),
-    _family(family)
-  {}
+  DTLFamilyParametersOptimizer(AleEvaluator &evaluator, unsigned int family)
+      : _evaluator(evaluator), _family(family) {}
   void setParameters(Parameters &parameters) {
     parameters.ensurePositivity();
-    auto fullParameters = _evaluator.getOptimizationClasses().getFullParameters(parameters);
+    auto fullParameters =
+        _evaluator.getOptimizationClasses().getFullParameters(parameters);
     _evaluator.setFamilyParameters(_family, fullParameters);
   }
   virtual double evaluate(Parameters &parameters) {
@@ -287,13 +250,13 @@ public:
     parameters.setScore(res);
     return res;
   }
+
 private:
   AleEvaluator &_evaluator;
   unsigned int _family;
 };
 
-double AleEvaluator::optimizeModelRates(bool thorough)
-{
+double AleEvaluator::optimizeModelRates(bool thorough) {
   auto ll = computeLikelihood();
   if (_optimizeRates) {
     Logger::timed << "[Species search] Optimizing model rates ";
@@ -318,16 +281,16 @@ double AleEvaluator::optimizeModelRates(bool thorough)
     settings.factr = LBFGSBPrecision::MEDIUM;
     if (_info.perFamilyRates) {
       Logger::timed << "[Species search]   Free parameters: "
-                    << _optimizationClasses.getFreeParameters() << " per family" << std::endl;
+                    << _optimizationClasses.getFreeParameters() << " per family"
+                    << std::endl;
       _optimizer.enableCheckpoints(false); // to avoid MPI issues
       for (unsigned int family = 0; family < getLocalFamilyNumber(); ++family) {
         DTLFamilyParametersOptimizer function(*this, family);
-        auto categorizedParameters = getOptimizationClasses().getCompressedParameters(
-            _modelParameters[family].getParameters());
+        auto categorizedParameters =
+            getOptimizationClasses().getCompressedParameters(
+                _modelParameters[family].getParameters());
         auto bestParameters = DTLOptimizer::optimizeParameters(
-            function,
-            categorizedParameters,
-            settings);
+            function, categorizedParameters, settings);
         // set the found best parameters to the family
         function.setParameters(bestParameters);
       }
@@ -337,18 +300,18 @@ double AleEvaluator::optimizeModelRates(bool thorough)
       Logger::timed << "[Species search]   Free parameters: "
                     << _optimizationClasses.getFreeParameters() << std::endl;
       DTLGlobalParametersOptimizer function(*this);
-      auto categorizedParameters = getOptimizationClasses().getCompressedParameters(
-          _modelParameters[0].getParameters());
+      auto categorizedParameters =
+          getOptimizationClasses().getCompressedParameters(
+              _modelParameters[0].getParameters());
       ParallelContext::barrier();
       auto bestParameters = DTLOptimizer::optimizeParameters(
-          function,
-          categorizedParameters,
-          settings);
+          function, categorizedParameters, settings);
       // set the found best parameters to all families
       function.setParameters(bestParameters);
       ll = computeLikelihood();
     }
-    Logger::timed << "[Species search]   After model rate opt, ll=" << ll << std::endl;
+    Logger::timed << "[Species search]   After model rate opt, ll=" << ll
+                  << std::endl;
     //            << ", rates=" << _modelParameters << std::endl;
   }
   ll = optimizeGammaRates();
@@ -357,16 +320,14 @@ double AleEvaluator::optimizeModelRates(bool thorough)
   return ll;
 }
 
-static double callback(void *p, double x)
-{
+static double callback(void *p, double x) {
   auto *evaluator = (AleEvaluator *)p;
   evaluator->setAlpha(x);
   auto ll = evaluator->computeLikelihood();
   return -ll;
 }
 
-double AleEvaluator::optimizeGammaRates()
-{
+double AleEvaluator::optimizeGammaRates() {
   auto ll = computeLikelihood();
   if (_info.gammaCategories == 1) {
     return ll;
@@ -379,24 +340,20 @@ double AleEvaluator::optimizeGammaRates()
   double fx = -ll;
   double f2x = 1.0;
   ParallelContext::barrier();
-  double alpha = corax_opt_minimize_brent(minAlpha,
-                                  startingAlpha,
-                                  maxAlpha,
-                                  tolerance,
-                                  &fx,
-                                  &f2x,
-                                  (void *)this,
-                                  &callback);
+  double alpha =
+      corax_opt_minimize_brent(minAlpha, startingAlpha, maxAlpha, tolerance,
+                               &fx, &f2x, (void *)this, &callback);
   ll = -fx;
   setAlpha(alpha);
   std::vector<double> categories(_info.gammaCategories);
   corax_compute_gamma_cats(alpha, categories.size(), &categories[0],
-      CORAX_GAMMA_RATES_MEAN);
-  Logger::timed << "[Species search]   After gamma cat  opt, ll=" << ll << std::endl;
+                           CORAX_GAMMA_RATES_MEAN);
+  Logger::timed << "[Species search]   After gamma cat  opt, ll=" << ll
+                << std::endl;
   if (_optimizeVerbose) {
     Logger::info << "alpha=" << alpha << std::endl;
     Logger::info << "speciation rate categories: ";
-    for (auto c: categories) {
+    for (auto c : categories) {
       Logger::info << c << " ";
     }
     Logger::info << std::endl;
@@ -404,24 +361,22 @@ double AleEvaluator::optimizeGammaRates()
   return ll;
 }
 
-void AleEvaluator::onSpeciesDatesChange()
-{
-  for (auto &evaluation: _evaluations) {
+void AleEvaluator::onSpeciesDatesChange() {
+  for (auto &evaluation : _evaluations) {
     evaluation->onSpeciesDatesChange();
   }
 }
 
 void AleEvaluator::onSpeciesTreeChange(
-    const std::unordered_set<corax_rnode_t *> *nodesToInvalidate)
-{
-  for (auto &evaluation: _evaluations) {
+    const std::unordered_set<corax_rnode_t *> *nodesToInvalidate) {
+  for (auto &evaluation : _evaluations) {
     evaluation->onSpeciesTreeChange(nodesToInvalidate);
   }
 }
 
-void AleEvaluator::sampleFamilyScenarios(unsigned int i, unsigned int samples,
-    std::vector<std::shared_ptr<Scenario> > &scenarios)
-{
+void AleEvaluator::sampleFamilyScenarios(
+    unsigned int i, unsigned int samples,
+    std::vector<std::shared_ptr<Scenario>> &scenarios) {
   assert(i < getLocalFamilyNumber());
   scenarios.clear();
   getEvaluation(i).computeLogLikelihood();
@@ -442,33 +397,30 @@ void AleEvaluator::sampleFamilyScenarios(unsigned int i, unsigned int samples,
   }
 }
 
-void AleEvaluator::getTransferInformation(SpeciesTree &speciesTree,
-    TransferFrequencies &transferFrequencies,
+void AleEvaluator::getTransferInformation(
+    SpeciesTree &speciesTree, TransferFrequencies &transferFrequencies,
     PerSpeciesEvents &perSpeciesEvents,
-    PerCorePotentialTransfers &potentialTransfers)
-{
+    PerCorePotentialTransfers &potentialTransfers) {
   // this is duplicated code from Routines...
   const auto labelToId = speciesTree.getTree().getDeterministicLabelToId();
   const auto idToLabel = speciesTree.getTree().getDeterministicIdToLabel();
   const unsigned int labelsNumber = idToLabel.size();
-  transferFrequencies.count = MatrixUint(labelsNumber, VectorUint(labelsNumber, 0));
+  transferFrequencies.count =
+      MatrixUint(labelsNumber, VectorUint(labelsNumber, 0));
   transferFrequencies.idToLabel = idToLabel;
   perSpeciesEvents = PerSpeciesEvents(speciesTree.getTree().getNodeNumber());
   auto infoCopy = _info;
   infoCopy.model = RecModel::UndatedDTL;
   infoCopy.originationStrategy = OriginationStrategy::UNIFORM;
   infoCopy.transferConstraint = TransferConstaint::PARENTS;
-  for (const auto &geneTree: _geneTrees.getTrees()) {
+  for (const auto &geneTree : _geneTrees.getTrees()) {
     const auto &family = _families[geneTree.familyIndex];
     GeneSpeciesMapping mapping;
     mapping.fill(family.mappingFile, family.startingGeneTree);
-    UndatedDTLMultiModel<ScaledValue> evaluation(
-        speciesTree.getDatedTree(),
-        mapping,
-        infoCopy,
-        family.ccp);
+    UndatedDTLMultiModel<ScaledValue> evaluation(speciesTree.getDatedTree(),
+                                                 mapping, infoCopy, family.ccp);
     evaluation.computeLogLikelihood();
-    std::vector< std::shared_ptr<Scenario> > scenarios;
+    std::vector<std::shared_ptr<Scenario>> scenarios;
     // Warning:
     // Using Random::getProba() in the sampling function makes
     // the random state inconsistent between the MPI ranks.
@@ -491,24 +443,21 @@ void AleEvaluator::getTransferInformation(SpeciesTree &speciesTree,
   assert(ParallelContext::isRandConsistent());
 }
 
-void AleEvaluator::addHighway(const Highway &highway)
-{
+void AleEvaluator::addHighway(const Highway &highway) {
   _highways.push_back(highway);
-  for (auto &evaluation: _evaluations) {
+  for (auto &evaluation : _evaluations) {
     evaluation->setHighways(_highways);
   }
 }
 
-void AleEvaluator::removeHighway()
-{
+void AleEvaluator::removeHighway() {
   _highways.pop_back();
-  for (auto &evaluation: _evaluations) {
+  for (auto &evaluation : _evaluations) {
     evaluation->setHighways(_highways);
   }
 }
 
-void AleEvaluator::saveSnapshotPerFamilyLL()
-{
+void AleEvaluator::saveSnapshotPerFamilyLL() {
   std::vector<double> localLikelihoods;
   for (unsigned int i = 0; i < getLocalFamilyNumber(); ++i) {
     auto ll = computeFamilyLikelihood(i);
@@ -516,12 +465,11 @@ void AleEvaluator::saveSnapshotPerFamilyLL()
   }
   ParallelContext::barrier();
   ParallelContext::concatenateHetherogeneousDoubleVectors(localLikelihoods,
-      _snapshotPerFamilyLL);
+                                                          _snapshotPerFamilyLL);
   assert(_snapshotPerFamilyLL.size() == _families.size());
 }
 
-void AleEvaluator::savePerFamilyLikelihoodDiff(const std::string &outputFile)
-{
+void AleEvaluator::savePerFamilyLikelihoodDiff(const std::string &outputFile) {
   std::vector<unsigned int> localIndices;
   std::vector<double> localLikelihoods;
   for (unsigned int i = 0; i < getLocalFamilyNumber(); ++i) {
@@ -534,19 +482,21 @@ void AleEvaluator::savePerFamilyLikelihoodDiff(const std::string &outputFile)
   std::vector<unsigned int> indices;
   std::vector<double> likelihoods;
   ParallelContext::concatenateHetherogeneousUIntVectors(localIndices, indices);
-  ParallelContext::concatenateHetherogeneousDoubleVectors(localLikelihoods, likelihoods);
+  ParallelContext::concatenateHetherogeneousDoubleVectors(localLikelihoods,
+                                                          likelihoods);
   assert(indices.size() == _snapshotPerFamilyLL.size());
   if (ParallelContext::getRank() == 0) {
     std::vector<ScoredFamily> scoredFamilies;
     for (unsigned int i = 0; i < indices.size(); ++i) {
       const auto &family = _families[indices[i]];
       auto ll = likelihoods[i];
-      scoredFamilies.push_back(ScoredFamily(family.name, ll - _snapshotPerFamilyLL[i]));
+      scoredFamilies.push_back(
+          ScoredFamily(family.name, ll - _snapshotPerFamilyLL[i]));
     }
     std::sort(scoredFamilies.begin(), scoredFamilies.end());
     std::ofstream os(outputFile);
     os << "fam, llDiff" << std::endl;
-    for (const auto &sf: scoredFamilies) {
+    for (const auto &sf : scoredFamilies) {
       os << sf.familyName << ", " << sf.score << std::endl;
     }
     os.close();
@@ -554,15 +504,12 @@ void AleEvaluator::savePerFamilyLikelihoodDiff(const std::string &outputFile)
   ParallelContext::barrier();
 }
 
-unsigned int AleEvaluator::getInputTreesNumber() const
-{
+unsigned int AleEvaluator::getInputTreesNumber() const {
   unsigned int totalInputTrees = 0;
-  for (auto &evaluation: _evaluations) {
+  for (auto &evaluation : _evaluations) {
     totalInputTrees += evaluation->getCCP().getInputTreesNumber();
   }
   ParallelContext::barrier();
   ParallelContext::sumUInt(totalInputTrees);
   return totalInputTrees;
 }
-
-
