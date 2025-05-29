@@ -5,7 +5,6 @@
 
 #include <IO/Families.hpp>
 #include <IO/FileSystem.hpp>
-#include <maths/ModelParameters.hpp>
 #include <optimizers/DTLOptimizer.hpp>
 #include <parallelization/PerCoreGeneTrees.hpp>
 #include <trees/PLLRootedTree.hpp>

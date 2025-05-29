@@ -4,7 +4,6 @@
 #include <vector>
 
 #include <IO/Families.hpp>
-#include <maths/ModelParameters.hpp>
 #include <parallelization/PerCoreGeneTrees.hpp>
 #include <search/SpeciesSearchCommon.hpp>
 #include <trees/PLLRootedTree.hpp>
@@ -16,7 +15,7 @@
 #include "UndatedDTLMultiModel.hpp"
 
 class RecModelInfo;
-using MultiEvaluation = MultiModel;
+using MultiEvaluation = MultiModelInterface;
 using MultiEvaluationPtr = std::shared_ptr<MultiEvaluation>;
 using PerCoreMultiEvaluations = std::vector<MultiEvaluationPtr>;
 class AleOptimizer;
@@ -174,7 +173,7 @@ public:
     return _modelParameters;
   }
   const std::vector<Highway> &getHighways() const { return _highways; }
-  MultiModel &getEvaluation(unsigned int i) { return *_evaluations[i]; }
+  MultiEvaluation &getEvaluation(unsigned int i) { return *_evaluations[i]; }
   unsigned int getLocalFamilyNumber() const {
     return _geneTrees.getTrees().size();
   }

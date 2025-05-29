@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <vector>
 
-#include <maths/ModelParameters.hpp>
+#include <maths/Parameters.hpp>
 #include <util/types.hpp>
 
 /**

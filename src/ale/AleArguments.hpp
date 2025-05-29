@@ -13,7 +13,7 @@ public:
   /**
    *  Parse the arguments from main()
    */
-  AleArguments(int argc, char *argv[]);
+  AleArguments(int iargc, char *iargv[]);
 
   /**
    *  Print AleRax' help message
@@ -60,6 +60,7 @@ public:
   // model
   std::string reconciliationModelStr;
   TransferConstaint transferConstraint;
+  bool noDL;
   bool noTL;
   unsigned int gammaCategories;
   bool pruneSpeciesTree;

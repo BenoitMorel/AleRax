@@ -9,12 +9,12 @@
 #include <parallelization/ParallelContext.hpp>
 #include <search/SpeciesTransferSearch.hpp>
 
-static std::shared_ptr<MultiModel>
+static MultiEvaluationPtr
 createModel(SpeciesTree &speciesTree, const FamilyInfo &family,
             const RecModelInfo &info, const double alpha,
             const AleModelParameters &modelParameters,
             const std::vector<Highway> &highways, bool highPrecision) {
-  std::shared_ptr<MultiModel> model;
+  std::shared_ptr<MultiModelInterface> model;
   GeneSpeciesMapping mapping;
   mapping.fill(family.mappingFile, family.startingGeneTree);
   switch (info.model) {
@@ -380,7 +380,6 @@ void AleEvaluator::sampleFamilyScenarios(
     std::vector<std::shared_ptr<Scenario>> &scenarios) {
   assert(i < getLocalFamilyNumber());
   scenarios.clear();
-  getEvaluation(i).computeLogLikelihood();
   bool ok = getEvaluation(i).sampleReconciliations(samples, scenarios);
   if (_highPrecisions[i] == -1 && !ok) {
     // We are in the low precision mode (we use double)
@@ -420,7 +419,6 @@ void AleEvaluator::getTransferInformation(
     mapping.fill(family.mappingFile, family.startingGeneTree);
     UndatedDTLMultiModel<ScaledValue> evaluation(speciesTree.getDatedTree(),
                                                  mapping, infoCopy, family.ccp);
-    evaluation.computeLogLikelihood();
     std::vector<std::shared_ptr<Scenario>> scenarios;
     // Warning:
     // Using Random::getProba() in the sampling function makes

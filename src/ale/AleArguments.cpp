@@ -16,7 +16,7 @@ const double DEFAULT_DTL_RATES = 0.1;
 
 AleArguments::AleArguments(int iargc, char *iargv[])
     : argc(iargc), argv(iargv), reconciliationModelStr("UndatedDTL"),
-      transferConstraint(TransferConstaint::PARENTS), noTL(false),
+      transferConstraint(TransferConstaint::PARENTS), noDL(false), noTL(false),
       gammaCategories(1), pruneSpeciesTree(false),
       ccpRooting(CCPRooting::UNIFORM),
       originationStrategy(OriginationStrategy::UNIFORM), memorySavings(false),
@@ -63,6 +63,8 @@ AleArguments::AleArguments(int iargc, char *iargv[])
     } else if (arg == "--transfer-constraint") {
       transferConstraint =
           ArgumentsHelper::strToTransferConstraint(std::string(argv[++i]));
+    } else if (arg == "--no-dl") {
+      noDL = true;
     } else if (arg == "--no-tl") {
       noTL = true;
     } else if (arg == "--memory-savings") {
@@ -188,6 +190,12 @@ void AleArguments::printSummary() const {
   case TransferConstaint::RELDATED:
     Logger::info << "transfers to the past are forbidden" << std::endl;
     break;
+  }
+  if (noDL) {
+    Logger::info << "\tThe model will not consider DL events" << std::endl;
+  }
+  if (noTL) {
+    Logger::info << "\tThe model will not consider TL events" << std::endl;
   }
   Logger::info << "\tMemory savings: " << getOnOff(memorySavings) << std::endl;
   Logger::info << "\tModel parametrization: ";
@@ -364,6 +372,8 @@ void AleArguments::printHelp() const {
   Logger::info << "\t--gene-tree-rooting {UNIFORM, MAD, ROOTED}" << std::endl;
   Logger::info << "\t--prune-species-tree" << std::endl;
   Logger::info << "\t--fraction-missing-file <filepath>" << std::endl;
+  Logger::info << "\t--no-dl" << std::endl;
+  Logger::info << "\t--no-tl" << std::endl;
   Logger::info << "\t--memory-savings" << std::endl;
 
   Logger::info << "Search strategy options:" << std::endl;
@@ -440,6 +450,12 @@ void AleArguments::checkValid() const {
                    << "with --rec-model UndatedDTL\n"
                    << std::endl;
     }
+    if (noTL) {
+      ok = false;
+      Logger::info << "\nError: --no-tl can only be used "
+                   << "with --rec-model UndatedDTL\n"
+                   << std::endl;
+    }
     if (highways) {
       ok = false;
       Logger::info << "\nError: --highways can only be used "
@@ -468,8 +484,15 @@ void AleArguments::checkValid() const {
       originationStrategy != OriginationStrategy::OPTIMIZE) {
     ok = false;
     Logger::info << "\nError: --model-parametrization ORIGINATION-PER-SPECIES "
-                    "should only be used "
+                    "can only be used "
                  << "with --origination OPTIMIZE\n"
+                 << std::endl;
+  }
+  if (modelParametrization == ModelParametrization::PER_FAMILY &&
+      gammaCategories > 1) {
+    ok = false;
+    Logger::info << "\nError: --speciation-gamma-categories cannot be used "
+                 << "with --model-parametrization PER-FAMILY\n"
                  << std::endl;
   }
   // reldating block
