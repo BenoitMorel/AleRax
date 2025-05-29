@@ -1,10 +1,11 @@
 #pragma once
 
-#include <maths/Parameters.hpp>
 #include <string>
 #include <unordered_map>
-#include <util/enums.hpp>
 #include <vector>
+
+#include <maths/Parameters.hpp>
+#include <util/enums.hpp>
 
 class PLLRootedTree;
 struct RecModelInfo;

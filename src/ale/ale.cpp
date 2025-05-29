@@ -1,10 +1,11 @@
+#include <cstdio>
+
 #include <DistanceMethods/MiniNJ.hpp>
 #include <IO/FamiliesFileParser.hpp>
 #include <IO/FileSystem.hpp>
 #include <IO/Logger.hpp>
 #include <IO/ParallelOfstream.hpp>
 #include <ccp/ConditionalClades.hpp>
-#include <cstdio>
 #include <parallelization/ParallelContext.hpp>
 #include <util/Paths.hpp>
 #include <util/RecModelInfo.hpp>

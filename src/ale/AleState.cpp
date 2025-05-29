@@ -1,9 +1,10 @@
 #include "AleState.hpp"
 
+#include <unordered_set>
+
 #include <IO/FileSystem.hpp>
 #include <IO/ParallelOfstream.hpp>
 #include <parallelization/ParallelContext.hpp>
-#include <unordered_set>
 
 void AleState::writeCheckpointCmd(const std::string &currentCmd,
                                   const std::string &checkpointDir) {

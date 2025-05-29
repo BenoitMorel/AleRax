@@ -1,13 +1,14 @@
 #pragma once
 
+#include <memory>
+#include <vector>
+
 #include <IO/Families.hpp>
 #include <maths/ModelParameters.hpp>
-#include <memory>
 #include <parallelization/PerCoreGeneTrees.hpp>
 #include <search/SpeciesSearchCommon.hpp>
 #include <trees/PLLRootedTree.hpp>
 #include <trees/SpeciesTree.hpp>
-#include <vector>
 
 #include "AleModelParameters.hpp"
 #include "OptimizationClasses.hpp"

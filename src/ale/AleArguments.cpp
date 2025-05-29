@@ -1,8 +1,9 @@
 #include "AleArguments.hpp"
 
+#include <climits>
+
 #include <IO/FileSystem.hpp>
 #include <IO/Logger.hpp>
-#include <climits>
 #include <parallelization/ParallelContext.hpp>
 
 const unsigned int DEFAULT_HIGHWAY_CANDIDATES_1 = 100;

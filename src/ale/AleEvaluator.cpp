@@ -1,9 +1,10 @@
 #include "AleOptimizer.hpp"
 
-#include <IO/Logger.hpp>
 #include <algorithm>
 #include <fstream>
 #include <memory>
+
+#include <IO/Logger.hpp>
 #include <optimizers/DTLOptimizer.hpp>
 #include <parallelization/ParallelContext.hpp>
 #include <search/SpeciesTransferSearch.hpp>

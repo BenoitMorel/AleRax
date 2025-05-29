@@ -1,14 +1,15 @@
 #pragma once
 
+#include <memory>
+#include <vector>
+
 #include <IO/Families.hpp>
 #include <IO/FileSystem.hpp>
 #include <maths/ModelParameters.hpp>
-#include <memory>
 #include <optimizers/DTLOptimizer.hpp>
 #include <parallelization/PerCoreGeneTrees.hpp>
 #include <trees/PLLRootedTree.hpp>
 #include <trees/SpeciesTree.hpp>
-#include <vector>
 
 #include "AleEvaluator.hpp"
 #include "AleState.hpp"

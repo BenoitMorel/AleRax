@@ -1,9 +1,10 @@
 #pragma once
 
 #include <algorithm>
+#include <vector>
+
 #include <maths/ModelParameters.hpp>
 #include <util/types.hpp>
-#include <vector>
 
 /**
  * Stores the model parameters for a gene family
