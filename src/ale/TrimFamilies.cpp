@@ -1,12 +1,13 @@
 #include "TrimFamilies.hpp"
 
+#include <algorithm>
+#include <vector>
+
 #include <IO/GeneSpeciesMapping.hpp>
 #include <IO/Logger.hpp>
-#include <algorithm>
 #include <ccp/ConditionalClades.hpp>
 #include <parallelization/ParallelContext.hpp>
 #include <util/types.hpp>
-#include <vector>
 
 void TrimFamilies::trimMinSpeciesCoverage(Families &families,
                                           unsigned int minCoverage) {
