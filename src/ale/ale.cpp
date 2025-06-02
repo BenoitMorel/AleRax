@@ -1,10 +1,11 @@
+#include <cstdio>
+
 #include <DistanceMethods/MiniNJ.hpp>
 #include <IO/FamiliesFileParser.hpp>
 #include <IO/FileSystem.hpp>
 #include <IO/Logger.hpp>
 #include <IO/ParallelOfstream.hpp>
 #include <ccp/ConditionalClades.hpp>
-#include <cstdio>
 #include <parallelization/ParallelContext.hpp>
 #include <util/Paths.hpp>
 #include <util/RecModelInfo.hpp>
@@ -384,7 +385,7 @@ RecModelInfo buildRecModelInfo(const AleArguments &args) {
       -1.0,  // branch length threshold
       args.transferConstraint,
       false, // no dup (option specific to GeneRax)
-      args.noTL, args.fractionMissingFile, args.memorySavings);
+      args.noDL, args.noTL, args.fractionMissingFile, args.memorySavings);
 }
 
 Parameters buildStartingRates(const AleArguments &args,

@@ -1,8 +1,9 @@
 #pragma once
 
+#include <string>
+
 #include "IO/ArgumentsHelper.hpp"
 #include "util/enums.hpp"
-#include <string>
 
 /**
  *  Parses and stores the program arguments
@@ -12,7 +13,7 @@ public:
   /**
    *  Parse the arguments from main()
    */
-  AleArguments(int argc, char *argv[]);
+  AleArguments(int iargc, char *iargv[]);
 
   /**
    *  Print AleRax' help message
@@ -59,6 +60,7 @@ public:
   // model
   std::string reconciliationModelStr;
   TransferConstaint transferConstraint;
+  bool noDL;
   bool noTL;
   unsigned int gammaCategories;
   bool pruneSpeciesTree;
