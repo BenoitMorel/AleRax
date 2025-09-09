@@ -4,7 +4,6 @@
 #include <IO/Logger.hpp>
 #include <IO/ParallelOfstream.hpp>
 #include <ccp/ConditionalClades.hpp>
-#include <cstdio>
 #include <parallelization/ParallelContext.hpp>
 #include <util/Paths.hpp>
 #include <util/RecModelInfo.hpp>
@@ -47,9 +46,9 @@ void checkEnoughFamilies(const Families &families) {
     ParallelContext::abort(0);
   }
   if (families.size() < ParallelContext::getSize()) {
-    Logger::info
-        << "\nError: More MPI ranks set than valid families, aborting\n"
-        << std::endl;
+    Logger::info << "\nError: More MPI ranks set than valid families, "
+                 << "aborting\n"
+                 << std::endl;
     ParallelContext::abort(0);
   }
 }
@@ -60,15 +59,15 @@ void checkEnoughFamilies(const Families &families) {
  *  - if set, check that the mapping files exist
  */
 void filterInvalidFamilies(const AleArguments &args, Families &families) {
-  if (!args.skipFamilyFiltering) {
+  if (args.skipFamilyFiltering) {
     return;
   }
   Logger::timed << "Checking families..." << std::endl;
   Families validFamilies;
   for (const auto &family : families) {
     // check that the gene tree distribution file exists
-    std::ifstream is(family.startingGeneTree);
-    if (!is || is.peek() == std::ifstream::traits_type::eof()) {
+    std::ifstream isTrees(family.startingGeneTree);
+    if (!isTrees || isTrees.peek() == std::ifstream::traits_type::eof()) {
       Logger::info << "Excluding family " << family.name
                    << ": cannot open the gene tree distribution file!"
                    << std::endl;
@@ -83,7 +82,6 @@ void filterInvalidFamilies(const AleArguments &args, Families &families) {
         continue;
       }
     }
-    is.close();
     validFamilies.push_back(family);
   }
   families = validFamilies;
@@ -120,7 +118,7 @@ getSortedIndices(const std::vector<unsigned int> &values) {
  *  @param families The gene families to process
  *  @param ccpRooting Mode to decide how to deal with rooted gene trees
  *  @param sampleFrequency Number used to subsample the gene trees (if set to 2,
- * we only use half)
+ *  we only use half)
  *  @param ccpDimensionFile Output file with the per-family ccp sizes
  */
 void generateCCPs(const AleArguments &args, const Families &families,
@@ -193,10 +191,10 @@ void cleanupCCPs(const Families &families) {
  */
 void trimFamilies(const AleArguments &args, Families &families) {
   Logger::timed << "Families: " << families.size() << std::endl;
-  int minSpecies = args.minCoveredSpecies;
-  double trimRatio = args.trimFamilyRatio;
-  double maxCladeSplitRatio = args.maxCladeSplitRatio;
-  if (minSpecies != -1) {
+  auto minSpecies = args.minCoveredSpecies;
+  auto trimRatio = args.trimFamilyRatio;
+  auto maxCladeSplitRatio = args.maxCladeSplitRatio;
+  if (minSpecies > 0) {
     Logger::timed << "Trimming families covering less than " << minSpecies
                   << " species..." << std::endl;
     TrimFamilies::trimMinSpeciesCoverage(families, minSpecies);
@@ -209,7 +207,7 @@ void trimFamilies(const AleArguments &args, Families &families) {
     TrimFamilies::trimHighCladesNumber(families, (1.0 - trimRatio));
     Logger::timed << "Remaining families: " << families.size() << std::endl;
   }
-  if (maxCladeSplitRatio > 1.0) {
+  if (maxCladeSplitRatio >= 0.0) {
     Logger::timed
         << "Trimming families with a ratio (observed clades)/(gene nodes) > "
         << maxCladeSplitRatio << "..." << std::endl;
@@ -382,9 +380,8 @@ RecModelInfo buildRecModelInfo(const AleArguments &args) {
       false, // force gene tree root (option specific to GeneRax)
       false, // mad rooting (option specific to GeneRax)
       -1.0,  // branch length threshold
-      args.transferConstraint,
-      false, // no dup (option specific to GeneRax)
-      args.noTL, args.fractionMissingFile, args.memorySavings);
+      args.transferConstraint, args.noDup, args.noDL, args.noTL,
+      args.fractionMissingFile, args.memorySavings);
 }
 
 Parameters buildStartingRates(const AleArguments &args,
@@ -509,9 +506,9 @@ void runReconciliationInference(const AleArguments &args,
 }
 
 /**
- * Main function of AleRax once the arguments have been parsed
+ *  Main function of AleRax once the arguments have been parsed
  *
- * @param args The program arguments
+ *  @param args The program arguments
  */
 void run(AleArguments &args) {
   Random::setSeed(static_cast<unsigned int>(args.seed));

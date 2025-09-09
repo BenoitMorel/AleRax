@@ -2,10 +2,11 @@
 
 #include <fstream>
 #include <map>
-#include <parallelization/ParallelContext.hpp>
 #include <sstream>
-#include <trees/PLLRootedTree.hpp>
 #include <unordered_set>
+
+#include <parallelization/ParallelContext.hpp>
+#include <trees/PLLRootedTree.hpp>
 #include <util/RecModelInfo.hpp>
 
 static void extractSpeciesToCatRecursive(

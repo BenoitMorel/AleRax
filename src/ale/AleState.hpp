@@ -1,10 +1,11 @@
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include <IO/Families.hpp>
 #include <IO/HighwayCandidateParser.hpp>
-#include <string>
 #include <trees/SpeciesTree.hpp>
-#include <vector>
 
 #include "AleModelParameters.hpp"
 
