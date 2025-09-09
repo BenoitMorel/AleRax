@@ -1,40 +1,36 @@
 #include "AleArguments.hpp"
 
-#include <climits>
-
-#include <IO/FileSystem.hpp>
 #include <IO/Logger.hpp>
 #include <parallelization/ParallelContext.hpp>
 
 const unsigned int DEFAULT_HIGHWAY_CANDIDATES_1 = 100;
 const unsigned int DEFAULT_HIGHWAY_CANDIDATES_2 = 50;
-const unsigned int DEFAULT_GENE_TREE_SAMPLES = 100;
+const unsigned int DEFAULT_SAMPLE_FREQUENCY = 1;
 const unsigned int DEFAULT_MIN_COVERED_SPECIES = 4;
-const double DEFAULT_MAX_SPLIT_RATIO = -1.0;
 const double DEFAULT_TRIM_FAMILY_RATIO = 0.0;
+const double DEFAULT_MAX_SPLIT_RATIO = -1.0;
 const double DEFAULT_DTL_RATES = 0.1;
 
-AleArguments::AleArguments(int iargc, char *iargv[])
+AleArguments::AleArguments(int iargc, char **iargv)
     : argc(iargc), argv(iargv), reconciliationModelStr("UndatedDTL"),
-      transferConstraint(TransferConstaint::PARENTS), noDL(false), noTL(false),
-      gammaCategories(1), pruneSpeciesTree(false),
-      ccpRooting(CCPRooting::UNIFORM),
+      transferConstraint(TransferConstaint::PARENTS), noDup(false), noDL(false),
+      noTL(false), pruneSpeciesTree(false), ccpRooting(CCPRooting::UNIFORM),
       originationStrategy(OriginationStrategy::UNIFORM), memorySavings(false),
       d(DEFAULT_DTL_RATES), l(DEFAULT_DTL_RATES), t(DEFAULT_DTL_RATES),
       speciesTreeAlgorithm(SpeciesTreeAlgorithm::User),
       speciesSearchStrategy(SpeciesSearchStrategy::SKIP),
       inferSpeciationOrders(false),
-      modelParametrization(ModelParametrization::GLOBAL),
+      modelParametrization(ModelParametrization::GLOBAL), gammaCategories(1),
       recOpt(RecOpt::LBFGSB), fixRates(false), skipThoroughRates(false),
       highways(false), highwayCandidatesStep1(DEFAULT_HIGHWAY_CANDIDATES_1),
       highwayCandidatesStep2(DEFAULT_HIGHWAY_CANDIDATES_2),
       skipFamilyFiltering(false),
       minCoveredSpecies(DEFAULT_MIN_COVERED_SPECIES),
       trimFamilyRatio(DEFAULT_TRIM_FAMILY_RATIO),
-      maxCladeSplitRatio(DEFAULT_MAX_SPLIT_RATIO), sampleFrequency(1),
-      output("alerax_output"), geneTreeSamples(DEFAULT_GENE_TREE_SAMPLES),
-      cleanupCCP(false), seed(123), randomSpeciesRoot(false),
-      optVerbose(false) {
+      maxCladeSplitRatio(DEFAULT_MAX_SPLIT_RATIO),
+      sampleFrequency(DEFAULT_SAMPLE_FREQUENCY), output("alerax_output"),
+      geneTreeSamples(100), cleanupCCP(false), seed(123),
+      randomSpeciesRoot(false), optVerbose(false) {
   if (argc == 1) {
     printHelp();
     ParallelContext::abort(0);
@@ -56,13 +52,15 @@ AleArguments::AleArguments(int iargc, char *iargv[])
           ArgumentsHelper::strToSpeciesSearchStrategy(std::string(argv[++i]));
     } else if (arg == "--infer-speciation-order") {
       inferSpeciationOrders = true;
-    } else if (arg == "--gene-tree-samples") {
+    } else if (arg == "-g" || arg == "--gene-tree-samples") {
       geneTreeSamples = atoi(argv[++i]);
     } else if (arg == "-r" || arg == "--rec-model") {
       reconciliationModelStr = std::string(argv[++i]);
     } else if (arg == "--transfer-constraint") {
       transferConstraint =
           ArgumentsHelper::strToTransferConstraint(std::string(argv[++i]));
+    } else if (arg == "--no-dup") {
+      noDup = noDL = true;
     } else if (arg == "--no-dl") {
       noDL = true;
     } else if (arg == "--no-tl") {
@@ -81,14 +79,14 @@ AleArguments::AleArguments(int iargc, char *iargv[])
       if (ModelParametrization::CUSTOM == modelParametrization) {
         optimizationClassFile = temp;
       }
+    } else if (arg == "--speciation-gamma-categories") {
+      gammaCategories = atoi(argv[++i]);
     } else if (arg == "--rate-optimizer") {
       recOpt = ArgumentsHelper::strToRecOpt(std::string(argv[++i]));
     } else if (arg == "--fix-rates") {
       fixRates = true;
     } else if (arg == "--skip-thorough-rates") {
       skipThoroughRates = true;
-    } else if (arg == "--speciation-gamma-categories") {
-      gammaCategories = atoi(argv[++i]);
     } else if (arg == "--prune-species-tree") {
       pruneSpeciesTree = true;
     } else if (arg == "--fraction-missing-file") {
@@ -113,7 +111,7 @@ AleArguments::AleArguments(int iargc, char *iargv[])
       trimFamilyRatio = atof(argv[++i]);
     } else if (arg == "--max-clade-split-ratio") {
       maxCladeSplitRatio = atof(argv[++i]);
-    } else if (arg == "--gene-tree-sample-frequency") {
+    } else if (arg == "--ccp-sample-frequency") {
       sampleFrequency = atoi(argv[++i]);
     } else if (arg == "--cleanup-ccp") {
       cleanupCCP = true;
@@ -125,9 +123,9 @@ AleArguments::AleArguments(int iargc, char *iargv[])
       optVerbose = true;
     } else if (arg == "--per-family-rates" || arg == "--per-species-rates") {
       Logger::info << "\nError: --per-family-rates and --per-species-rates are "
-                      "deprecated and have been replaced "
-                   << "with --model-parametrization PER-FAMILY or "
-                      "--model-paramtetrization PER-SPECIES\n"
+                   << "deprecated and have been replaced with "
+                   << "--model-parametrization PER-FAMILY and "
+                   << "--model-parametrization PER-SPECIES\n"
                    << std::endl;
       ParallelContext::abort(0);
     } else {
@@ -150,14 +148,14 @@ void AleArguments::printCommand() const {
   Logger::info << getCommand() << std::endl << std::endl;
 }
 
-static std::string getOnOff(bool onOff) { return onOff ? "ON" : "OFF"; }
+static std::string getOnOff(bool isOn) { return isOn ? "ON" : "OFF"; }
 
 void AleArguments::printSummary() const {
   Logger::timed << "Run settings:" << std::endl;
   Logger::info << "\tOutput directory: " << output << std::endl;
   Logger::info << "\tFamilies information: " << families << std::endl;
   Logger::info << "\tStarting species tree: ";
-  switch (Enums::strToSpeciesTree(speciesTree)) {
+  switch (speciesTreeAlgorithm) {
   case SpeciesTreeAlgorithm::User:
     Logger::info << "will be imported from the user file: " << speciesTree
                  << std::endl;
@@ -171,7 +169,7 @@ void AleArguments::printSummary() const {
     break;
   }
 #ifdef WITH_MPI
-  Logger::info << "\tMPI Ranks: " << ParallelContext::getSize() << std::endl;
+  Logger::info << "\tMPI ranks: " << ParallelContext::getSize() << std::endl;
 #else
   Logger::info << "\tYou are running AleRax without MPI (no parallelization)"
                << std::endl;
@@ -191,6 +189,9 @@ void AleArguments::printSummary() const {
     Logger::info << "transfers to the past are forbidden" << std::endl;
     break;
   }
+  if (noDup) {
+    Logger::info << "\tThe model will not consider D events" << std::endl;
+  }
   if (noDL) {
     Logger::info << "\tThe model will not consider DL events" << std::endl;
   }
@@ -204,34 +205,34 @@ void AleArguments::printSummary() const {
     Logger::info << "rates are global to all species and families" << std::endl;
     break;
   case ModelParametrization::PER_FAMILY:
-    Logger::info
-        << "each family has a different set of rates, common to all species"
-        << std::endl;
+    Logger::info << "each family has a different set of rates "
+                 << "common to all species" << std::endl;
     break;
   case ModelParametrization::PER_SPECIES:
-    Logger::info
-        << "each species has a different set of rates, common to all families"
-        << std::endl;
+    Logger::info << "each species has a different set of rates "
+                 << "common to all families" << std::endl;
     break;
   case ModelParametrization::ORIGINATION_PER_SPECIES:
-    Logger::info << "each species has a different set of origination "
-                    "probabilities, other rates are global"
-                 << std::endl;
+    Logger::info << "each species has a different origination rate, "
+                 << "other rates are global" << std::endl;
     break;
   case ModelParametrization::CUSTOM:
-    Logger::info << "clades of species sharing specific common rates are "
-                    "described in the user file: "
-                 << optimizationClassFile << std::endl;
+    Logger::info << "is described in the user file: " << optimizationClassFile
+                 << std::endl;
     break;
-  };
-  Logger::info << "\tRate optimizer: " << ArgumentsHelper::recOptToStr(recOpt)
-               << std::endl;
+  }
   if (gammaCategories > 1) {
     Logger::info << "\tSpeciation probability categories: " << gammaCategories
                  << std::endl;
   }
-  Logger::info << "\tPrune species mode is "
-               << (pruneSpeciesTree ? "enabled" : "disabled") << std::endl;
+  Logger::info << "\tRate optimizer: " << ArgumentsHelper::recOptToStr(recOpt)
+               << std::endl;
+  if (fixRates) {
+    Logger::info << "\tStarting model rates (d,l,t) = (" << d << "," << l << ","
+                 << t << ") will not be optimized" << std::endl;
+  }
+  Logger::info << "\tPrune species mode: " << getOnOff(pruneSpeciesTree)
+               << std::endl;
   if (fractionMissingFile.size()) {
     Logger::info << "\tFraction of missing gene file: " << fractionMissingFile
                  << std::endl;
@@ -239,103 +240,91 @@ void AleArguments::printSummary() const {
   Logger::info << "\tGene tree rooting: ";
   switch (ccpRooting) {
   case CCPRooting::UNIFORM:
-    Logger::info << "all gene tree root positions are considered with the same "
-                    "probability"
-                 << std::endl;
+    Logger::info << "all gene tree root positions are considered with the "
+                 << "same probability" << std::endl;
     break;
   case CCPRooting::ROOTED:
     Logger::info << "only the roots of the input gene trees are considered"
                  << std::endl;
     break;
   case CCPRooting::MAD:
-    Logger::info << "all gene tree root positions are considered with weights "
-                    "depending on their MAD scores"
-                 << std::endl;
+    Logger::info << "all gene tree root positions are considered, weighted "
+                 << "by their MAD scores" << std::endl;
     break;
   }
   Logger::info << "\tOrigination strategy: ";
   switch (originationStrategy) {
   case OriginationStrategy::UNIFORM:
     Logger::info << "gene families can originate from each species with the "
-                    "same probability"
-                 << std::endl;
+                 << "same probability" << std::endl;
     break;
   case OriginationStrategy::ROOT:
-    Logger::info
-        << "gene families only originate at the root of the species tree"
-        << std::endl;
+    Logger::info << "gene families only originate at the root of the "
+                 << "species tree" << std::endl;
     break;
   case OriginationStrategy::LCA:
     Logger::info << "gene families only originate at the LCA of the species "
-                    "that they cover"
-                 << std::endl;
+                 << "that they cover" << std::endl;
     break;
   case OriginationStrategy::OPTIMIZE:
-    Logger::info
-        << "gene families can originate from each species, "
-        << "the per-species origination probabilities will be estimated"
-        << std::endl;
+    Logger::info << "gene families originate according to estimated "
+                 << "per-species probabilities" << std::endl;
     break;
   }
   Logger::info << "\tSpecies tree search: ";
   switch (speciesSearchStrategy) {
   case SpeciesSearchStrategy::SKIP:
   case SpeciesSearchStrategy::EVAL:
-    Logger::info << "skipping species tree search" << std::endl;
+    Logger::info << "skip species tree search" << std::endl;
     break;
   case SpeciesSearchStrategy::REROOT:
-    Logger::info << "the starting species tree will be rerooted based on the "
-                    "gene tree distributions"
-                 << std::endl;
+    Logger::info << "reroot the starting species tree based on the "
+                 << "gene tree distributions" << std::endl;
     break;
   case SpeciesSearchStrategy::HYBRID:
   case SpeciesSearchStrategy::SPR:
   case SpeciesSearchStrategy::TRANSFERS:
-    Logger::info << "the optimal species tree topology will be inferred from "
-                    "the gene tree distributions"
-                 << std::endl;
+    Logger::info << "infer the optimal species tree topology from the "
+                 << "gene tree distributions" << std::endl;
     break;
   }
   if (inferSpeciationOrders) {
     Logger::info << "\tAleRax will estimate the relative order of speciation "
-                    "events from the inferred HGTs"
-                 << std::endl;
+                 << "events from the inferred HGTs" << std::endl;
   }
   if (highways) {
     Logger::info << "\tAleRax will infer highways of horizontal gene transfer"
                  << std::endl;
     if (highwayCandidateFile.size()) {
-      Logger::info
-          << "\tCandidate highways will be obtained from the user file: "
-          << highwayCandidateFile << std::endl;
+      Logger::info << "\tCandidate highways will be obtained from the "
+                   << "user file: " << highwayCandidateFile << std::endl;
     } else {
       Logger::info << "\tCandidate highways will be obtained from "
-                      "reconciliations, max candidates: "
+                   << "reconciliations, max candidates: "
                    << highwayCandidatesStep1 << std::endl;
     }
     Logger::info << "\tMax number of the best highways to retain after "
-                    "filtering the candidates: "
-                 << highwayCandidatesStep2 << std::endl;
+                 << "filtering the candidates: " << highwayCandidatesStep2
+                 << std::endl;
   }
   Logger::info << "\tNumber of reconciled gene trees to sample: "
                << geneTreeSamples << std::endl;
   Logger::info << "\tAleRax will exclude gene families covering less than "
                << minCoveredSpecies << " species" << std::endl;
   if (trimFamilyRatio != DEFAULT_TRIM_FAMILY_RATIO) {
-    Logger::info
-        << "\tAleRax will exclude top " << trimFamilyRatio * 100
-        << "\% of the gene families with the highest numbers of observed clades"
-        << std::endl;
+    Logger::info << "\tAleRax will exclude top " << trimFamilyRatio * 100
+                 << "\% of the gene families with the highest numbers of "
+                 << "observed clades" << std::endl;
   }
   if (maxCladeSplitRatio != DEFAULT_MAX_SPLIT_RATIO) {
-    Logger::info << "\tAleRax will exclude gene families with the observed "
-                    "clades to gene nodes ratio greater than "
+    Logger::info << "\tAleRax will exclude gene families with the "
+                 << "observed clades to gene nodes ratio greater than "
                  << maxCladeSplitRatio << std::endl;
   }
-  if (sampleFrequency != 1) {
+  if (sampleFrequency != DEFAULT_SAMPLE_FREQUENCY) {
     Logger::info << "\tAleRax will use only every i-th tree from the given "
-                    "gene tree distributions to obtain "
-                 << "observed clades, i = " << sampleFrequency << std::endl;
+                 << "gene tree distributions to obtain observed clades, "
+                 << "i = " << sampleFrequency << std::endl;
   }
   printWarning();
   Logger::info << std::endl;
@@ -346,32 +335,31 @@ void AleArguments::printHelp() const {
   Logger::info << "General options:" << std::endl;
   Logger::info << "\t-h, --help" << std::endl;
   Logger::info << "\t-f, --families <FAMILIES FILE>" << std::endl;
-  Logger::info
-      << "\t-s, --species-tree <SPECIES TREE> {Random, MiniNJ, <filepath>}"
-      << std::endl;
+  Logger::info << "\t-s, --species-tree <SPECIES TREE> "
+               << "{Random, MiniNJ, <filepath>}" << std::endl;
   Logger::info << "\t-p, --prefix <OUTPUT DIR>" << std::endl;
-  Logger::info << "\t--gene-tree-samples <number of samples>" << std::endl;
+  Logger::info << "\t-g, --gene-tree-samples <number of samples>" << std::endl;
   Logger::info << "\t--seed <seed>" << std::endl;
+  Logger::info << "\t--cleanup-ccp" << std::endl;
 
   Logger::info << "Reconciliation model options:" << std::endl;
-  Logger::info
-      << "\t-r --rec-model <reconciliationModel> {UndatedDL, UndatedDTL}"
-      << std::endl;
+  Logger::info << "\t-r, --rec-model <reconciliation model> "
+               << "{UndatedDL, UndatedDTL}" << std::endl;
   Logger::info << "\t--transfer-constraint {NONE, PARENTS, RELDATED}"
                << std::endl;
   Logger::info << "\t--model-parametrization {GLOBAL, PER-FAMILY, PER-SPECIES, "
-                  "ORIGINATION-PER-SPECIES, <filepath>}"
-               << std::endl;
+               << "ORIGINATION-PER-SPECIES, <filepath>}" << std::endl;
   Logger::info << "\t--speciation-gamma-categories <number of categories>"
                << std::endl;
-  Logger::info << "\t--origination {UNIFORM, ROOT, LCA, OPTIMIZE}" << std::endl;
   Logger::info << "\t--rate-optimizer {LBFGSB, GRADIENT, SIMPLEX, GSL_SIMPLEX}"
                << std::endl;
   Logger::info << "\t--fix-rates" << std::endl;
   Logger::info << "\t--verbose-opt" << std::endl;
   Logger::info << "\t--gene-tree-rooting {UNIFORM, MAD, ROOTED}" << std::endl;
+  Logger::info << "\t--origination {UNIFORM, ROOT, LCA, OPTIMIZE}" << std::endl;
   Logger::info << "\t--prune-species-tree" << std::endl;
   Logger::info << "\t--fraction-missing-file <filepath>" << std::endl;
+  Logger::info << "\t--no-dup" << std::endl;
   Logger::info << "\t--no-dl" << std::endl;
   Logger::info << "\t--no-tl" << std::endl;
   Logger::info << "\t--memory-savings" << std::endl;
@@ -384,7 +372,7 @@ void AleArguments::printHelp() const {
   Logger::info << "\t--min-covered-species <int>" << std::endl;
   Logger::info << "\t--trim-ratio <proportion>" << std::endl;
   Logger::info << "\t--max-clade-split-ratio <value>" << std::endl;
-  Logger::info << "\t--gene-tree-sample-frequency <int>" << std::endl;
+  Logger::info << "\t--ccp-sample-frequency <int>" << std::endl;
 
   Logger::info << "Transfer highway options:" << std::endl;
   Logger::info << "\t--highways" << std::endl;
@@ -393,8 +381,7 @@ void AleArguments::printHelp() const {
   Logger::info << "\t--highway-candidates-step2 <int>" << std::endl;
 
   Logger::info << "For a more detailed description please check the wiki on "
-                  "our github page:"
-               << std::endl;
+               << "our github page:" << std::endl;
   Logger::info << "https://github.com/BenoitMorel/AleRax/wiki" << std::endl;
   Logger::info << std::endl;
 }
@@ -403,8 +390,8 @@ void AleArguments::printWarning() const {
   if (transferConstraint == TransferConstaint::NONE) {
     Logger::info << std::string(112, '!') << std::endl;
     Logger::info << "! WARNING: --transfer-constraint NONE is biologically "
-                    "nonsensical and "
-                 << "should be used for testing purposes only !" << std::endl;
+                 << "nonsensical and should be used for testing purposes only !"
+                 << std::endl;
     Logger::info << std::string(112, '!') << std::endl;
   }
 }
@@ -416,14 +403,12 @@ void AleArguments::checkValid() const {
     if (transferConstraint == TransferConstaint::RELDATED) {
       ok = false;
       Logger::info << "\nError: species tree search is not compatible "
-                   << "with --transfer-constraint RELDATED\n"
-                   << std::endl;
+                   << "with --transfer-constraint RELDATED" << std::endl;
     }
     if (modelParametrization == ModelParametrization::CUSTOM) {
       ok = false;
       Logger::info << "\nError: species tree search is not compatible "
-                   << "with --model-parametrization <filename>\n"
-                   << std::endl;
+                   << "with --model-parametrization <filename>" << std::endl;
     }
   }
   if (speciesSearchStrategy == SpeciesSearchStrategy::REROOT) {
@@ -432,14 +417,12 @@ void AleArguments::checkValid() const {
       ok = false;
       Logger::info << "\nError: species tree root inference is not compatible "
                    << "with --transfer-constraint RELDATED unless "
-                   << "using --infer-speciation-order\n"
-                   << std::endl;
+                   << "using --infer-speciation-order" << std::endl;
     }
     if (modelParametrization == ModelParametrization::CUSTOM) {
       ok = false;
       Logger::info << "\nError: species tree root inference is not compatible "
-                   << "with --model-parametrization <filename>\n"
-                   << std::endl;
+                   << "with --model-parametrization <filename>" << std::endl;
     }
   }
   // recmodel block
@@ -447,28 +430,39 @@ void AleArguments::checkValid() const {
     if (transferConstraint != TransferConstaint::PARENTS) {
       ok = false;
       Logger::info << "\nError: --transfer-constraint can only be used "
-                   << "with --rec-model UndatedDTL\n"
-                   << std::endl;
+                   << "with --rec-model UndatedDTL" << std::endl;
+    }
+    if (noDup) {
+      ok = false;
+      Logger::info << "\nError: --no-dup can only be used "
+                   << "with --rec-model UndatedDTL" << std::endl;
     }
     if (noTL) {
       ok = false;
       Logger::info << "\nError: --no-tl can only be used "
-                   << "with --rec-model UndatedDTL\n"
-                   << std::endl;
+                   << "with --rec-model UndatedDTL" << std::endl;
     }
     if (highways) {
       ok = false;
       Logger::info << "\nError: --highways can only be used "
-                   << "with --rec-model UndatedDTL\n"
-                   << std::endl;
+                   << "with --rec-model UndatedDTL" << std::endl;
     }
+  }
+  if (noDup && noTL) {
+    ok = false;
+    Logger::info << "\nError: --no-dup cannot be used "
+                 << "with --no-tl" << std::endl;
+  }
+  if (d <= 0.0 || l <= 0.0 || t <= 0.0) {
+    ok = false;
+    Logger::info << "\nError: --d and --l and --t can only take "
+                 << "values > 0.0" << std::endl;
   }
   // missing species block
   if (pruneSpeciesTree && fractionMissingFile.size()) {
     ok = false;
     Logger::info << "\nError: --fraction-missing-file cannot be used "
-                 << "with --prune-species-tree\n"
-                 << std::endl;
+                 << "with --prune-species-tree" << std::endl;
   }
   // model parametrization block
   if ((modelParametrization == ModelParametrization::GLOBAL ||
@@ -477,62 +471,80 @@ void AleArguments::checkValid() const {
     ok = false;
     Logger::info << "\nError: --origination OPTIMIZE cannot be used "
                  << "with --model-parametrization GLOBAL or "
-                 << "--model-parametrization PER-FAMILY\n"
-                 << std::endl;
+                 << "--model-parametrization PER-FAMILY" << std::endl;
   }
   if (modelParametrization == ModelParametrization::ORIGINATION_PER_SPECIES &&
       originationStrategy != OriginationStrategy::OPTIMIZE) {
     ok = false;
     Logger::info << "\nError: --model-parametrization ORIGINATION-PER-SPECIES "
-                    "can only be used "
-                 << "with --origination OPTIMIZE\n"
-                 << std::endl;
+                 << "can only be used with --origination OPTIMIZE" << std::endl;
   }
   if (modelParametrization == ModelParametrization::PER_FAMILY &&
       gammaCategories > 1) {
     ok = false;
     Logger::info << "\nError: --speciation-gamma-categories cannot be used "
-                 << "with --model-parametrization PER-FAMILY\n"
-                 << std::endl;
+                 << "with --model-parametrization PER-FAMILY" << std::endl;
+  }
+  if (gammaCategories < 1) {
+    ok = false;
+    Logger::info << "\nError: --speciation-gamma-categories can only take "
+                 << "values >= 1" << std::endl;
   }
   // reldating block
   if (transferConstraint != TransferConstaint::RELDATED &&
       inferSpeciationOrders) {
     ok = false;
     Logger::info << "\nError: --infer-speciation-order can only be used "
-                 << "with --transfer-constraint RELDATED\n"
-                 << std::endl;
+                 << "with --transfer-constraint RELDATED" << std::endl;
   }
   // highway block
   if (!highways) {
     if (highwayCandidateFile.size()) {
       ok = false;
       Logger::info << "\nError: --highway-candidates-file can only be used "
-                   << "with --highways\n"
-                   << std::endl;
+                   << "with --highways" << std::endl;
     }
     if (highwayCandidatesStep1 != DEFAULT_HIGHWAY_CANDIDATES_1) {
       ok = false;
       Logger::info << "\nError: --highway-candidate-step1 can only be used "
-                   << "with --highways\n"
-                   << std::endl;
+                   << "with --highways" << std::endl;
     }
     if (highwayCandidatesStep2 != DEFAULT_HIGHWAY_CANDIDATES_2) {
       ok = false;
       Logger::info << "\nError: --highway-candidate-step2 can only be used "
-                   << "with --highways\n"
-                   << std::endl;
+                   << "with --highways" << std::endl;
     }
   }
   if (highwayCandidateFile.size() &&
       highwayCandidatesStep1 != DEFAULT_HIGHWAY_CANDIDATES_1) {
     ok = false;
     Logger::info << "\nError: --highway-candidate-step1 cannot be used "
-                 << "with --highway-candidates-file\n"
-                 << std::endl;
+                 << "with --highway-candidates-file" << std::endl;
+  }
+  // trimming block
+  if (minCoveredSpecies < 1) {
+    ok = false;
+    Logger::info << "\nError: --min-covered-species can only take "
+                 << "values >= 1" << std::endl;
+  }
+  if (trimFamilyRatio < 0.0 || trimFamilyRatio > 1.0) {
+    ok = false;
+    Logger::info << "\nError: --trim-ratio can only take "
+                 << "values from interval [0.0,1.0]" << std::endl;
+  }
+  if (maxCladeSplitRatio < 0.0 && maxCladeSplitRatio != -1.0) {
+    ok = false;
+    Logger::info << "\nError: --max-clade-split-ratio can only take "
+                 << "values >= 0.0 or -1.0" << std::endl;
+  }
+  if (sampleFrequency < 1) {
+    ok = false;
+    Logger::info << "\nError: --ccp-sample-frequency can only take "
+                 << "values >= 1" << std::endl;
   }
   // final
   if (!ok) {
+    Logger::info << std::endl;
     ParallelContext::abort(0);
   }
 }

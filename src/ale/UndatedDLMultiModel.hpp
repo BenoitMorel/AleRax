@@ -156,6 +156,7 @@ void UndatedDLMultiModel<REAL>::recomputeSpeciesProbabilities() {
       _PL[ec] = lossRates[e];
       _PS[ec] = _gammaScalers[c];
       if (this->_info.noDup) {
+        assert(false);
         _PD[ec] = 0.0;
       }
       auto sum = _PD[ec] + _PL[ec] + _PS[ec];

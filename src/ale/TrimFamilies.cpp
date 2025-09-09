@@ -37,6 +37,7 @@ void TrimFamilies::trimMinSpeciesCoverage(Families &families,
 }
 
 void TrimFamilies::trimHighCladesNumber(Families &families, double keepRatio) {
+  assert(keepRatio >= 0.0);
   auto N = families.size();
   // get family observed clade numbers in parallel
   std::vector<unsigned int> localCcpSizes;
@@ -65,22 +66,25 @@ void TrimFamilies::trimHighCladesNumber(Families &families, double keepRatio) {
   // trim families
   Families familiesCopy = families;
   families.clear();
-  unsigned int cutAfter = (unsigned int)(double(N) * keepRatio);
-  assert(cutAfter > 0);
-  for (unsigned int i = 0; i < cutAfter; ++i) {
+  unsigned int cutFrom = (unsigned int)(double(N) * keepRatio);
+  assert(cutFrom <= N);
+  unsigned int maxCcpSizeKept = 0;
+  for (unsigned int i = 0; i < cutFrom; ++i) {
     assert(ParallelContext::isIntEqual(sizeToIndex[i].second));
     families.push_back(familiesCopy[sizeToIndex[i].second]);
+    maxCcpSizeKept = sizeToIndex[i].first;
   }
-  Logger::info << "Trimming families with from " << sizeToIndex[cutAfter].first
-               << " to " << sizeToIndex.back().first << " clades" << std::endl;
+  Logger::info << "Trimming families with more than " << maxCcpSizeKept
+               << " clades" << std::endl;
 }
 
 void TrimFamilies::trimCladeSplitRatio(Families &families, double maxRatio) {
+  assert(maxRatio >= 0.0);
   auto N = families.size();
   // filter families in parallel
   std::vector<unsigned int> localToKeep;
   unsigned int allClades = 0;
-  unsigned int filteredClades = 0;
+  unsigned int keptClades = 0;
   for (auto i = ParallelContext::getBegin(N); i < ParallelContext::getEnd(N);
        ++i) {
     ConditionalClades ccp;
@@ -88,9 +92,9 @@ void TrimFamilies::trimCladeSplitRatio(Families &families, double maxRatio) {
     auto c = ccp.getCladesNumber();
     auto n = ccp.getLeafNumber() * 2 - 3;
     allClades += c;
-    if (maxRatio * n >= c) {
+    if (maxRatio * double(n) >= double(c)) {
       localToKeep.push_back(i);
-      filteredClades += c;
+      keptClades += c;
     }
   }
   ParallelContext::barrier();
@@ -98,9 +102,9 @@ void TrimFamilies::trimCladeSplitRatio(Families &families, double maxRatio) {
   std::vector<unsigned int> toKeep;
   ParallelContext::concatenateHetherogeneousUIntVectors(localToKeep, toKeep);
   ParallelContext::sumUInt(allClades);
-  ParallelContext::sumUInt(filteredClades);
+  ParallelContext::sumUInt(keptClades);
   Logger::info << "Clades before trimming: " << allClades << std::endl;
-  Logger::info << "Clades after trimming: " << filteredClades << std::endl;
+  Logger::info << "Clades after trimming: " << keptClades << std::endl;
   // trim families
   Families familiesCopy = families;
   families.clear();

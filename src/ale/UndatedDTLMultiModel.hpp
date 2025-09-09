@@ -53,7 +53,7 @@ private:
     // given the clade is mapped to the species branch e.
     // In the paper: Pi_{e,gamma} of a clade gamma for each branch e
     std::vector<REAL> _uq;
-    // Element e of the gene clade's _ut stores the probability of the clade
+    // Element e of the gene clade's _tq stores the probability of the clade
     // to be transferred from the species node e to some other species node.
     // In the paper: \bar{Pi}_{e,gamma} of a clade gamma for each branch e
     std::vector<REAL> _tq;
@@ -313,6 +313,7 @@ void UndatedDTLMultiModel<REAL>::recomputeSpeciesProbabilities() {
       _PT[ec] = transferRates[e];
       _PS[ec] = _gammaScalers[c];
       if (this->_info.noDup) {
+        assert(!this->_info.noTL);
         _PD[ec] = 0.0;
       }
       auto sum = _PD[ec] + _PL[ec] + _PT[ec] + _PS[ec];

@@ -254,8 +254,9 @@ template <class REAL> double MultiModel<REAL>::computeLogLikelihood() {
   // check if LL is already computed for this species tree
   auto cacheIt = this->_llCache.find(hash);
   if (cacheIt != this->_llCache.end()) {
-    if (!this->_info.isDated()) // too many collisions for dated getHash(), del
-                                // the line upon fixing
+    // too many collisions for dated getHash(),
+    // delete the condition line upon fixing
+    if (!this->_info.isDated())
       return cacheIt->second;
   }
   if (this->_memorySavings) {
@@ -368,7 +369,7 @@ bool MultiModel<REAL>::computeScenario(Scenario &scenario, bool stochastic) {
   scenario.setSpeciesTree(&this->_speciesTree);
   auto geneRoot = scenario.generateGeneRoot();
   scenario.setGeneRoot(geneRoot);
-  auto virtualRootIndex = 2 * _ccp.getLeafNumber();
+  auto virtualRootIndex = 2 * this->_ccp.getLeafNumber();
   scenario.setVirtualRootIndex(virtualRootIndex);
   // run sampling recursion
   auto ok = backtrace(rootCID, originationSpecies, geneRoot, category, scenario,

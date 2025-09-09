@@ -37,29 +37,19 @@ void AleState::checkCheckpointCmd(const std::string &currentCmd,
   is >> std::ws;
   std::getline(is, checkpointCmd);
   is.close();
+  std::string errorStr;
   if (checkpointRanks != currentRanks) {
-    Logger::info << "\nThe number of MPI ranks used to run the program is "
-                    "different from the checkpoint."
-                 << std::endl;
-    Logger::info
-        << "To run anew please rename or remove or change the output directory."
-        << std::endl;
-    Logger::info << "To restart from the checkpoint please run the program "
-                    "exactly as given in the "
-                 << cmdPath << " file\n"
-                 << std::endl;
-    ParallelContext::abort(0);
+    errorStr = "number of MPI ranks";
+  } else if (checkpointCmd != currentCmd) {
+    errorStr = "command";
   }
-  if (checkpointCmd != currentCmd) {
-    Logger::info << "\nThe command used to run the program is different from "
-                    "the checkpoint."
-                 << std::endl;
-    Logger::info
-        << "To run anew please rename or remove or change the output directory."
-        << std::endl;
+  if (errorStr.size()) {
+    Logger::info << "\nThe " << errorStr << " used to run the program is "
+                 << "different from the checkpoint." << std::endl;
+    Logger::info << "To run anew please rename or remove or change "
+                 << "the output directory." << std::endl;
     Logger::info << "To restart from the checkpoint please run the program "
-                    "exactly as given in the "
-                 << cmdPath << " file\n"
+                 << "exactly as given in the " << cmdPath << " file\n"
                  << std::endl;
     ParallelContext::abort(0);
   }
@@ -163,11 +153,10 @@ void AleState::unserialize(const std::string &checkpointDir,
   is >> bufferUint;
   currentStep = static_cast<AleStep>(bufferUint);
   if (currentStep == AleStep::End) {
-    Logger::info << "\nThe previous run finished successfully according to the "
-                    "checkpoint."
-                 << std::endl;
-    Logger::info << "To run anew please rename or remove or change the output "
-                    "directory\n"
+    Logger::info << "\nThe previous run finished successfully according to "
+                 << "the checkpoint." << std::endl;
+    Logger::info << "To run anew please rename or remove or change "
+                 << "the output directory\n"
                  << std::endl;
     ParallelContext::abort(0);
   }
