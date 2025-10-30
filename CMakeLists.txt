@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0.1)
+cmake_minimum_required(VERSION 3.11)
 
 project(AleRaxProject
         VERSION 0.0)
@@ -53,7 +53,6 @@ set(ALERAX_INCLUDE_DIRS ${GENERAXCORE_INCLUDE_DIRS}
    ${CMAKE_CURRENT_SOURCE_DIR}/ext
    ${MPI_INCLUDE_PATH}
    ${CORAX_INCLUDE_DIRS})
-  
+
 
 add_subdirectory(src)
-
