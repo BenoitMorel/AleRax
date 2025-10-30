@@ -27,7 +27,8 @@ public:
   OptimizationClasses(const PLLRootedTree &speciesTree,
                       ModelParametrization parametrization,
                       const std::string &optimizationClassFile,
-                      const RecModelInfo &info);
+                      const RecModelInfo &info,
+                      const std::vector<std::tuple<char, unsigned int, double>> &fixed_rates);
 
   /**
    *  Accessor
@@ -62,4 +63,6 @@ private:
   std::unordered_map<char, unsigned int> _allTypeIndices;
   // number of optimization classes (number of free parameters in the model)
   unsigned int _classNumber;
+  // list of fixed rates by type specified by user input
+  std::vector<std::vector<std::pair<unsigned int, double>>> _fixed_rates;
 };

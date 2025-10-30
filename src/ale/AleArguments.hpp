@@ -55,6 +55,7 @@ public:
   CCPRooting ccpRooting;
   std::string fractionMissingFile;
   std::string optimizationClassFile;
+  std::string fixedRatesFile;
   ModelParametrization modelParametrization;
   bool memorySavings;
   double d;

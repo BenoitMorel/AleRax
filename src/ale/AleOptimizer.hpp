@@ -42,7 +42,9 @@ public:
   AleOptimizer(const std::string speciesTreeFile, const Families &families,
                const RecModelInfo &info,
                ModelParametrization modelParametrization,
-               const Parameters &startingRates, bool optimizeRates,
+               const Parameters &startingRates,
+               const std::string &fixedRatesFile,
+               bool optimizeRates,
                bool optimizeVerbose, const std::string &optimizationClassFile,
                const std::string &outputDir);
 

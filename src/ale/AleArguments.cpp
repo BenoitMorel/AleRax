@@ -55,6 +55,8 @@ AleArguments::AleArguments(int iargc, char *iargv[])
       recOpt = ArgumentsHelper::strToRecOpt(std::string(argv[++i]));
     } else if (arg == "--fix-rates") {
       fixRates = true;
+    } else if (arg == "--fixed-rates-file") {
+      fixedRatesFile = std::string(argv[++i]);
     } else if (arg == "--highways") {
       highways = true;
     } else if (arg == "--highway-candidate-file") {

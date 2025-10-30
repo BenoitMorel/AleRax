@@ -22,6 +22,39 @@ static bool dirExists(const std::string &pathname) {
   }
 }
 
+
+static bool parseFixedRates(const std::string& filepath, SpeciesTree &tree, std::vector<std::tuple<char, unsigned int, double>> &fixed_rates) {
+  std::ifstream file(filepath);
+  if (!file.is_open()) {
+    throw std::runtime_error("Could not open file: " + filepath);
+  }
+  std::string line;
+  std::string branch;
+  char paramType;
+  double paramValue;
+  auto labelToNodeId = tree.getTree().getLabelToNode(false);
+
+  while (std::getline(file, line)) {
+    if (line.empty()) continue; // skip blank lines
+    std::istringstream iss(line);
+    if (!(iss >> paramType >> branch >> paramValue)) {
+      throw std::runtime_error("Invalid line format: " + line);
+    }
+    auto it = labelToNodeId.find(branch);
+    if (it == labelToNodeId.end()) {
+      Logger::info << "Error: label " << branch <<
+      " not found in the species tree. Check line:\n"
+      << line << "\nof file " << filepath << std::endl;
+      return false;
+    }
+    unsigned int branchId = it->second->node_index;
+    Logger::info << "Fixing parameter " << paramType << " on branch " << branch << " to " << paramValue << std::endl;
+    fixed_rates.emplace_back(paramType, branchId, paramValue);
+  }
+  return true;
+}
+
+
 static bool testAndSwap(size_t &hash1, size_t &hash2) {
   std::swap(hash1, hash2);
   return hash1 != hash2;
@@ -30,7 +63,9 @@ static bool testAndSwap(size_t &hash1, size_t &hash2) {
 AleOptimizer::AleOptimizer(const std::string speciesTreeFile,
                            const Families &families, const RecModelInfo &info,
                            ModelParametrization modelParametrization,
-                           const Parameters &startingRates, bool optimizeRates,
+                           const Parameters &startingRates,
+                           const std::string &fixedRatesFile,
+                           bool optimizeRates,
                            bool optimizeVerbose,
                            const std::string &optimizationClassFile,
                            const std::string &outputDir)
@@ -54,12 +89,18 @@ AleOptimizer::AleOptimizer(const std::string speciesTreeFile,
       Paths::getSpeciesTreeFile(_outputDir, "inferred_species_tree.newick"),
       _geneTrees.getTrees().size());
   _speciesTreeSearchState->addListener(this);
+
+  std::vector<std::tuple<char, unsigned int, double>> fixed_rates;
+  if (!fixedRatesFile.empty() && !parseFixedRates(fixedRatesFile, getSpeciesTree(), fixed_rates)) {
+    Logger::info << "Fixed rates parsing encountered an error! No fixed rates will be used!" << std::endl;
+    fixed_rates.clear();
+  }
   Logger::info << getSpeciesTree().getTree().getNewickString() << std::endl;
   getSpeciesTree().addListener(this);
   ParallelContext::barrier();
   _evaluator = std::make_unique<AleEvaluator>(
       *this, getSpeciesTree(), getRecModelInfo(), modelParametrization,
-      getModelParameters(), optimizeRates, optimizeVerbose, families,
+      getModelParameters(), fixed_rates, optimizeRates, optimizeVerbose, families,
       _geneTrees, optimizationClassFile, _outputDir);
   Logger::timed << "Initial ll=" << getEvaluator().computeLikelihood()
                 << std::endl;

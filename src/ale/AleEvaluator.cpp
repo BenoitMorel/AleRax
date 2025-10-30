@@ -51,7 +51,8 @@ createModel(SpeciesTree &speciesTree, const FamilyInfo &family,
 AleEvaluator::AleEvaluator(
     AleOptimizer &optimizer, SpeciesTree &speciesTree, const RecModelInfo &info,
     ModelParametrization modelParametrization,
-    std::vector<AleModelParameters> &modelParameters, bool optimizeRates,
+    std::vector<AleModelParameters> &modelParameters,
+    const std::vector<std::tuple<char, unsigned int, double>> &fixed_rates, bool optimizeRates,
     bool optimizeVerbose, const Families &families, PerCoreGeneTrees &geneTrees,
     const std::string &speciesCategoryFile, const std::string &outputDir)
     : _optimizer(optimizer), _speciesTree(speciesTree), _info(info),
@@ -60,7 +61,7 @@ AleEvaluator::AleEvaluator(
       _highPrecisions(_geneTrees.getTrees().size(), -1), _outputDir(outputDir),
       _optimizeVerbose(optimizeVerbose),
       _optimizationClasses(_speciesTree.getTree(), modelParametrization,
-                           speciesCategoryFile, _info) {
+                           speciesCategoryFile, _info, fixed_rates) {
   Logger::timed << "Initializing ccps and evaluators..." << std::endl;
   _evaluations.resize(_geneTrees.getTrees().size());
   for (unsigned int i = 0; i < _geneTrees.getTrees().size(); ++i) {

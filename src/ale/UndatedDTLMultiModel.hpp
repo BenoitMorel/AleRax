@@ -152,7 +152,7 @@ UndatedDTLMultiModel<REAL>::UndatedDTLMultiModel(
       _originationStrategy(info.originationStrategy) {
   auto N = this->_speciesTree.getNodeNumber();
   _highways.resize(N);
-  _dtlRates.resize(this->_info.modelFreeParameters(),
+  _dtlRates.resize(this->_info.modelParameters(),
                    std::vector<double>(N, 0.2));
   this->onSpeciesTreeChange(nullptr);
   setAlpha(1.0);
@@ -173,7 +173,7 @@ template <class REAL> void UndatedDTLMultiModel<REAL>::deallocateMemory() {
 template <class REAL>
 void UndatedDTLMultiModel<REAL>::setRates(const RatesVector &rates) {
   resetCache();
-  assert(rates.size() == this->_info.modelFreeParameters());
+  assert(rates.size() == this->_info.modelParameters());
   _dtlRates = rates;
   recomputeSpeciesProbabilities();
 }
@@ -478,7 +478,7 @@ void UndatedDTLMultiModel<REAL>::recomputeSpeciesProbabilities() {
     possibleSpeciesRootNodes = &speciesNodesBuffer;
     break;
   }
-  if (_originationStrategy == OriginationStrategy::OPTIMIZE) {
+  if (_originationStrategy == OriginationStrategy::OPTIMIZE || _originationStrategy == OriginationStrategy::UNIFORM) {
     double sum = 0.0;
     for (auto speciesNode : *possibleSpeciesRootNodes) {
       sum += _dtlRates[3][speciesNode->node_index];

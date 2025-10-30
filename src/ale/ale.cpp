@@ -357,18 +357,20 @@ RecModelInfo buildRecModelInfo(const AleArguments &args) {
 
 Parameters buildStartingRates(const AleArguments &args,
                               const RecModelInfo &info) {
-  Parameters res(info.modelFreeParameters());
+  Parameters res(info.modelParameters());
   double average = 0.0;
   switch (info.model) {
   case RecModel::UndatedDL:
     res[0] = args.d;
     res[1] = args.l;
+    res[2] = 1.0;
     average = (args.d + args.l) / 2.0;
     break;
   case RecModel::UndatedDTL:
     res[0] = args.d;
     res[1] = args.l;
     res[2] = args.t;
+    res[3] = 1.0;
     average = (args.d + args.l + args.t) / 3.0;
     break;
   default:
@@ -475,6 +477,7 @@ void initStartingSpeciesTreeFromCheckpoint(AleArguments &args) {
   ParallelContext::barrier();
 }
 
+
 /**
  * Main function of AleRax once the arguments have been parsed
  *
@@ -522,7 +525,7 @@ void run(AleArguments &args) {
   Family::printStats(families, args.speciesTree, coverageFile,
                      fractionMissingFile);
   AleOptimizer speciesTreeOptimizer(args.speciesTree, families, info,
-                                    args.modelParametrization, startingRates,
+                                    args.modelParametrization, startingRates, args.fixedRatesFile,
                                     !args.fixRates, args.verboseOptRates,
                                     args.optimizationClassFile, args.output);
 

@@ -65,7 +65,7 @@ UndatedDLMultiModel<REAL>::UndatedDLMultiModel(
 
 template <class REAL>
 void UndatedDLMultiModel<REAL>::setRates(const RatesVector &rates) {
-  assert(rates.size() == this->_info.modelFreeParameters());
+  assert(rates.size() == this->_info.modelParameters());
   _dlRates = rates;
   recomputeSpeciesProbabilities();
 }

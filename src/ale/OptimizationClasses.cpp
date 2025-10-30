@@ -119,7 +119,8 @@ static void fillFromOriginations(
 
 OptimizationClasses::OptimizationClasses(
     const PLLRootedTree &speciesTree, ModelParametrization parametrization,
-    const std::string &optimizationClassFile, const RecModelInfo &info)
+    const std::string &optimizationClassFile, const RecModelInfo &info,
+    const std::vector<std::tuple<char, unsigned int, double>> &fixed_rates)
     : _classNumber(0) {
   unsigned int N = speciesTree.getNodeNumber();
   std::map<char, std::map<std::string, unsigned int>> labelToCat;
@@ -134,7 +135,14 @@ OptimizationClasses::OptimizationClasses(
     _classNumber++;
     _classes[paramType] = std::vector<unsigned int>(N, i);
   }
-
+  _fixed_rates.resize(_allTypes.size(), std::vector<std::pair<unsigned int, double>>());
+  char type;
+  unsigned int species;
+  double value;
+  for (const auto &v : fixed_rates) {
+    std::tie(type, species, value) = v;
+    _fixed_rates[_allTypeIndices.at(std::toupper(type))].push_back(std::make_pair(species, value));
+  }
   switch (parametrization) {
   case ModelParametrization::GLOBAL:
   case ModelParametrization::PER_FAMILY:
@@ -191,22 +199,35 @@ Parameters OptimizationClasses::getFullParameters(
   Parameters res(_allTypes.size() * _classes.at(_allTypes[0]).size());
   for (auto type : _allTypes) {
     const auto &typeClasses = _classes.at(type);
+    const auto typeIndex = _allTypeIndices.at(type);
     double norm = 1.0;
     if (normalizeParamType(type)) {
       norm = 0.0;
       for (unsigned int species = 0; species < typeClasses.size(); ++species) {
         auto cat = typeClasses[species];
-        auto typeIndex = _allTypeIndices.at(type);
         norm += res[species * _allTypes.size() + typeIndex] =
             compressedParameters[cat];
+      }
+      unsigned int species;
+      double value;
+      for (const auto &v : _fixed_rates[typeIndex]) {
+        std::tie(species, value) = v;
+        auto cat = typeClasses[species];
+        norm += value - compressedParameters[cat];
       }
     }
     for (unsigned int species = 0; species < typeClasses.size(); ++species) {
       auto cat = typeClasses[species];
-      auto typeIndex = _allTypeIndices.at(type);
       res[species * _allTypes.size() + typeIndex] =
           compressedParameters[cat] / norm;
     }
+    unsigned int species;
+    double value;
+    for (const auto &v : _fixed_rates[typeIndex]) {
+      std::tie(species, value) = v;
+      res[species * _allTypes.size() + typeIndex] = value / norm;
+    }
+    // Logger::info << "Full parameters: " << res << std::endl;
   }
   return res;
 }

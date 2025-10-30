@@ -47,6 +47,7 @@ public:
                const RecModelInfo &info,
                ModelParametrization modelParametrization,
                std::vector<AleModelParameters> &modelParameters,
+               const std::vector<std::tuple<char, unsigned int, double>> &fixed_rates,
                bool optimizeRates, bool optimizeVerbose,
                const Families &families, PerCoreGeneTrees &geneTrees,
                const std::string &speciesCategoryFile,
