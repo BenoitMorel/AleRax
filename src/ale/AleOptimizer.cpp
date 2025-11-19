@@ -56,7 +56,7 @@ AleOptimizer::AleOptimizer(const std::string &speciesTreeFile,
 
 void AleOptimizer::randomizeRoot() {
   assert(getCurrentStep() == AleStep::SpeciesTreeOpt);
-  auto &tree = getSpeciesTree().getDatedTree();
+  const auto &tree = getSpeciesTree().getDatedTree();
   unsigned int N = tree.getOrderedSpeciations().size();
   for (unsigned int i = 0; i < N; ++i) {
     auto direction = Random::getInt() % 4;
@@ -199,8 +199,7 @@ void AleOptimizer::optimizeDates(bool thorough) {
                   << "bestLL=" << bestLL << ", llDiff=" << llDiff << std::endl;
   }
   Logger::timed << "[Species search] Optimizing speciation order with random "
-                   "dating perturbations"
-                << std::endl;
+                << "dating perturbations" << std::endl;
   DatedSpeciesTreeSearch::optimizeDates(getSpeciesTree(), getEvaluator(),
                                         *_speciesTreeSearchState, thorough);
   saveCheckpoint();
@@ -295,7 +294,7 @@ void AleOptimizer::saveRatesAndLL() {
   // Logger::info << "save per-family likelihoods to " <<
   // perFamilyLikelihoodPath << std::endl;
   //  save the DTL rates
-  auto parameterNames = Enums::parameterNames(_info.model);
+  auto parameterNames = _info.getParamTypes();
   auto ratesDir = FileSystem::joinPaths(_outputDir, "model_parameters");
   FileSystem::mkdir(ratesDir, true);
   ParallelContext::barrier();
@@ -304,9 +303,10 @@ void AleOptimizer::saveRatesAndLL() {
       auto familyRatesPath = FileSystem::joinPaths(
           ratesDir, _geneTrees.getTrees()[i].name + "_rates.txt");
       std::ofstream ratesOs(familyRatesPath);
-      ratesOs << "#";
-      for (auto name : parameterNames) {
-        ratesOs << " " << name;
+      for (const auto &name : parameterNames) {
+        if (name != parameterNames[0])
+          ratesOs << " ";
+        ratesOs << name;
       }
       ratesOs << std::endl;
       const auto &parameters = getModelParameters()[i];
@@ -323,8 +323,8 @@ void AleOptimizer::saveRatesAndLL() {
     auto globalRatesPath =
         FileSystem::joinPaths(ratesDir, "model_parameters.txt");
     ParallelOfstream ratesOs(globalRatesPath, true);
-    ratesOs << "# node";
-    for (auto name : parameterNames) {
+    ratesOs << "node";
+    for (const auto &name : parameterNames) {
       ratesOs << " " << name;
     }
     ratesOs << std::endl;

@@ -1,7 +1,8 @@
 #pragma once
 
-#include <IO/HighwayCandidateParser.hpp>
 #include <vector>
+
+#include <IO/HighwayCandidateParser.hpp>
 
 class AleOptimizer;
 

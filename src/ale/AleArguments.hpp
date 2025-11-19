@@ -1,8 +1,9 @@
 #pragma once
 
+#include <string>
+
 #include "IO/ArgumentsHelper.hpp"
 #include "util/enums.hpp"
-#include <string>
 
 /**
  *  Parses and stores the program arguments
@@ -12,7 +13,7 @@ public:
   /**
    *  Parse the arguments from main()
    */
-  AleArguments(int argc, char *argv[]);
+  AleArguments(int iargc, char **iargv);
 
   /**
    *  Print AleRax' help message
@@ -30,7 +31,7 @@ public:
   void printCommand() const;
 
   /**
-   *  Write a user-friendly summary of the most important
+   *  Print a user-friendly summary of the most important
    *  parameters set by the user
    */
   void printSummary() const;
@@ -59,8 +60,9 @@ public:
   // model
   std::string reconciliationModelStr;
   TransferConstaint transferConstraint;
+  bool noDup;
+  bool noDL;
   bool noTL;
-  unsigned int gammaCategories;
   bool pruneSpeciesTree;
   std::string fractionMissingFile;
   CCPRooting ccpRooting;
@@ -76,6 +78,7 @@ public:
   bool inferSpeciationOrders;
   ModelParametrization modelParametrization;
   std::string optimizationClassFile;
+  unsigned int gammaCategories;
   RecOpt recOpt;
   bool fixRates;
   bool skipThoroughRates;
@@ -88,7 +91,7 @@ public:
 
   // trimming
   bool skipFamilyFiltering;
-  int minCoveredSpecies;
+  unsigned int minCoveredSpecies;
   double trimFamilyRatio;
   double maxCladeSplitRatio;
   unsigned int sampleFrequency;
