@@ -1,17 +1,22 @@
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <string>
+#include <vector>
+
 #include <trees/PLLUnrootedTree.hpp>
 
-std::vector<std::string> getLines(const std::string path) {
+std::vector<std::string> getLines(const std::string &path) {
   std::ifstream is(path);
   std::string line;
-  std::vector<std::string> res;
+  std::vector<std::string> lines;
   while (std::getline(is, line)) {
     if (line.size() > 2) {
-      res.push_back(line);
+      lines.push_back(line);
     }
   }
-  return res;
+  is.close();
+  return lines;
 }
 
 int main(int argc, char **argv) {
@@ -21,15 +26,14 @@ int main(int argc, char **argv) {
               << std::endl;
     return 1;
   }
-  std::string input(argv[1]);
+  std::string inputFile(argv[1]);
   double threshold = atof(argv[2]);
-  std::string output(argv[3]);
-
-  auto newicks = getLines(input);
-  auto outNewick = PLLUnrootedTree::buildConsensusTree(newicks, threshold);
-  std::ofstream os(output);
-  os << outNewick << std::endl;
-  std::cout << outNewick << std::endl;
-
+  std::string outputFile(argv[3]);
+  auto utreeStrs = getLines(inputFile);
+  auto consUtreeStr = PLLUnrootedTree::buildConsensusTree(utreeStrs, threshold);
+  std::ofstream os(outputFile);
+  os << consUtreeStr << std::endl;
+  std::cout << consUtreeStr << std::endl;
+  os.close();
   return 0;
 }
