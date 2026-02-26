@@ -1,9 +1,6 @@
 #pragma once
 
-#include <string>
-
 #include "IO/ArgumentsHelper.hpp"
-#include "util/enums.hpp"
 
 /**
  *  Parses and stores the program arguments

@@ -1,8 +1,5 @@
 #pragma once
 
-#include <algorithm>
-#include <vector>
-
 #include <maths/Parameters.hpp>
 #include <util/types.hpp>
 
@@ -14,7 +11,7 @@ public:
   /**
    *  @brief Default constructor
    */
-  AleModelParameters() : _speciesBranchNumber(0) {}
+  AleModelParameters() : _paramTypeNumber(0), _speciesBranchNumber(0) {}
 
   /**
    *  @brief Constructor

@@ -1,5 +1,8 @@
 #include "AleOptimizer.hpp"
 
+#include <algorithm>
+#include <cassert>
+
 #include <IO/FileSystem.hpp>
 #include <IO/Logger.hpp>
 #include <IO/ParallelOfstream.hpp>
@@ -10,11 +13,7 @@
 #include <search/SpeciesSPRSearch.hpp>
 #include <search/SpeciesTransferSearch.hpp>
 #include <util/Paths.hpp>
-
-static bool testAndSwap(size_t &hash1, size_t &hash2) {
-  std::swap(hash1, hash2);
-  return hash1 != hash2;
-}
+#include <util/Scenario.hpp>
 
 AleOptimizer::AleOptimizer(const std::string &speciesTreeFile,
                            const Families &families, const RecModelInfo &info,
@@ -22,15 +21,19 @@ AleOptimizer::AleOptimizer(const std::string &speciesTreeFile,
                            const std::string &optimizationClassFile,
                            const Parameters &startingRates, bool optimizeRates,
                            bool optimizeVerbose, const std::string &outputDir)
-    : _state(speciesTreeFile), _families(families), // global families
-      _geneTrees(families, false, true),            // init local families
+    : _families(families),               // global families
+      _geneTrees(families, false, true), // init local families
       _info(info), _rootLikelihoods(getLocalFamilyNumber()),
-      _outputDir(outputDir), _checkpointDir(getCheckpointDir(outputDir)),
-      _enableCheckpoints(true) {
+      _outputDir(outputDir), _enableCheckpoints(true) {
   // init the current state (from checkpoint or de novo)
+  _state.speciesTree = std::make_unique<SpeciesTree>(
+      speciesTreeFile, true, getRecModelInfo().isDated());
   if (checkpointExists()) {
     Logger::info << "Loading checkpoint information..." << std::endl;
-    loadCheckpoint();
+    for (unsigned int i = 0; i < getLocalFamilyNumber(); ++i) {
+      _state.localFamilyNames.push_back(_geneTrees.getTrees()[i].name);
+    }
+    _state.unserialize(getCheckpointDir(_outputDir));
   } else {
     for (unsigned int i = 0; i < getLocalFamilyNumber(); ++i) {
       _state.localFamilyNames.push_back(_geneTrees.getTrees()[i].name);
@@ -47,17 +50,16 @@ AleOptimizer::AleOptimizer(const std::string &speciesTreeFile,
   // init the evaluator
   _evaluator = std::make_unique<AleEvaluator>(
       *this, getSpeciesTree(), getRecModelInfo(), modelParametrization,
-      optimizationClassFile, getMixtureAlpha(), getModelParameters(),
-      getTransferHighways(), optimizeRates, optimizeVerbose, families,
-      _geneTrees, _outputDir);
+      optimizationClassFile, getMixtureAlpha(), getTransferHighways(),
+      getModelParameters(), optimizeRates, optimizeVerbose, _families,
+      _geneTrees);
   Logger::timed << "Initial ll=" << getEvaluator().computeLikelihood()
                 << std::endl;
 }
 
 void AleOptimizer::randomizeRoot() {
   assert(getCurrentStep() == AleStep::SpeciesTreeOpt);
-  const auto &tree = getSpeciesTree().getDatedTree();
-  unsigned int N = tree.getOrderedSpeciations().size();
+  auto N = getSpeciesTree().getTree().getInnerNodeNumber();
   for (unsigned int i = 0; i < N; ++i) {
     auto direction = Random::getInt() % 4;
     if (SpeciesTreeOperator::canChangeRoot(getSpeciesTree(), direction)) {
@@ -68,19 +70,20 @@ void AleOptimizer::randomizeRoot() {
 
 void AleOptimizer::optimize() {
   assert(getCurrentStep() == AleStep::SpeciesTreeOpt);
-  size_t hash1 = 0;
-  size_t hash2 = 0;
-  unsigned int index = 0;
   PerFamLL initialPerFamLL;
   auto ll = getEvaluator().computeLikelihood(&initialPerFamLL);
   _speciesTreeSearchState->bestLL = ll;
   _speciesTreeSearchState->farFromPlausible = true;
   _speciesTreeSearchState->betterTreeCallback(ll, initialPerFamLL);
-  // Alternate transfer search and normal SPR search,
-  // until one cannot find a better tree.
-  // Run each at least once.
+  // Initial root search
   Logger::info << std::endl;
   rootSearch(3);
+  // Alternate transfer search and normal SPR search,
+  // until one cannot find a better tree.
+  // Run each at least once
+  size_t hash1 = getSpeciesTree().getHash();
+  size_t hash2 = 0;
+  unsigned int index = 0;
   do {
     if (index++ % 2 == 0) {
       Logger::info << std::endl;
@@ -93,8 +96,9 @@ void AleOptimizer::optimize() {
       Logger::info << std::endl;
       rootSearch(3);
     }
-    hash1 = getSpeciesTree().getHash();
-  } while (testAndSwap(hash1, hash2));
+    hash2 = getSpeciesTree().getHash();
+    std::swap(hash1, hash2);
+  } while (hash1 != hash2);
   // Final root search
   Logger::info << std::endl;
   rootSearch(-1);
@@ -105,7 +109,7 @@ void AleOptimizer::reroot() {
   PerFamLL initialPerFamLL;
   auto ll = getEvaluator().computeLikelihood(&initialPerFamLL);
   _speciesTreeSearchState->bestLL = ll;
-  _speciesTreeSearchState->farFromPlausible = false;
+  _speciesTreeSearchState->farFromPlausible = true;
   _speciesTreeSearchState->betterTreeCallback(ll, initialPerFamLL);
   // Optimize rates and run a local root search.
   // If the species tree is dated, run the second
@@ -128,7 +132,7 @@ void AleOptimizer::reroot() {
 double AleOptimizer::rootSearch(unsigned int maxDepth, bool thorough) {
   _rootLikelihoods.reset();
   if (thorough) {
-    _speciesTreeSearchState->farFromPlausible = true;
+    _speciesTreeSearchState->farFromPlausible = false;
   }
   SpeciesRootSearch::rootSearch(getSpeciesTree(), getEvaluator(),
                                 *_speciesTreeSearchState, maxDepth,
@@ -179,7 +183,7 @@ void AleOptimizer::optimizeDates(bool thorough) {
       20; // max number of best datings to continue with
   Logger::timed << "[Species search] Inferring speciation order for "
                 << datingsNumber << " random datings" << std::endl;
-  auto scoredBackups = DatedSpeciesTreeSearch::optimizeDatesFromReconciliation(
+  auto scoredBackups = DatedSpeciesTreeSearch::getBestDatingsFromReconciliation(
       getSpeciesTree(), getEvaluator(), datingsNumber, backupsNumber);
   Logger::timed << "[Species search] Best " << backupsNumber
                 << " dating likelihoods from random datings:" << std::endl;
@@ -192,20 +196,22 @@ void AleOptimizer::optimizeDates(bool thorough) {
   if (llDiff > 0.0) {
     Logger::timed << "[Species search] Accept improvement from random datings: "
                   << "bestLL=" << bestLL << ", llDiff=" << llDiff << std::endl;
-    _speciesTreeSearchState->bestLL = bestLL;
-    getSpeciesTree().getDatedTree().restore(scoredBackups[0].backup);
+    SpeciesTreeOperator::restoreDates(getSpeciesTree(),
+                                      scoredBackups[0].backup);
   } else {
     Logger::timed << "[Species search] No improvement from random datings: "
                   << "bestLL=" << bestLL << ", llDiff=" << llDiff << std::endl;
   }
-  Logger::timed << "[Species search] Optimizing speciation order with random "
-                << "dating perturbations" << std::endl;
   DatedSpeciesTreeSearch::optimizeDates(getSpeciesTree(), getEvaluator(),
                                         *_speciesTreeSearchState, thorough);
   saveCheckpoint();
   saveSpeciesTree();
   Logger::timed << "Species tree with ordered speciations: "
                 << _speciesTreeSearchState->pathToBestSpeciesTree << std::endl;
+}
+
+void AleOptimizer::onSpeciesDatesChange() {
+  getEvaluator().onSpeciesDatesChange();
 }
 
 void AleOptimizer::onSpeciesTreeChange(
@@ -222,9 +228,6 @@ void AleOptimizer::onBetterParametersFoundCallback() {
 }
 
 void AleOptimizer::saveSpeciesTree() {
-  if (_info.isDated()) {
-    getSpeciesTree().getDatedTree().rescaleBranchLengths();
-  }
   auto out = _speciesTreeSearchState->pathToBestSpeciesTree;
   getSpeciesTree().saveToFile(out, true);
   // Logger::info << "save species tree to " << out << std::endl;
@@ -274,9 +277,9 @@ void AleOptimizer::saveRatesAndLL() {
   ParallelContext::barrier();
   std::vector<unsigned int> indices;
   std::vector<double> likelihoods;
-  ParallelContext::concatenateHetherogeneousUIntVectors(localIndices, indices);
-  ParallelContext::concatenateHetherogeneousDoubleVectors(localLikelihoods,
-                                                          likelihoods);
+  ParallelContext::concatenateHeterogeneousUIntVectors(localIndices, indices);
+  ParallelContext::concatenateHeterogeneousDoubleVectors(localLikelihoods,
+                                                         likelihoods);
   assert(indices.size() == _families.size());
   if (ParallelContext::getRank() == 0) {
     std::vector<ScoredFamily> familiesAndLLs;
@@ -347,16 +350,16 @@ void AleOptimizer::saveGeneConsensusTree(const std::string &geneSampleFile,
                                          const std::string &outputFile) {
   std::ifstream is(geneSampleFile);
   std::string line;
-  std::vector<std::string> newicks;
+  std::vector<std::string> rtreeStrs;
   while (std::getline(is, line)) {
     if (line.size() > 2) {
-      newicks.push_back(line);
+      rtreeStrs.push_back(line);
     }
   }
   is.close();
-  auto cons_newick = PLLRootedTree::buildConsensusTree(newicks, 0.50001);
+  auto consRtreeStr = PLLRootedTree::buildConsensusTree(rtreeStrs, 0.50001);
   std::ofstream os(outputFile);
-  os << cons_newick << std::endl;
+  os << consRtreeStr << std::endl;
   os.close();
 }
 
@@ -371,9 +374,9 @@ void AleOptimizer::saveFamiliesTakingHighway(
   ParallelContext::barrier();
   std::vector<unsigned int> indices;
   std::vector<double> transfers;
-  ParallelContext::concatenateHetherogeneousUIntVectors(localIndices, indices);
-  ParallelContext::concatenateHetherogeneousDoubleVectors(perFamilyTransfers,
-                                                          transfers);
+  ParallelContext::concatenateHeterogeneousUIntVectors(localIndices, indices);
+  ParallelContext::concatenateHeterogeneousDoubleVectors(perFamilyTransfers,
+                                                         transfers);
   assert(indices.size() == _families.size());
   if (ParallelContext::getRank() == 0) {
     std::vector<ScoredFamily> scoredFamilies;
@@ -427,7 +430,7 @@ void AleOptimizer::reconcile(unsigned int samples) {
   std::vector<std::string> summaryTransferFiles;
   std::vector<std::shared_ptr<Scenario>> allScenarios;
   MatrixDouble perHighwayPerFamTransfers;
-  const auto &highways = _evaluator->getHighways();
+  const auto &highways = getTransferHighways();
   if (highways.size() && localFamilies.size()) {
     assert(FileSystem::dirExists(highwayFamiliesOutputDir));
     perHighwayPerFamTransfers =
@@ -447,33 +450,32 @@ void AleOptimizer::reconcile(unsigned int samples) {
     assert(scenarios.size() == samples);
     // writing in the reconciliations/all/ dir
     auto geneTreesPath = FileSystem::joinPaths(
-        allRecDir, localFamilies[i].name + std::string("_samples.newick"));
+        allRecDir, localFamilies[i].name + "_samples.newick");
     ParallelOfstream geneTreesOs(geneTreesPath, false);
     auto geneTreesAlePath = FileSystem::joinPaths(
-        allRecDir, localFamilies[i].name + std::string("_samples.alerec"));
+        allRecDir, localFamilies[i].name + "_samples.alerec");
     ParallelOfstream geneTreesAleOs(geneTreesAlePath, false);
     for (unsigned int sample = 0; sample < samples; ++sample) {
-      auto out = FileSystem::joinPaths(
-          allRecDir, localFamilies[i].name + std::string("_sample_") +
-                         std::to_string(sample) + ".xml");
+      auto geneTreeXMLPath =
+          FileSystem::joinPaths(allRecDir, localFamilies[i].name + "_sample_" +
+                                               std::to_string(sample) + ".xml");
       auto eventCountsFile = FileSystem::joinPaths(
-          allRecDir, localFamilies[i].name + std::string("_eventCounts_") +
+          allRecDir, localFamilies[i].name + "_eventCounts_" +
                          std::to_string(sample) + ".txt");
       auto perSpeciesEventCountsFile = FileSystem::joinPaths(
-          allRecDir, localFamilies[i].name +
-                         std::string("_speciesEventCounts_") +
+          allRecDir, localFamilies[i].name + "_speciesEventCounts_" +
                          std::to_string(sample) + ".txt");
       auto transferFile = FileSystem::joinPaths(
-          allRecDir, localFamilies[i].name + std::string("_transfers_") +
+          allRecDir, localFamilies[i].name + "_transfers_" +
                          std::to_string(sample) + ".txt");
       perSpeciesEventCountsFiles.push_back(perSpeciesEventCountsFile);
       transferFiles.push_back(transferFile);
       auto &scenario = *scenarios[sample];
-      scenario.saveReconciliation(out, ReconciliationFormat::RecPhyloXML,
-                                  false);
       scenario.saveReconciliation(geneTreesOs,
                                   ReconciliationFormat::NewickEvents);
       scenario.saveReconciliation(geneTreesAleOs, ReconciliationFormat::ALE);
+      scenario.saveReconciliation(geneTreeXMLPath,
+                                  ReconciliationFormat::RecPhyloXML, false);
       scenario.saveEventsCounts(eventCountsFile, false);
       scenario.savePerSpeciesEventsCounts(perSpeciesEventCountsFile, false);
       scenario.saveTransfers(transferFile, false);
@@ -489,19 +491,16 @@ void AleOptimizer::reconcile(unsigned int samples) {
     geneTreesAleOs.close();
     // writing in the reconciliations/summaries/ dir
     auto consensusFile = FileSystem::joinPaths(
-        summariesDir,
-        localFamilies[i].name + std::string("_consensus_50.newick"));
+        summariesDir, localFamilies[i].name + "_consensus_50.newick");
     saveGeneConsensusTree(geneTreesPath, consensusFile);
     auto perSpeciesEventCountsFile = FileSystem::joinPaths(
-        summariesDir,
-        localFamilies[i].name + std::string("_meanSpeciesEventCounts.txt"));
+        summariesDir, localFamilies[i].name + "_meanSpeciesEventCounts.txt");
     Scenario::mergePerSpeciesEventCounts(
         getSpeciesTree().getTree(), perSpeciesEventCountsFile,
         perSpeciesEventCountsFiles, false, true);
     summaryPerSpeciesEventCountsFiles.push_back(perSpeciesEventCountsFile);
     auto transferFile = FileSystem::joinPaths(
-        summariesDir,
-        localFamilies[i].name + std::string("_meanTransfers.txt"));
+        summariesDir, localFamilies[i].name + "_meanTransfers.txt");
     Scenario::mergeTransfers(getSpeciesTree().getTree(), transferFile,
                              transferFiles, false, true);
     summaryTransferFiles.push_back(transferFile);
@@ -592,30 +591,8 @@ void AleOptimizer::inferHighways(const std::string &highwayCandidateFile,
   std::vector<ScoredHighway> acceptedHighways;
   Highways::optimizeAllHighways(*this, filteredHighways, acceptedHighways,
                                 true);
-  assert(acceptedHighways.size()); // there must be some since we can get here
+  assert(acceptedHighways.size()); // there must be some, since we can get here
   saveBestHighways(acceptedHighways, acceptedHighwayOutput);
   Logger::timed << "Highway output directory: " << highwaysOutputDir
                 << std::endl;
-}
-
-void AleOptimizer::saveCheckpoint() {
-  if (_info.isDated()) {
-    // We rescale the branch lengths because relative dates will be
-    // unserialized from the branch lengths
-    getSpeciesTree().getDatedTree().rescaleBranchLengths();
-  }
-  _state.serialize(_checkpointDir);
-}
-
-void AleOptimizer::loadCheckpoint() {
-  assert(checkpointExists());
-  std::vector<std::string> localFamilyNames;
-  for (unsigned int i = 0; i < getLocalFamilyNumber(); ++i) {
-    localFamilyNames.push_back(_geneTrees.getTrees()[i].name);
-  }
-  _state.unserialize(_checkpointDir, localFamilyNames);
-}
-
-bool AleOptimizer::checkpointExists(const std::string &outputDir) {
-  return FileSystem::dirExists(getCheckpointDir(outputDir));
 }
