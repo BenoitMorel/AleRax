@@ -3,16 +3,16 @@
 #include <memory>
 
 #include <IO/Families.hpp>
+#include <IO/HighwayCandidateParser.hpp>
 #include <search/SpeciesSearchCommon.hpp>
 #include <util/types.hpp>
 
+#include "AleModelParameters.hpp"
 #include "OptimizationClasses.hpp"
 
 class AleOptimizer;
 class SpeciesTree;
 class RecModelInfo;
-class Highway;
-class AleModelParameters;
 class PerCoreGeneTrees;
 class MultiModelInterface;
 class Scenario;
