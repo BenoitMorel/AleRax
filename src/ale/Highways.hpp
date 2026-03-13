@@ -1,17 +1,15 @@
 #pragma once
 
-#include <vector>
-
 #include <IO/HighwayCandidateParser.hpp>
 
 class AleOptimizer;
 
 struct ScoredHighway {
-  ScoredHighway() {}
-  ScoredHighway(const Highway &highway, double score = 0.0)
-      : highway(highway), score(score) {}
   Highway highway;
   double score;
+  ScoredHighway() : score(0.0) {}
+  ScoredHighway(const Highway &highway, double score = 0.0)
+      : highway(highway), score(score) {}
   bool operator<(const ScoredHighway &other) const {
     return score < other.score;
   }

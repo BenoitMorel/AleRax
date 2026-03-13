@@ -1,7 +1,7 @@
 #include "TrimFamilies.hpp"
 
 #include <algorithm>
-#include <vector>
+#include <cassert>
 
 #include <IO/GeneSpeciesMapping.hpp>
 #include <IO/Logger.hpp>
@@ -26,7 +26,7 @@ void TrimFamilies::trimMinSpeciesCoverage(Families &families,
   ParallelContext::barrier();
   // gather family information from all MPI ranks
   std::vector<unsigned int> toKeep;
-  ParallelContext::concatenateHetherogeneousUIntVectors(localToKeep, toKeep);
+  ParallelContext::concatenateHeterogeneousUIntVectors(localToKeep, toKeep);
   // trim families
   Families familiesCopy = families;
   families.clear();
@@ -41,21 +41,16 @@ void TrimFamilies::trimHighCladesNumber(Families &families, double keepRatio) {
   auto N = families.size();
   // get family observed clade numbers in parallel
   std::vector<unsigned int> localCcpSizes;
-  std::vector<unsigned int> localCheck;
   for (auto i = ParallelContext::getBegin(N); i < ParallelContext::getEnd(N);
        ++i) {
     ConditionalClades ccp;
-    ccp.unserialize(families[i].ccp);
+    ccp.unserialize(families[i].ccpFile);
     localCcpSizes.push_back(ccp.getCladesNumber());
-    localCheck.push_back(i);
   }
   ParallelContext::barrier();
   // gather family information from all MPI ranks
   std::vector<unsigned int> ccpSizes;
-  std::vector<unsigned int> check;
-  ParallelContext::concatenateHetherogeneousUIntVectors(localCcpSizes,
-                                                        ccpSizes);
-  ParallelContext::concatenateHetherogeneousUIntVectors(localCheck, check);
+  ParallelContext::concatenateHeterogeneousUIntVectors(localCcpSizes, ccpSizes);
   // sort families by the number of observed clades
   std::vector<PairUInt> sizeToIndex(N);
   for (unsigned int i = 0; i < N; ++i) {
@@ -88,7 +83,7 @@ void TrimFamilies::trimCladeSplitRatio(Families &families, double maxRatio) {
   for (auto i = ParallelContext::getBegin(N); i < ParallelContext::getEnd(N);
        ++i) {
     ConditionalClades ccp;
-    ccp.unserialize(families[i].ccp);
+    ccp.unserialize(families[i].ccpFile);
     auto c = ccp.getCladesNumber();
     auto n = ccp.getLeafNumber() * 2 - 3;
     allClades += c;
@@ -100,7 +95,7 @@ void TrimFamilies::trimCladeSplitRatio(Families &families, double maxRatio) {
   ParallelContext::barrier();
   // gather family information from all MPI ranks
   std::vector<unsigned int> toKeep;
-  ParallelContext::concatenateHetherogeneousUIntVectors(localToKeep, toKeep);
+  ParallelContext::concatenateHeterogeneousUIntVectors(localToKeep, toKeep);
   ParallelContext::sumUInt(allClades);
   ParallelContext::sumUInt(keptClades);
   Logger::info << "Clades before trimming: " << allClades << std::endl;

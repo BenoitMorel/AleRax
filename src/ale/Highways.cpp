@@ -1,5 +1,8 @@
 #include "AleOptimizer.hpp"
 
+#include <algorithm>
+#include <cassert>
+
 #include <IO/FileSystem.hpp>
 #include <IO/Logger.hpp>
 #include <optimizers/DTLOptimizer.hpp>

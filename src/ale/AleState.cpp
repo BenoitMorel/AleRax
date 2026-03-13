@@ -1,8 +1,11 @@
 #include "AleState.hpp"
 
-#include <unordered_set>
+#include <cassert>
+#include <iostream>
+#include <sstream>
 
 #include <IO/FileSystem.hpp>
+#include <IO/Logger.hpp>
 #include <IO/ParallelOfstream.hpp>
 #include <parallelization/ParallelContext.hpp>
 
@@ -95,6 +98,8 @@ void AleState::filterCheckpointFamilies(Families &families,
 }
 
 void AleState::serialize(const std::string &checkpointDir) const {
+  assert(currentStep > AleStep::Init);
+  assert(!localFamilyNames.empty());
   ParallelContext::barrier();
   auto checkpointPath =
       FileSystem::joinPaths(checkpointDir, "mainCheckpoint.txt");
@@ -136,10 +141,10 @@ void AleState::serialize(const std::string &checkpointDir) const {
   ParallelContext::barrier();
 }
 
-void AleState::unserialize(const std::string &checkpointDir,
-                           const std::vector<std::string> &perCoreFamilyNames) {
+void AleState::unserialize(const std::string &checkpointDir) {
+  assert(currentStep == AleStep::Init);
+  assert(!localFamilyNames.empty());
   ParallelContext::barrier();
-  localFamilyNames = perCoreFamilyNames;
   auto checkpointPath =
       FileSystem::joinPaths(checkpointDir, "mainCheckpoint.txt");
   std::ifstream is(checkpointPath);
@@ -152,6 +157,7 @@ void AleState::unserialize(const std::string &checkpointDir,
   unsigned int bufferUint = 0;
   is >> bufferUint;
   currentStep = static_cast<AleStep>(bufferUint);
+  assert(currentStep > AleStep::Init);
   if (currentStep == AleStep::End) {
     Logger::info << "\nThe previous run finished successfully according to "
                  << "the checkpoint." << std::endl;
@@ -160,10 +166,9 @@ void AleState::unserialize(const std::string &checkpointDir,
                  << std::endl;
     ParallelContext::abort(0);
   }
-  // dated species tree
+  // dated species tree (but we already know it)
   std::string bufferStr;
   is >> bufferStr;
-  speciesTree = std::make_unique<SpeciesTree>(bufferStr, false);
   // mixture alpha
   is >> mixtureAlpha;
   // transfer highways
@@ -175,7 +180,7 @@ void AleState::unserialize(const std::string &checkpointDir,
       std::string src;
       std::string dest;
       double proba;
-      std::stringstream iss(line);
+      std::istringstream iss(line);
       iss >> src;
       iss >> dest;
       iss >> proba;
@@ -206,7 +211,6 @@ void AleState::unserialize(const std::string &checkpointDir,
     is.close();
     perLocalFamilyModelParams.push_back(mp);
   }
-  assert(perLocalFamilyModelParams.size() == perCoreFamilyNames.size());
   ParallelContext::barrier();
 }
 

@@ -4,10 +4,12 @@
 
 /**
  *  A collection of routines to trim "bad" families (that are too large,
- *  that have too much uncertainty, or that do not cover enough families)
+ *  that have too much uncertainty, or that cover not enough species)
  */
 class TrimFamilies {
 public:
+  TrimFamilies() = delete;
+
   /**
    *  Remove the families that cover less than minCoverage species
    *

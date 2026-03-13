@@ -1,21 +1,18 @@
 #pragma once
 
-#include <string>
-#include <unordered_map>
-#include <vector>
-
 #include <maths/Parameters.hpp>
 #include <util/enums.hpp>
+#include <util/types.hpp>
 
 class PLLRootedTree;
-struct RecModelInfo;
+class RecModelInfo;
 
 /**
  *  Describes which DTLO parameters should be shared among which species
- * branches. An optimization class is a set of pairs of (paramType,
- * speciesNodeIndex) that share the same value when optimizing the model
- * parameters. Each optimization class adds one free parameter in the whole
- * model.
+ *  branches. An optimization class is a set of pairs of (paramType,
+ *  speciesNodeIndex) that share the same value when optimizing the model
+ *  parameters. Each optimization class adds one free parameter in the whole
+ *  model
  */
 class OptimizationClasses {
 public:
@@ -33,20 +30,20 @@ public:
 
   /**
    *  The two following methods convert the compressed parameters to the full
-   * parameters and vice versa. Applying both methods results in the same
-   * initial parameter vector.
+   *  parameters and vice versa. Applying both methods successively results in
+   *  the same initial parameter vector
    *
-   *  -Full parameters: raw parameter vector, with one value for each species
-   * and each parameter type, the order of the elements is the same as in the
-   * AleModelParameters class. -Compressed parameters: one value per
-   * optimization class
+   *  - Full parameters: raw parameter vector, with one value for each species
+   *  and each parameter type, the order of the elements is the same as in
+   *  the AleModelParameters class
+   *  - Compressed parameters: one value per optimization class
    */
   Parameters getCompressedParameters(const Parameters &fullParameters) const;
   Parameters getFullParameters(const Parameters &compressedParameters) const;
 
   /**
    *  Accessor
-   *  @param paramType e.g. 'D', 'T', 'L' etc.
+   *  @param paramType e.g. 'D', 'L', 'T', etc.
    *  @param speciesNodeIndex The index of the corresponding species branch
    */
   unsigned int getClass(char paramType, unsigned int speciesNodeIndex) const {
@@ -62,7 +59,7 @@ private:
   // _classes[paramType][speciesNodeIndex] = integer representing the
   // corresponding class
   std::unordered_map<char, std::vector<unsigned int>> _classes;
-  // list of the represented parameter types (e.g. [D, T, L])
+  // list of the represented parameter types (e.g. [D, L, T])
   std::vector<char> _allTypes;
   // indices of the elements of _allTypes
   std::unordered_map<char, unsigned int> _allTypeIndices;

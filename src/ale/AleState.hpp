@@ -1,11 +1,11 @@
 #pragma once
 
-#include <string>
-#include <vector>
+#include <memory>
 
 #include <IO/Families.hpp>
 #include <IO/HighwayCandidateParser.hpp>
 #include <trees/SpeciesTree.hpp>
+#include <util/types.hpp>
 
 #include "AleModelParameters.hpp"
 
@@ -37,10 +37,7 @@ struct AleState {
   /**
    *  Constructor
    */
-  AleState(const std::string &speciesTreePath)
-      : currentStep(AleStep::Init),
-        speciesTree(std::make_unique<SpeciesTree>(speciesTreePath)),
-        mixtureAlpha(1.0) {}
+  AleState() : currentStep(AleStep::Init), mixtureAlpha(1.0) {}
 
   /**
    *  Dump the current run arguments to the checkpoint directory
@@ -76,12 +73,10 @@ struct AleState {
   /**
    *  Load the current state from the checkpoint directory
    */
-  void unserialize(const std::string &checkpointDir,
-                   const std::vector<std::string> &perCoreFamilyNames);
+  void unserialize(const std::string &checkpointDir);
 
   /**
-   *  Read the species tree newick from the dumped current state
-   *  (from the checkpoint directory)
+   *  Read the species tree newick from the checkpoint directory
    */
   static std::string
   readCheckpointSpeciesTree(const std::string &checkpointDir);
@@ -90,11 +85,11 @@ struct AleState {
   AleStep currentStep;
   // the current species tree
   std::unique_ptr<SpeciesTree> speciesTree;
+  // the current model parameters
+  double mixtureAlpha;
+  std::vector<Highway> transferHighways;
+  std::vector<AleModelParameters> perLocalFamilyModelParams;
   // the names of the families, to map the model parameters to their
   // respective families
   std::vector<std::string> localFamilyNames;
-  // the current model parameters
-  double mixtureAlpha;
-  std::vector<AleModelParameters> perLocalFamilyModelParams;
-  std::vector<Highway> transferHighways;
 };

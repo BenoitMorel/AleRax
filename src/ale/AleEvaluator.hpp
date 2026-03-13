@@ -1,31 +1,32 @@
 #pragma once
 
 #include <memory>
-#include <vector>
 
 #include <IO/Families.hpp>
-#include <parallelization/PerCoreGeneTrees.hpp>
+#include <IO/HighwayCandidateParser.hpp>
 #include <search/SpeciesSearchCommon.hpp>
-#include <trees/PLLRootedTree.hpp>
-#include <trees/SpeciesTree.hpp>
+#include <util/types.hpp>
 
 #include "AleModelParameters.hpp"
 #include "OptimizationClasses.hpp"
-#include "UndatedDLMultiModel.hpp"
-#include "UndatedDTLMultiModel.hpp"
 
+class AleOptimizer;
+class SpeciesTree;
 class RecModelInfo;
+class PerCoreGeneTrees;
+class MultiModelInterface;
+class Scenario;
+
 using MultiEvaluation = MultiModelInterface;
 using MultiEvaluationPtr = std::shared_ptr<MultiEvaluation>;
 using PerCoreMultiEvaluations = std::vector<MultiEvaluationPtr>;
-class AleOptimizer;
 
 struct ScoredFamily {
-  ScoredFamily() {}
-  ScoredFamily(const std::string &familyName, double score = 0.0)
-      : familyName(familyName), score(score) {}
   std::string familyName;
   double score;
+  ScoredFamily() : score(0.0) {}
+  ScoredFamily(const std::string &familyName, double score = 0.0)
+      : familyName(familyName), score(score) {}
   bool operator<(const ScoredFamily &other) const {
     if (score == other.score) {
       return familyName < other.familyName;
@@ -43,32 +44,27 @@ public:
   /**
    *  Constructor
    *  @param optimizer
-   *  @param speciesTree Reference to the current AleState species tree
+   *  @param speciesTree Reference to the AleState species tree
    *  @param info Description of the reconciliation model
    *  @param modelParametrization Describes how parameters should be optimized
-   *  @param optimizationClassFile Path to the file defining parameter
-   * optimization classes
-   *  @param mixtureAlpha Reference to the current AleState model alpha
-   *  @param perLocalFamilyModelParams Reference to the current AleState model
-   * parameters
-   *  @param transferHighways Reference to the current AleState transfer
-   * highways
-   *  @param optimizeRates If set to false, model parameter optimization will be
-   * skipped
-   *  @param optimizeVerbose If set to true, the optimization routines will
-   * print more logs
+   *  @param optimizationClassFile Path to the file defining model parameter
+   *                               optimization classes
+   *  @param mixtureAlpha Reference to the AleState model alpha
+   *  @param transferHighways Reference to the AleState transfer highways
+   *  @param perLocalFamilyModelParams Reference to the AleState model params
+   *  @param optimizeRates If false, model parameter optimization is skipped
+   *  @param optimizeVerbose If true, the optimization routines print more logs
    *  @param families List of all gene families
    *  @param geneTrees List of the gene families assigned to the MPI rank
-   *  @param outputDir AleRax output directory
    */
   AleEvaluator(AleOptimizer &optimizer, SpeciesTree &speciesTree,
                const RecModelInfo &info,
                const ModelParametrization &modelParametrization,
                const std::string &optimizationClassFile, double &mixtureAlpha,
+               std::vector<Highway> &transferHighways,
                std::vector<AleModelParameters> &perLocalFamilyModelParams,
-               std::vector<Highway> &transferHighways, bool optimizeRates,
-               bool optimizeVerbose, const Families &families,
-               const PerCoreGeneTrees &geneTrees, const std::string &outputDir);
+               bool optimizeRates, bool optimizeVerbose,
+               const Families &families, const PerCoreGeneTrees &geneTrees);
 
   /**
    *  Destructor
@@ -168,28 +164,26 @@ public:
   /**
    *  Accessors
    */
-  const RecModelInfo &getRecModelInfo() const { return _info; }
-  std::vector<AleModelParameters> &getModelParameters() {
-    return _modelParameters;
-  }
-  const std::vector<Highway> &getHighways() const { return _highways; }
-  MultiEvaluation &getEvaluation(unsigned int i) { return *_evaluations[i]; }
+  // general info
   unsigned int getLocalFamilyNumber() const {
     return _geneTrees.getTrees().size();
   }
-  std::string getOutputDir() const { return _outputDir; }
+  const RecModelInfo &getRecModelInfo() const { return _info; }
+  // model parameter optimization classes
   const OptimizationClasses &getOptimizationClasses() const {
     return _optimizationClasses;
   }
+  // evaluation of the i-th family
+  MultiEvaluation &getEvaluation(unsigned int i) { return *_evaluations[i]; }
 
 private:
   // optimize the alpha parameter for speciation probability gamma categories
   double optimizeGammaRates();
-  // set precision of the evaluator of the i-th family
+  // set precision of the evaluation of the i-th family
   void resetEvaluation(unsigned int i, bool highPrecision);
-  // try to set all evaluators to low precision
+  // try to set all evaluations to low precision
   void resetAllPrecisions();
-  // print the number of evaluators having high precision
+  // print the number of evaluations having high precision
   void printHighPrecisionCount();
 
 private:
@@ -202,8 +196,8 @@ private:
   // the same value
   const OptimizationClasses _optimizationClasses;
   double &_mixtureAlpha;
+  std::vector<Highway> &_transferHighways;
   std::vector<AleModelParameters> &_modelParameters;
-  std::vector<Highway> &_highways;
   bool _optimizeRates;
   bool _optimizeVerbose;
   // global families
@@ -214,6 +208,6 @@ private:
   PerCoreMultiEvaluations _evaluations;
   PerCoreMultiEvaluations _approxEvaluations;
   std::vector<int> _highPrecisions;
+  // LL buffer for global families
   std::vector<double> _snapshotPerFamilyLL;
-  const std::string _outputDir;
 };

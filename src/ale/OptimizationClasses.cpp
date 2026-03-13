@@ -1,10 +1,11 @@
 #include "OptimizationClasses.hpp"
 
+#include <algorithm>
+#include <cassert>
 #include <fstream>
-#include <map>
 #include <sstream>
-#include <unordered_set>
 
+#include <IO/Logger.hpp>
 #include <parallelization/ParallelContext.hpp>
 #include <trees/PLLRootedTree.hpp>
 #include <util/RecModelInfo.hpp>
@@ -41,7 +42,7 @@ static void fillFromOptimizationClassFile(
     if (line.size() == 0) {
       continue;
     }
-    std::stringstream iss(line);
+    std::istringstream iss(line);
     std::string speciesLabel;
     std::string paramTypes;
     iss >> speciesLabel;
@@ -58,7 +59,7 @@ static void fillFromOptimizationClassFile(
     }
     if (paramTypes.size() == 0) {
       Logger::error
-          << "Error: no parameter type (e.g. D, T, L...) specified for species "
+          << "Error: no parameter type (e.g. D, L, T...) specified for species "
           << speciesLabel << " in " << optimizationClassFile << std::endl;
       ParallelContext::abort(30);
     }

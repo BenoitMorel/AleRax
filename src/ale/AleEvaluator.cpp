@@ -1,39 +1,42 @@
 #include "AleOptimizer.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <fstream>
-#include <memory>
 
 #include <IO/Logger.hpp>
 #include <optimizers/DTLOptimizer.hpp>
 #include <parallelization/ParallelContext.hpp>
 #include <search/SpeciesTransferSearch.hpp>
 
+#include "UndatedDLMultiModel.hpp"
+#include "UndatedDTLMultiModel.hpp"
+
 static MultiEvaluationPtr
 createModel(SpeciesTree &speciesTree, const FamilyInfo &family,
             const RecModelInfo &info, const double alpha,
             const AleModelParameters &modelParameters,
             const std::vector<Highway> &highways, bool highPrecision) {
-  std::shared_ptr<MultiModelInterface> model;
+  MultiEvaluationPtr model;
   GeneSpeciesMapping mapping;
   mapping.fill(family.mappingFile, family.startingGeneTree);
   switch (info.model) {
   case RecModel::UndatedDL:
     if (highPrecision) {
       model = std::make_shared<UndatedDLMultiModel<ScaledValue>>(
-          speciesTree.getTree(), mapping, info, family.ccp);
+          speciesTree.getTree(), mapping, info, family.ccpFile);
     } else {
       model = std::make_shared<UndatedDLMultiModel<double>>(
-          speciesTree.getTree(), mapping, info, family.ccp);
+          speciesTree.getTree(), mapping, info, family.ccpFile);
     }
     break;
   case RecModel::UndatedDTL:
     if (highPrecision) {
       model = std::make_shared<UndatedDTLMultiModel<ScaledValue>>(
-          speciesTree.getDatedTree(), mapping, info, family.ccp);
+          speciesTree.getDatedTree(), mapping, info, family.ccpFile);
     } else {
       model = std::make_shared<UndatedDTLMultiModel<double>>(
-          speciesTree.getDatedTree(), mapping, info, family.ccp);
+          speciesTree.getDatedTree(), mapping, info, family.ccpFile);
     }
     break;
   default:
@@ -51,18 +54,18 @@ AleEvaluator::AleEvaluator(
     AleOptimizer &optimizer, SpeciesTree &speciesTree, const RecModelInfo &info,
     const ModelParametrization &modelParametrization,
     const std::string &optimizationClassFile, double &mixtureAlpha,
+    std::vector<Highway> &transferHighways,
     std::vector<AleModelParameters> &perLocalFamilyModelParams,
-    std::vector<Highway> &transferHighways, bool optimizeRates,
-    bool optimizeVerbose, const Families &families,
-    const PerCoreGeneTrees &geneTrees, const std::string &outputDir)
+    bool optimizeRates, bool optimizeVerbose, const Families &families,
+    const PerCoreGeneTrees &geneTrees)
     : _optimizer(optimizer), _speciesTree(speciesTree), _info(info),
       _optimizationClasses(_speciesTree.getTree(), modelParametrization,
                            optimizationClassFile, _info),
-      _mixtureAlpha(mixtureAlpha), _modelParameters(perLocalFamilyModelParams),
-      _highways(transferHighways), _optimizeRates(optimizeRates),
-      _optimizeVerbose(optimizeVerbose), _families(families),
-      _geneTrees(geneTrees), _highPrecisions(getLocalFamilyNumber(), -1),
-      _outputDir(outputDir) {
+      _mixtureAlpha(mixtureAlpha), _transferHighways(transferHighways),
+      _modelParameters(perLocalFamilyModelParams),
+      _optimizeRates(optimizeRates), _optimizeVerbose(optimizeVerbose),
+      _families(families), _geneTrees(geneTrees),
+      _highPrecisions(getLocalFamilyNumber(), -1) {
   Logger::timed << "Initializing ccps and evaluators..." << std::endl;
   _evaluations.resize(getLocalFamilyNumber());
   for (unsigned int i = 0; i < getLocalFamilyNumber(); ++i) {
@@ -71,7 +74,7 @@ AleEvaluator::AleEvaluator(
   ParallelContext::barrier();
   unsigned int totalCladesNumber = 0;
   unsigned int worstFamilyCladesNumber = 0;
-  for (auto &evaluation : _evaluations) {
+  for (const auto &evaluation : _evaluations) {
     auto ccpSize = evaluation->getCCP().getCladesNumber();
     totalCladesNumber += ccpSize;
     worstFamilyCladesNumber = std::max(worstFamilyCladesNumber, ccpSize);
@@ -96,7 +99,7 @@ void AleEvaluator::resetEvaluation(unsigned int i, bool highPrecision) {
   auto famIndex = _geneTrees.getTrees()[i].familyIndex;
   _evaluations[i] =
       createModel(_speciesTree, _families[famIndex], _info, _mixtureAlpha,
-                  _modelParameters[i], _highways, highPrecision);
+                  _modelParameters[i], _transferHighways, highPrecision);
   auto ll = _evaluations[i]->computeLogLikelihood();
   if (highPrecision) {
     _highPrecisions[i] = 1;
@@ -213,6 +216,7 @@ class DTLGlobalParametersOptimizer : public FunctionToOptimize {
 public:
   DTLGlobalParametersOptimizer(AleEvaluator &evaluator)
       : _evaluator(evaluator) {}
+
   void setParameters(Parameters &parameters) {
     parameters.ensurePositivity();
     auto fullParameters =
@@ -221,6 +225,7 @@ public:
       _evaluator.setFamilyParameters(i, fullParameters);
     }
   }
+
   virtual double evaluate(Parameters &parameters) {
     setParameters(parameters);
     auto res = _evaluator.computeLikelihood();
@@ -239,12 +244,14 @@ class DTLFamilyParametersOptimizer : public FunctionToOptimize {
 public:
   DTLFamilyParametersOptimizer(AleEvaluator &evaluator, unsigned int family)
       : _evaluator(evaluator), _family(family) {}
+
   void setParameters(Parameters &parameters) {
     parameters.ensurePositivity();
     auto fullParameters =
         _evaluator.getOptimizationClasses().getFullParameters(parameters);
     _evaluator.setFamilyParameters(_family, fullParameters);
   }
+
   virtual double evaluate(Parameters &parameters) {
     setParameters(parameters);
     auto res = _evaluator.computeFamilyLikelihood(_family);
@@ -417,8 +424,8 @@ void AleEvaluator::getTransferInformation(
     const auto &family = _families[geneTree.familyIndex];
     GeneSpeciesMapping mapping;
     mapping.fill(family.mappingFile, family.startingGeneTree);
-    UndatedDTLMultiModel<ScaledValue> evaluation(speciesTree.getDatedTree(),
-                                                 mapping, infoCopy, family.ccp);
+    UndatedDTLMultiModel<ScaledValue> evaluation(
+        speciesTree.getDatedTree(), mapping, infoCopy, family.ccpFile);
     std::vector<std::shared_ptr<Scenario>> scenarios;
     // Warning:
     // Using Random::getProba() in the sampling function makes
@@ -443,16 +450,16 @@ void AleEvaluator::getTransferInformation(
 }
 
 void AleEvaluator::addHighway(const Highway &highway) {
-  _highways.push_back(highway);
+  _transferHighways.push_back(highway);
   for (auto &evaluation : _evaluations) {
-    evaluation->setHighways(_highways);
+    evaluation->setHighways(_transferHighways);
   }
 }
 
 void AleEvaluator::removeHighway() {
-  _highways.pop_back();
+  _transferHighways.pop_back();
   for (auto &evaluation : _evaluations) {
-    evaluation->setHighways(_highways);
+    evaluation->setHighways(_transferHighways);
   }
 }
 
@@ -463,8 +470,8 @@ void AleEvaluator::saveSnapshotPerFamilyLL() {
     localLikelihoods.push_back(ll);
   }
   ParallelContext::barrier();
-  ParallelContext::concatenateHetherogeneousDoubleVectors(localLikelihoods,
-                                                          _snapshotPerFamilyLL);
+  ParallelContext::concatenateHeterogeneousDoubleVectors(localLikelihoods,
+                                                         _snapshotPerFamilyLL);
   assert(_snapshotPerFamilyLL.size() == _families.size());
 }
 
@@ -480,9 +487,9 @@ void AleEvaluator::savePerFamilyLikelihoodDiff(const std::string &outputFile) {
   ParallelContext::barrier();
   std::vector<unsigned int> indices;
   std::vector<double> likelihoods;
-  ParallelContext::concatenateHetherogeneousUIntVectors(localIndices, indices);
-  ParallelContext::concatenateHetherogeneousDoubleVectors(localLikelihoods,
-                                                          likelihoods);
+  ParallelContext::concatenateHeterogeneousUIntVectors(localIndices, indices);
+  ParallelContext::concatenateHeterogeneousDoubleVectors(localLikelihoods,
+                                                         likelihoods);
   assert(indices.size() == _snapshotPerFamilyLL.size());
   if (ParallelContext::getRank() == 0) {
     std::vector<ScoredFamily> scoredFamilies;
@@ -505,7 +512,7 @@ void AleEvaluator::savePerFamilyLikelihoodDiff(const std::string &outputFile) {
 
 unsigned int AleEvaluator::getInputTreesNumber() const {
   unsigned int totalInputTrees = 0;
-  for (auto &evaluation : _evaluations) {
+  for (const auto &evaluation : _evaluations) {
     totalInputTrees += evaluation->getCCP().getInputTreesNumber();
   }
   ParallelContext::barrier();

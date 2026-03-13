@@ -1,14 +1,11 @@
 #pragma once
 
 #include <memory>
-#include <vector>
 
-#include <IO/Families.hpp>
 #include <IO/FileSystem.hpp>
 #include <optimizers/DTLOptimizer.hpp>
 #include <parallelization/PerCoreGeneTrees.hpp>
-#include <trees/PLLRootedTree.hpp>
-#include <trees/SpeciesTree.hpp>
+#include <util/RecModelInfo.hpp>
 
 #include "AleEvaluator.hpp"
 #include "AleState.hpp"
@@ -36,20 +33,22 @@ public:
   void randomizeRoot();
   // Optimize the species tree topology
   void optimize();
-  //  Optimize the species tree rooting
+  // Optimize the species tree rooting
   void reroot();
 
   /**
    *  Parameter optimization functions
    */
-  //  Optimize the model parameters
+  // Optimize the model parameters
   double optimizeModelRates(bool thorough = false);
-  //  Optimize the relative order of speciation events
+  // Optimize the relative order of speciation events
   void optimizeDates(bool thorough = true);
 
   /**
    *  Callback functions
    */
+  // Callback called when the species tree node dates change
+  virtual void onSpeciesDatesChange();
   // Callback called when the species tree topology changes
   virtual void onSpeciesTreeChange(
       const std::unordered_set<corax_rnode_t *> *nodesToInvalidate);
@@ -88,10 +87,11 @@ public:
   /**
    *  Functions to handle checkpoints
    */
-  void saveCheckpoint();
-  void loadCheckpoint();
+  void saveCheckpoint() { _state.serialize(getCheckpointDir(_outputDir)); };
   bool checkpointExists() const { return checkpointExists(_outputDir); }
-  static bool checkpointExists(const std::string &outputDir);
+  static bool checkpointExists(const std::string &outputDir) {
+    return FileSystem::dirExists(getCheckpointDir(outputDir));
+  }
   static std::string getCheckpointDir(const std::string &outputDir) {
     return FileSystem::joinPaths(outputDir, "checkpoint");
   }
@@ -106,18 +106,21 @@ public:
   /**
    *  Accessors
    */
-  SpeciesTree &getSpeciesTree() { return *_state.speciesTree; }
-  double &getMixtureAlpha() { return _state.mixtureAlpha; }
-  std::vector<AleModelParameters> &getModelParameters() {
-    return _state.perLocalFamilyModelParams;
-  }
-  std::vector<Highway> &getTransferHighways() {
-    return _state.transferHighways;
-  }
+  // general info
   unsigned int getLocalFamilyNumber() const {
     return _geneTrees.getTrees().size();
   }
   const RecModelInfo &getRecModelInfo() const { return _info; }
+  // species tree and model parameters
+  SpeciesTree &getSpeciesTree() { return *_state.speciesTree; }
+  double &getMixtureAlpha() { return _state.mixtureAlpha; }
+  std::vector<Highway> &getTransferHighways() {
+    return _state.transferHighways;
+  }
+  std::vector<AleModelParameters> &getModelParameters() {
+    return _state.perLocalFamilyModelParams;
+  }
+  // likelihood evaluator
   AleEvaluator &getEvaluator() { return *_evaluator; }
 
 private:
@@ -133,16 +136,16 @@ private:
                         const std::string &outputFile);
 
 private:
-  AleState _state;
   // all families
-  const Families &_families;
+  const Families _families;
   // families of the current MPI rank
   const PerCoreGeneTrees _geneTrees;
   const RecModelInfo _info;
-  std::unique_ptr<AleEvaluator> _evaluator;
-  std::unique_ptr<SpeciesSearchState> _speciesTreeSearchState;
   RootLikelihoods _rootLikelihoods;
   const std::string _outputDir;
-  const std::string _checkpointDir;
   bool _enableCheckpoints;
+  // helper classes
+  AleState _state;
+  std::unique_ptr<AleEvaluator> _evaluator;
+  std::unique_ptr<SpeciesSearchState> _speciesTreeSearchState;
 };
