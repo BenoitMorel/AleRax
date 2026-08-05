@@ -9,6 +9,44 @@
 #include <IO/ParallelOfstream.hpp>
 #include <parallelization/ParallelContext.hpp>
 
+const std::string CKP_INCOMPLETE = std::string(10, '*');
+const std::string CKP_COMPLETE = std::string(10, '#');
+
+static void finishMessageAndExit() {
+  Logger::info << "To run anew, please rename or remove or change "
+               << "the output directory\n"
+               << std::endl;
+  ParallelContext::abort(0);
+}
+
+bool AleState::checkpointExists(const std::string &checkpointDir) {
+  if (FileSystem::dirExists(checkpointDir)) {
+    Logger::info << "Checkpoint detected" << std::endl;
+    // The checkpoint directory exists. Now check that the header of
+    // the mainCheckpoint.txt file is complete, which would imply
+    // that all checkpoint files exist and are updated, since
+    // - args.txt and fams.txt are written before mainCheckpoint.txt
+    // - the header is complete only after all family files have been updated
+    // Note that the current algorithm:
+    // - does control the order of writing files to the OS buffer (i.e.
+    //   safe against software interruptions: process kill)
+    // - does NOT control the order of writing files to the disk (i.e.
+    //   NOT safe against hardware interruptions: power loss or kernel crash)
+    auto checkpointPath =
+        FileSystem::joinPaths(checkpointDir, "mainCheckpoint.txt");
+    std::string headerStr;
+    std::ifstream is(checkpointPath);
+    if (!is || !std::getline(is, headerStr) || headerStr != CKP_COMPLETE) {
+      Logger::info << "\nThe previous run failed to properly save "
+                   << "the checkpoint." << std::endl;
+      finishMessageAndExit();
+    }
+    is.close();
+    return true;
+  }
+  return false;
+}
+
 void AleState::writeCheckpointCmd(const std::string &currentCmd,
                                   const std::string &checkpointDir) {
   auto cmdPath = FileSystem::joinPaths(checkpointDir, "args.txt");
@@ -31,9 +69,9 @@ void AleState::checkCheckpointCmd(const std::string &currentCmd,
     ParallelContext::abort(32);
   }
   unsigned int currentRanks = ParallelContext::getSize();
-  std::string bufferStr;
   unsigned int checkpointRanks = 0;
   std::string checkpointCmd;
+  std::string bufferStr;
   is >> bufferStr;
   is >> checkpointRanks;
   is >> bufferStr;
@@ -49,12 +87,10 @@ void AleState::checkCheckpointCmd(const std::string &currentCmd,
   if (errorStr.size()) {
     Logger::info << "\nThe " << errorStr << " used to run the program is "
                  << "different from the checkpoint." << std::endl;
-    Logger::info << "To run anew please rename or remove or change "
-                 << "the output directory." << std::endl;
     Logger::info << "To restart from the checkpoint please run the program "
-                 << "exactly as given in the " << cmdPath << " file\n"
+                 << "exactly as given in the " << cmdPath << " file."
                  << std::endl;
-    ParallelContext::abort(0);
+    finishMessageAndExit();
   }
 }
 
@@ -88,10 +124,9 @@ void AleState::filterCheckpointFamilies(Families &families,
   }
   is.close();
   for (const auto &family : families) {
-    if (checkpointNames.find(family.name) == checkpointNames.end()) {
-      continue;
+    if (checkpointNames.find(family.name) != checkpointNames.end()) {
+      validFamilies.push_back(family);
     }
-    validFamilies.push_back(family);
   }
   families = validFamilies;
   ParallelContext::barrier();
@@ -104,6 +139,7 @@ void AleState::serialize(const std::string &checkpointDir) const {
   auto checkpointPath =
       FileSystem::joinPaths(checkpointDir, "mainCheckpoint.txt");
   ParallelOfstream os(checkpointPath, true);
+  os << CKP_INCOMPLETE << std::endl;
   // current step
   os << static_cast<unsigned int>(currentStep) << std::endl;
   // dated species tree
@@ -139,6 +175,16 @@ void AleState::serialize(const std::string &checkpointDir) const {
     os.close();
   }
   ParallelContext::barrier();
+  // reset the header (to ensure all checkpoint files have been updated)
+  if (ParallelContext::getRank() == 0) {
+    std::string headerStr;
+    std::fstream fs(checkpointPath, std::ios::in | std::ios::out);
+    assert(fs && std::getline(fs, headerStr) && headerStr == CKP_INCOMPLETE);
+    fs.seekp(0, std::ios::beg);
+    fs << CKP_COMPLETE << std::endl;
+    fs.close();
+  }
+  ParallelContext::barrier();
 }
 
 void AleState::unserialize(const std::string &checkpointDir) {
@@ -153,6 +199,8 @@ void AleState::unserialize(const std::string &checkpointDir) {
                   << std::endl;
     ParallelContext::abort(32);
   }
+  std::string headerStr;
+  std::getline(is, headerStr);
   // current step
   unsigned int bufferUint = 0;
   is >> bufferUint;
@@ -161,10 +209,7 @@ void AleState::unserialize(const std::string &checkpointDir) {
   if (currentStep == AleStep::End) {
     Logger::info << "\nThe previous run finished successfully according to "
                  << "the checkpoint." << std::endl;
-    Logger::info << "To run anew please rename or remove or change "
-                 << "the output directory\n"
-                 << std::endl;
-    ParallelContext::abort(0);
+    finishMessageAndExit();
   }
   // dated species tree (but we already know it)
   std::string bufferStr;
@@ -176,19 +221,18 @@ void AleState::unserialize(const std::string &checkpointDir) {
   is >> std::ws;
   std::string line;
   while (std::getline(is, line)) {
-    if (line.size()) {
-      std::string src;
-      std::string dest;
-      double proba;
-      std::istringstream iss(line);
-      iss >> src;
-      iss >> dest;
-      iss >> proba;
-      Highway highway(labelToNode.find(src)->second,
-                      labelToNode.find(dest)->second);
-      highway.proba = proba;
-      transferHighways.push_back(highway);
-    }
+    std::string src;
+    std::string dest;
+    double proba = -1.0;
+    std::istringstream iss(line);
+    iss >> src;
+    iss >> dest;
+    iss >> proba;
+    assert(proba >= 0.0);
+    Highway highway(labelToNode.find(src)->second,
+                    labelToNode.find(dest)->second);
+    highway.proba = proba;
+    transferHighways.push_back(highway);
   }
   is.close();
   // param vectors
@@ -224,6 +268,8 @@ AleState::readCheckpointSpeciesTree(const std::string &checkpointDir) {
                   << std::endl;
     ParallelContext::abort(32);
   }
+  std::string headerStr;
+  std::getline(is, headerStr);
   unsigned int bufferUint = 0;
   is >> bufferUint;
   std::string speciesTreeNewick;
