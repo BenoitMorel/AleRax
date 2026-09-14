@@ -35,7 +35,7 @@ if (NOT CMAKE_BUILD_TYPE)
           message(STATUS "CMAKE_BUILD_TYPE not set, defaulting to Debug")
 endif ()
 
-
+add_compile_options(-UNDEBUG)
 
 add_subdirectory(ext)
 

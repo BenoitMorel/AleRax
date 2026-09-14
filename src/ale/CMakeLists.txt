@@ -10,6 +10,5 @@ set(alerax_SOURCES ale.cpp
   )
 
 add_program(alerax "${alerax_SOURCES}")
-target_link_libraries(alerax PRIVATE mpi-scheduler)
 install(TARGETS alerax DESTINATION bin)
 
