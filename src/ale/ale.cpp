@@ -497,10 +497,9 @@ void runReconciliationInference(const AleArguments &args,
 void run(AleArguments &args) {
   Random::setSeed(static_cast<unsigned int>(args.seed));
   // initializing the output dir, ccp files, species tree, model info, etc.
-  bool checkpointDetected = AleOptimizer::checkpointExists(args.output);
   auto ckpDir = AleOptimizer::getCheckpointDir(args.output);
+  bool checkpointDetected = AleState::checkpointExists(ckpDir);
   if (checkpointDetected) {
-    Logger::info << "Checkpoint detected" << std::endl;
     AleState::checkCheckpointCmd(args.getCommand(), ckpDir);
   }
   auto ccpDir = FileSystem::joinPaths(args.output, "ccps");
