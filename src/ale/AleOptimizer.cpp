@@ -309,14 +309,16 @@ void AleOptimizer::saveRatesAndLL() {
       std::ofstream ratesOs(familyRatesPath);
       for (const auto &name : parameterNames) {
         if (name != parameterNames[0])
-          ratesOs << "\t" << name;
+          ratesOs << "\t";
+        ratesOs << name;
       }
       ratesOs << std::endl;
       const auto &parameters = getModelParameters()[i];
       assert(parameters.getParamTypeNumber() == parameterNames.size());
       for (unsigned int rate = 0; rate < parameterNames.size(); ++rate) {
         if (rate != 0)
-          ratesOs << "\t" << parameters.getParameter(0, rate);
+          ratesOs << "\t";
+        ratesOs << parameters.getParameter(0, rate);
       }
       ratesOs << std::endl;
       ratesOs.close();
@@ -434,14 +436,12 @@ void AleOptimizer::reconcile(unsigned int samples) {
     perHighwayPerFamTransfers =
         MatrixDouble(highways.size(), VectorDouble(localFamilies.size(), 0.0));
   }
-
   const auto labelToId = getSpeciesTree().getTree().getDeterministicLabelToId();
   const unsigned int N = labelToId.size();
   const VectorUint zeros(N, 0);
   auto countMatrix = MatrixUint(N, zeros);
   std::vector<unsigned int> fromS(N, 0);
   std::vector<unsigned int> fromSButL(N, 0);
-
   for (unsigned int i = 0; i < localFamilies.size(); ++i) {
     std::vector<std::string> perSpeciesEventCountsFiles;
     std::vector<std::string> transferFiles;
@@ -489,7 +489,6 @@ void AleOptimizer::reconcile(unsigned int samples) {
       scenario.savePerSpeciesEventsCounts(perSpeciesEventCountsOs, sample);
       scenario.saveTransfers(transferOs, sample);
       scenario.countOrigins(labelToId, fromS, fromSButL, countMatrix);
-
       for (unsigned int hi = 0; hi < highways.size(); ++hi) {
         perHighwayPerFamTransfers[hi][i] += scenario.countTransfer(
             highways[hi].src->label, highways[hi].dest->label);
