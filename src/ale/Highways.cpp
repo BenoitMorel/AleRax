@@ -72,7 +72,7 @@ static double testHighwayFast(AleEvaluator &evaluator, const Highway &highway,
   double ll = evaluator.computeLikelihood();
   auto out = FileSystem::joinPaths(directory, std::string("transferll_") +
                                                   highway.src->label + "_to_" +
-                                                  highway.dest->label + ".txt");
+                                                  highway.dest->label + ".tsv");
   evaluator.savePerFamilyLikelihoodDiff(out);
   evaluator.removeHighway();
   return ll;

@@ -22,7 +22,7 @@
 #include "AleOptimizer.hpp"
 #include "TrimFamilies.hpp"
 
-const char *version = "AleRax v1.4.1";
+const char *version = "AleRax v1.5.0";
 
 /**
  *  Create AleRax top directories
@@ -148,10 +148,10 @@ void generateCCPs(const AleArguments &args, const Families &families,
   // output the families and their cpp sizes, from the largest to the smallest
   auto sortedIndices = sort_indices_descending<unsigned int>(ccpSizes);
   ParallelOfstream os(ccpDimensionFile, true);
-  os << "fam, leaves, ccps" << std::endl;
+  os << "family\tleaves\tccps" << std::endl;
   for (unsigned int i = 0; i < familyIndices.size(); ++i) {
     auto j = sortedIndices[i];
-    os << families[familyIndices[j]].name << ", " << treeSizes[j] << ", "
+    os << families[familyIndices[j]].name << "\t" << treeSizes[j] << "\t"
        << ccpSizes[j] << std::endl;
   }
   os.close();
@@ -508,7 +508,7 @@ void run(AleArguments &args) {
     initAleRaxDirectories(args, ccpDir);
   }
   printInitialMessage(args);
-  auto ccpDimensionFile = FileSystem::joinPaths(ccpDir, "ccpdim.txt");
+  auto ccpDimensionFile = FileSystem::joinPaths(ccpDir, "ccpdim.tsv");
   auto families = FamiliesFileParser::parseFamiliesFile(args.families);
   for (auto &family : families) {
     family.ccpFile = FileSystem::joinPaths(ccpDir, family.name + ".ccp");
@@ -524,9 +524,9 @@ void run(AleArguments &args) {
   }
   checkCCPAndSpeciesTree(families, args.speciesTree);
   auto coverageFile =
-      FileSystem::joinPaths(args.output, "perSpeciesCoverage.txt");
+      FileSystem::joinPaths(args.output, "perSpeciesCoverage.tsv");
   auto fractionMissingFile =
-      FileSystem::joinPaths(args.output, "perSpeciesMissing.txt");
+      FileSystem::joinPaths(args.output, "perSpeciesMissing.tsv");
   Family::printStats(families, args.speciesTree, coverageFile,
                      fractionMissingFile);
   // initializing the optimizer

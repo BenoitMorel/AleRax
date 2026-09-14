@@ -501,9 +501,9 @@ void AleEvaluator::savePerFamilyLikelihoodDiff(const std::string &outputFile) {
     }
     std::sort(scoredFamilies.begin(), scoredFamilies.end());
     std::ofstream os(outputFile);
-    os << "fam, llDiff" << std::endl;
+    os << "family\tllDiff" << std::endl;
     for (const auto &sf : scoredFamilies) {
-      os << sf.familyName << ", " << sf.score << std::endl;
+      os << sf.familyName << "\t" << sf.score << std::endl;
     }
     os.close();
   }
