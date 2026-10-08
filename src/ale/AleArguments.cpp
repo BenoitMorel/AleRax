@@ -32,7 +32,7 @@ AleArguments::AleArguments(int iargc, char **iargv)
       maxCladeSplitRatio(DEFAULT_MAX_SPLIT_RATIO),
       sampleFrequency(DEFAULT_SAMPLE_FREQUENCY), output("alerax_output"),
       geneTreeSamples(100), cleanupCCP(false), seed(123),
-      randomSpeciesRoot(false), optVerbose(false) {
+      randomSpeciesRoot(false), optVerbose(false), recIterations(4) {
   if (argc == 1) {
     printHelp();
     ParallelContext::abort(0);
@@ -161,6 +161,14 @@ AleArguments::AleArguments(int iargc, char **iargv)
       printDeprecated(arg, "--verbose-opt");
       optVerbose = true;
       /* end recently renamed options */
+    } else if (arg == "--rec-iterations") {
+      auto iterations = atoi(argv[++i]);
+      if (iterations < 1) {
+        Logger::info << "\nrec-iterations must be at least 1 but is "
+                     << iterations << std::endl;
+        ParallelContext::abort(0);
+      }
+      recIterations = static_cast<unsigned int>(iterations);
     } else {
       Logger::info << "\nUnknown argument " << arg << "\n" << std::endl;
       ParallelContext::abort(0);
@@ -232,6 +240,7 @@ void AleArguments::printSummary() const {
     Logger::info << "\tThe model will not consider TL events" << std::endl;
   }
   Logger::info << "\tMemory savings: " << getOnOff(memorySavings) << std::endl;
+  Logger::info << "\tReconciliation iterations: " << recIterations << std::endl;
   Logger::info << "\tModel parametrization: ";
   switch (modelParametrization) {
   case ModelParametrization::GLOBAL:
@@ -412,6 +421,7 @@ void AleArguments::printHelp() const {
   Logger::info << "\t--highway-candidates-file <filepath>" << std::endl;
   Logger::info << "\t--highway-candidates-step1 <int>" << std::endl;
   Logger::info << "\t--highway-candidates-step2 <int>" << std::endl;
+  Logger::info << "\t--rec-iterations <int>" << std::endl;
 
   Logger::info << "For a more detailed description please check the wiki on "
                << "our github page:" << std::endl;

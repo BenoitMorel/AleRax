@@ -104,4 +104,5 @@ public:
   // experimental
   bool randomSpeciesRoot;
   bool optVerbose;
+  unsigned int recIterations;
 };
