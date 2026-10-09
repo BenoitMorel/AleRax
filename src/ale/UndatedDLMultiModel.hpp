@@ -206,7 +206,7 @@ void UndatedDLMultiModel<REAL>::recomputeSpeciesProbabilities() {
   std::fill(_uE.begin(), _uE.end(), REAL());
   // iterate several times to resolve _uE probas with
   // fixed point optimization
-  unsigned int maxIt = 4;
+  unsigned int maxIt = this->_info.recIterations;
   for (unsigned int it = 0; it < maxIt; ++it) {
     for (unsigned int c = 0; c < _gammaCatNumber; ++c) {
       // postorder species tree traversal is granted

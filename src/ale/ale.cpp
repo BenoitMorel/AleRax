@@ -365,7 +365,7 @@ RecModelInfo buildRecModelInfo(const AleArguments &args) {
       false, // mad rooting (option specific to GeneRax)
       -1.0,  // branch length threshold
       args.transferConstraint, args.noDup, args.noDL, args.noTL,
-      args.fractionMissingFile, args.memorySavings);
+      args.fractionMissingFile, args.memorySavings, args.recIterations);
 }
 
 Parameters buildStartingRates(const AleArguments &args,

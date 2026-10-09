@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <fstream>
 
 #include <IO/Logger.hpp>
@@ -149,21 +150,41 @@ double AleEvaluator::computeLikelihoodFast() {
   return computeLikelihood();
 }
 
+double sumInFixedOrder(const std::vector<double> &localValues) {
+  std::vector<double> all;
+  ParallelContext::concatenateHeterogeneousDoubleVectors(localValues, all);
+  for (auto v : all) {
+    if (std::isnan(v)) {
+      return v; // sum would be NaN
+    }
+  }
+  std::sort(all.begin(), all.end(), [](double a, double b) {
+    const auto fa = std::fabs(a);
+    const auto fb = std::fabs(b);
+    return fa < fb || (fa == fb && a < b);
+  });
+  double sum = 0.0;
+  for (auto v : all) {
+    sum += v;
+  }
+  return sum;
+}
+
 double AleEvaluator::computeLikelihood(PerFamLL *perFamLL) {
   if (perFamLL) {
     perFamLL->clear();
   }
-  double sumLL = 0.0;
+  std::vector<double> localLL;
+  localLL.reserve(getLocalFamilyNumber());
   for (unsigned int i = 0; i < getLocalFamilyNumber(); ++i) {
     auto ll = computeFamilyLikelihood(i);
     if (perFamLL) {
       perFamLL->push_back(ll);
     }
-    sumLL += ll;
+    localLL.push_back(ll);
   }
   ParallelContext::barrier();
-  ParallelContext::sumDouble(sumLL);
-  return sumLL;
+  return sumInFixedOrder(localLL);
 }
 
 double AleEvaluator::computeFamilyLikelihood(unsigned int i) {

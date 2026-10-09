@@ -209,7 +209,7 @@ template <class REAL> void UndatedDTLMultiModel<REAL>::updateCLV(CID cid) {
   std::fill(tq.begin(), tq.end(), REAL());
   // iterate several times to resolve the DL and TL terms with
   // fixed point optimization: not needed if we don't model TL
-  unsigned int maxIt = this->_info.noTL ? 1 : 4;
+  unsigned int maxIt = this->_info.noTL ? 1 : this->_info.recIterations;
   for (unsigned int it = 0; it < maxIt; ++it) {
     bool ok;
     for (unsigned int c = 0; c < _gammaCatNumber; ++c) {
@@ -377,7 +377,7 @@ void UndatedDTLMultiModel<REAL>::recomputeSpeciesProbabilities() {
   std::fill(_tE.begin(), _tE.end(), REAL());
   // iterate several times to resolve _uE and _tE probas with
   // fixed point optimization
-  unsigned int maxIt = 4;
+  unsigned int maxIt = this->_info.recIterations;
   for (unsigned int it = 0; it < maxIt; ++it) {
     for (unsigned int c = 0; c < _gammaCatNumber; ++c) {
       REAL extinctionSum = REAL();
