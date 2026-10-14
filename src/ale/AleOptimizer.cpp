@@ -61,7 +61,7 @@ void AleOptimizer::randomizeRoot() {
   assert(getCurrentStep() == AleStep::SpeciesTreeOpt);
   auto N = getSpeciesTree().getTree().getInnerNodeNumber();
   for (unsigned int i = 0; i < N; ++i) {
-    auto direction = Random::getInt() % 4;
+    auto direction = Random::getUInt() % 4;
     if (SpeciesTreeOperator::canChangeRoot(getSpeciesTree(), direction)) {
       SpeciesTreeOperator::changeRoot(getSpeciesTree(), direction);
     }

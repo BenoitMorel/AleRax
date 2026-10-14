@@ -31,7 +31,7 @@ void TrimFamilies::trimMinSpeciesCoverage(Families &families,
   Families familiesCopy = families;
   families.clear();
   for (auto i : toKeep) {
-    assert(ParallelContext::isIntEqual(i));
+    assert(ParallelContext::isUIntEqual(i));
     families.push_back(familiesCopy[i]);
   }
 }
@@ -61,13 +61,14 @@ void TrimFamilies::trimHighCladesNumber(Families &families, double keepRatio) {
   // trim families
   Families familiesCopy = families;
   families.clear();
-  unsigned int cutFrom = (unsigned int)(double(N) * keepRatio);
+  auto cutFrom = static_cast<unsigned int>(double(N) * keepRatio);
   assert(cutFrom <= N);
   unsigned int maxCcpSizeKept = 0;
   for (unsigned int i = 0; i < cutFrom; ++i) {
-    assert(ParallelContext::isIntEqual(sizeToIndex[i].second));
-    families.push_back(familiesCopy[sizeToIndex[i].second]);
-    maxCcpSizeKept = sizeToIndex[i].first;
+    const auto &p = sizeToIndex[i];
+    assert(ParallelContext::isUIntEqual(p.second));
+    families.push_back(familiesCopy[p.second]);
+    maxCcpSizeKept = p.first;
   }
   Logger::info << "Trimming families with more than " << maxCcpSizeKept
                << " clades" << std::endl;
@@ -104,7 +105,7 @@ void TrimFamilies::trimCladeSplitRatio(Families &families, double maxRatio) {
   Families familiesCopy = families;
   families.clear();
   for (auto i : toKeep) {
-    assert(ParallelContext::isIntEqual(i));
+    assert(ParallelContext::isUIntEqual(i));
     families.push_back(familiesCopy[i]);
   }
 }
