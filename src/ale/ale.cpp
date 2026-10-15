@@ -211,12 +211,14 @@ void trimFamilies(const AleArguments &args, Families &families) {
 void computeInitialSpeciesTree(const Families &families,
                                const SpeciesTreeAlgorithm &algo,
                                const std::string &outputFile) {
+  std::unique_ptr<PLLRootedTree> tree;
   switch (algo) {
   case SpeciesTreeAlgorithm::MiniNJ:
-    MiniNJ::runMiniNJ(families)->save(outputFile);
+    tree = MiniNJ::runMiniNJ(families);
     break;
   case SpeciesTreeAlgorithm::Random:
-    std::make_unique<SpeciesTree>(families)->getTree().save(outputFile);
+    tree = std::make_unique<PLLRootedTree>(
+        Family::getLabelsFromFamilies(families));
     break;
   case SpeciesTreeAlgorithm::User:
     assert(false);
@@ -226,6 +228,9 @@ void computeInitialSpeciesTree(const Families &families,
                  << "is not implemented in AleRax\n"
                  << std::endl;
     ParallelContext::abort(0);
+  }
+  if (ParallelContext::getRank() == 0) {
+    tree->save(outputFile);
   }
 }
 
@@ -258,11 +263,10 @@ void initStartingSpeciesTree(AleArguments &args, const Families &families) {
         Logger::info << e.what() << std::endl;
         ParallelContext::abort(153);
       }
+      // read the initial tree, provide it with internal node labels
+      // and save it as the starting tree
+      PLLRootedTree::labelRootedTree(args.speciesTree, startingSpeciesTree);
     }
-    ParallelContext::barrier();
-    // read the initial tree, provide it with internal node labels
-    // and save it as the starting tree
-    PLLRootedTree::labelRootedTree(args.speciesTree, startingSpeciesTree);
   } else {
     // compute the initial tree and save it as the starting tree
     computeInitialSpeciesTree(families, args.speciesTreeAlgorithm,
