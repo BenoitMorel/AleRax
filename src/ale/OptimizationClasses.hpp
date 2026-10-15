@@ -4,8 +4,8 @@
 #include <util/enums.hpp>
 #include <util/types.hpp>
 
+struct RecModelInfo;
 class PLLRootedTree;
-class RecModelInfo;
 
 /**
  *  Describes which DTLO parameters should be shared among which species

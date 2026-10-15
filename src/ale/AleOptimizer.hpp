@@ -25,6 +25,13 @@ public:
                const Parameters &startingRates, bool optimizeRates,
                bool optimizeVerbose, const std::string &outputDir);
 
+  // forbid copy and move
+  AleOptimizer(const AleOptimizer &) = delete;
+  AleOptimizer &operator=(const AleOptimizer &) = delete;
+  AleOptimizer(AleOptimizer &&) = delete;
+  AleOptimizer &operator=(AleOptimizer &&) = delete;
+  ~AleOptimizer() = default;
+
   /**
    *  Species tree search functions
    */

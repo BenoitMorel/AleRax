@@ -10,9 +10,9 @@
 #include "AleModelParameters.hpp"
 #include "OptimizationClasses.hpp"
 
+struct RecModelInfo;
 class AleOptimizer;
 class SpeciesTree;
-class RecModelInfo;
 class PerCoreGeneTrees;
 class MultiModelInterface;
 class Scenario;

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 
 #include <IO/FileSystem.hpp>
 #include <IO/Logger.hpp>
@@ -267,7 +268,7 @@ void Highways::filterCandidateHighways(
       withHighwayLL = bestParameters.getScore();
       llDiff = withHighwayLL - initialLL;
       // if BIC < 0, accept the highway and add it to the recmodel for a while
-      if (2.0 * llDiff > log(sampleSize)) {
+      if (2.0 * llDiff > std::log(sampleSize)) {
         Logger::timed << "  Accepting the candidate: ";
         filteredHighways.push_back(ScoredHighway(highway, llDiff));
         evaluator.addHighway(highway);

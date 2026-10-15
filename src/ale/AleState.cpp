@@ -1,7 +1,6 @@
 #include "AleState.hpp"
 
 #include <cassert>
-#include <iostream>
 #include <sstream>
 
 #include <IO/FileSystem.hpp>

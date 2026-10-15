@@ -1,6 +1,6 @@
 #pragma once
 
-#include "IO/ArgumentsHelper.hpp"
+#include <IO/ArgumentsHelper.hpp>
 
 /**
  *  Parses and stores the program arguments

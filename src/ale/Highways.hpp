@@ -20,10 +20,12 @@ struct ScoredHighway {
 
 /**
  *  Implements the main functions to infer transfer highways, to compute their
- *  highway probabilities and to add them to the reconciliation model
+ *  highway probabilities, and to add them to the reconciliation model
  */
 class Highways {
 public:
+  Highways() = delete;
+
   /**
    *  Include the provided highways to the potential candidates in the order
    *  defined by the frequencies of the transfer directions they represent

@@ -22,16 +22,15 @@
 #include "AleOptimizer.hpp"
 #include "TrimFamilies.hpp"
 
-const char *version = "AleRax v1.4.1";
+const char *version = "AleRax v1.4.2";
 
 /**
  *  Create AleRax top directories
  */
-void initAleRaxDirectories(const AleArguments &args,
-                           const std::string &ccpDir) {
+void initAleRaxDirectories(const AleArguments &args) {
   FileSystem::mkdir(args.output, true);
-  FileSystem::mkdir(args.output + "/species_trees", true);
-  FileSystem::mkdir(ccpDir, true);
+  FileSystem::mkdir(FileSystem::joinPaths(args.output, "species_trees"), true);
+  FileSystem::mkdir(FileSystem::joinPaths(args.output, "ccps"), true);
   ParallelContext::barrier();
 }
 
@@ -499,14 +498,13 @@ void run(AleArguments &args) {
   // initializing the output dir, ccp files, species tree, model info, etc.
   auto ckpDir = AleOptimizer::getCheckpointDir(args.output);
   bool checkpointDetected = AleState::checkpointExists(ckpDir);
-  if (checkpointDetected) {
+  if (!checkpointDetected) {
+    initAleRaxDirectories(args);
+  } else {
     AleState::checkCheckpointCmd(args.getCommand(), ckpDir);
   }
-  auto ccpDir = FileSystem::joinPaths(args.output, "ccps");
-  if (!checkpointDetected) {
-    initAleRaxDirectories(args, ccpDir);
-  }
   printInitialMessage(args);
+  auto ccpDir = FileSystem::joinPaths(args.output, "ccps");
   auto ccpDimensionFile = FileSystem::joinPaths(ccpDir, "ccpdim.txt");
   auto families = FamiliesFileParser::parseFamiliesFile(args.families);
   for (auto &family : families) {
@@ -588,13 +586,13 @@ void run(AleArguments &args) {
 /**
  *  This main will be called by each process and is the entry
  *  point to AleRax. It inits the parallel context, the logger,
- *  reads the arguments, runs AleRax and closes everything.
+ *  reads the arguments, runs AleRax, and closes everything.
  *
- *  If comm is set to nullptr, MPI_Init will be called to initiate the
- *  MPI context
+ *  If commPtr is set to nullptr, MPI_Init() will be called to
+ *  initialize the MPI context
  */
-int alerax_main(int argc, char **argv, void *comm) {
-  ParallelContext::init(comm);
+int alerax_main(int argc, char **argv, void *commPtr) {
+  ParallelContext::init(commPtr);
   Logger::init();
   Logger::timed << version << std::endl;
   AleArguments args(argc, argv);
@@ -607,7 +605,7 @@ int alerax_main(int argc, char **argv, void *comm) {
 
 int main(int argc, char **argv) {
 #ifdef WITH_MPI
-  // the null communicator signals that we need to call MPI_Init
+  // the null communicator signals that we need to call MPI_Init()
   return alerax_main(argc, argv, nullptr);
 #else
   // this fake communicator signals that we're not using MPI
