@@ -219,23 +219,27 @@ template <class REAL> double MultiModel<REAL>::computeLogLikelihood() {
   // compute CLVs based on recomputed per-branch probas
   updateCLVs();
   // compute the species tree LL
-  REAL res = REAL();
-  std::vector<REAL> categoryLikelihoods(getGammaCatNumber(), REAL());
+  REAL lh = REAL();
   for (unsigned int c = 0; c < getGammaCatNumber(); ++c) {
+    REAL catLh = REAL();
+    // sum over all possible origination species
     for (auto speciesNode : this->getPrunedSpeciesNodes()) {
-      categoryLikelihoods[c] += getRootCladeLikelihood(speciesNode, c);
+      catLh += getRootCladeLikelihood(speciesNode, c);
     }
     // condition on survival
-    categoryLikelihoods[c] /=
-        getLikelihoodFactor(c); // no need to scale here as factor <= 1.0
+    catLh /= getLikelihoodFactor(c); // no need to scale here as factor <= 1.0
+    // check after conditioning
+    if (catLh > REAL(1.0)) {
+      Logger::error << "error: lh=" << catLh << " (lh > 1.0)" << std::endl;
+      assert(false);
+    }
+    // add the category likelihood
+    lh += catLh;
   }
-  // sum over the categories
-  res = std::accumulate(categoryLikelihoods.begin(), categoryLikelihoods.end(),
-                        REAL());
   // normalize by the number of categories
-  res /= static_cast<double>(getGammaCatNumber());
-  scale(res);
-  auto ll = getLog(res);
+  lh /= static_cast<double>(getGammaCatNumber());
+  scale(lh);
+  auto ll = getLog(lh);
   // remember the computed LL for this species tree
   this->_llCache[hash] = ll;
   if (this->_memorySavings) {

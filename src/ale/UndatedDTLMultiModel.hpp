@@ -196,7 +196,7 @@ template <class REAL> void UndatedDTLMultiModel<REAL>::allocateMemory() {
  *  Free memory allocated to the CLVs
  */
 template <class REAL> void UndatedDTLMultiModel<REAL>::deallocateMemory() {
-  _dtlclvs = std::vector<DTLCLV>();
+  std::vector<DTLCLV>().swap(_dtlclvs);
 }
 
 /**
@@ -421,7 +421,11 @@ void UndatedDTLMultiModel<REAL>::recomputeSpeciesProbabilities() {
           scale(temp);
           proba += temp;
         }
-        assert(proba < REAL(1.000001));
+        // check proba
+        if (proba > REAL(1.0)) {
+          assert(proba < REAL(1.000001));
+          proba = REAL(1.0);
+        }
         extinctionSum += proba;
         _uE[ec] = proba;
       }
