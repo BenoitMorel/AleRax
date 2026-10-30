@@ -544,7 +544,7 @@ bool UndatedDTLMultiModel<REAL>::computeProbability(
     // - S event on a terminal species branch (only for compatible genes and
     // species)
     if (isSpeciesLeaf && this->_geneToSpecies[cid] == e) {
-      temp = REAL(_PS[ec]);
+      temp = REAL(_PS[ec] * (1.0 - this->_fm[e])); // S and observed scenario
       scale(temp);
       proba += temp;
       if (recCell && proba > maxProba) {
