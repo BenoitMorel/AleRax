@@ -22,7 +22,7 @@
 #include "AleOptimizer.hpp"
 #include "TrimFamilies.hpp"
 
-const char *version = "AleRax v1.4.2";
+const char *version = "AleRax v1.4.3";
 
 /**
  *  Create AleRax top directories
