@@ -411,9 +411,8 @@ void AleEvaluator::getTransferInformation(
   // this is duplicated code from Routines...
   const auto labelToId = speciesTree.getTree().getDeterministicLabelToId();
   const auto idToLabel = speciesTree.getTree().getDeterministicIdToLabel();
-  const unsigned int labelsNumber = idToLabel.size();
-  transferFrequencies.count =
-      MatrixUint(labelsNumber, VectorUint(labelsNumber, 0));
+  const unsigned int N = idToLabel.size();
+  transferFrequencies.count = MatrixUint(N, VectorUint(N, 0));
   transferFrequencies.idToLabel = idToLabel;
   perSpeciesEvents = PerSpeciesEvents(speciesTree.getTree().getNodeNumber());
   auto infoCopy = _info;
@@ -435,14 +434,14 @@ void AleEvaluator::getTransferInformation(
     bool ok = evaluation.sampleReconciliations(1, scenarios);
     assert(ok);
     assert(scenarios.size() == 1);
-    auto &scenario = *scenarios[0];
+    const auto &scenario = *scenarios[0];
     scenario.countTransfers(labelToId, transferFrequencies.count);
     scenario.gatherReconciliationStatistics(perSpeciesEvents);
     potentialTransfers.addScenario(scenario);
   }
   ParallelContext::barrier();
   ParallelContext::makeRandConsistent();
-  for (unsigned int i = 0; i < labelsNumber; ++i) {
+  for (unsigned int i = 0; i < N; ++i) {
     ParallelContext::sumVectorUInt(transferFrequencies.count[i]);
   }
   perSpeciesEvents.parallelSum();
