@@ -196,7 +196,7 @@ template <class REAL> void UndatedDTLMultiModel<REAL>::allocateMemory() {
  *  Free memory allocated to the CLVs
  */
 template <class REAL> void UndatedDTLMultiModel<REAL>::deallocateMemory() {
-  _dtlclvs = std::vector<DTLCLV>();
+  std::vector<DTLCLV>().swap(_dtlclvs);
 }
 
 /**
@@ -421,7 +421,11 @@ void UndatedDTLMultiModel<REAL>::recomputeSpeciesProbabilities() {
           scale(temp);
           proba += temp;
         }
-        assert(proba < REAL(1.000001));
+        // check proba
+        if (proba > REAL(1.0)) {
+          assert(proba < REAL(1.000001));
+          proba = REAL(1.0);
+        }
         extinctionSum += proba;
         _uE[ec] = proba;
       }
@@ -540,7 +544,7 @@ bool UndatedDTLMultiModel<REAL>::computeProbability(
     // - S event on a terminal species branch (only for compatible genes and
     // species)
     if (isSpeciesLeaf && this->_geneToSpecies[cid] == e) {
-      temp = REAL(_PS[ec]);
+      temp = REAL(_PS[ec] * (1.0 - this->_fm[e])); // S and observed scenario
       scale(temp);
       proba += temp;
       if (recCell && proba > maxProba) {
