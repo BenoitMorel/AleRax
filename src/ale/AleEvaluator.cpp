@@ -106,7 +106,7 @@ void AleEvaluator::resetEvaluation(unsigned int i, bool highPrecision) {
     _highPrecisions[i] = 1;
   } else {
     _highPrecisions[i] = -1;
-    if (!std::isnormal(ll)) {
+    if (!std::isfinite(ll)) {
       resetEvaluation(i, true);
     }
   }
@@ -169,14 +169,14 @@ double AleEvaluator::computeLikelihood(PerFamLL *perFamLL) {
 
 double AleEvaluator::computeFamilyLikelihood(unsigned int i) {
   auto ll = _evaluations[i]->computeLogLikelihood();
-  if (_highPrecisions[i] == -1 && !std::isnormal(ll)) {
+  if (_highPrecisions[i] == -1 && !std::isfinite(ll)) {
     // We are in the low precision mode (we use double)
     // and it's not accurate enough, switch to the high
     // precision mode and recompute the ll
     resetEvaluation(i, true);
     ll = _evaluations[i]->computeLogLikelihood();
   }
-  if (!std::isnormal(ll)) {
+  if (!std::isfinite(ll)) {
     // Bad ll even in the high precision mode!
     Logger::error << "Error: ll=" << ll << " for family "
                   << _geneTrees.getTrees()[i].name << std::endl;

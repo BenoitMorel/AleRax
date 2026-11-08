@@ -356,8 +356,10 @@ bool UndatedDLMultiModel<REAL>::computeProbability(
         return true;
       }
     }
-    // - D event
-    temp = _dlclvs[cidLeft][ec] * _dlclvs[cidRight][ec] * (_PD[ec] * freq);
+    // - D event (times 2: either copy can found either subclade, as the S
+    // term counts both orientations of the split)
+    temp =
+        _dlclvs[cidLeft][ec] * _dlclvs[cidRight][ec] * (2.0 * _PD[ec] * freq);
     scale(temp);
     proba += temp;
     if (recCell && proba > maxProba) {
