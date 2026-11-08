@@ -64,6 +64,7 @@ public:
   std::string fractionMissingFile;
   CCPRooting ccpRooting;
   OriginationStrategy originationStrategy;
+  unsigned int fixedPointIterations;
   bool memorySavings;
   double d;
   double l;
