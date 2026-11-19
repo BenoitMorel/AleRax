@@ -1,64 +1,50 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import os
 import sys
 
-
-
-
-def get_frequency(transfer_file, species_from, species_to):
-  reader = open(transfer_file)
-  while(True):
-    line = reader.readline()
-    if (not line):
-      break
-    sp = line.split(" ")
-    if (len(sp) < 2):
-      continue
-    if (species_from != sp[0]):
-      continue
-    if (species_to != sp[1]):
-      continue
-    print(sp[2])
-    return float(sp[2])
+def get_frequency(transfer_file, src, dest):
+  with open(transfer_file, "r") as reader:
+    # skip the header
+    reader.readline()
+    for line in reader:
+      items = line.split()
+      assert(len(items) == 3)
+      if (src == items[0] and dest == items[1]):
+        return float(items[2])
   return 0.0
 
-def extract(alerax_dir, from_species, to_species, min_value, output_file):
+def extract(alerax_dir, src, dest, min_freq, output_file):
   res = []
   summaries = os.path.join(alerax_dir, "reconciliations", "summaries")
-  for f in os.listdir(summaries):
-    if (f.endswith("_transfers.txt")):
-      family = f.replace("_transfers.txt", "")
-      event_file = os.path.join(summaries, f)
-      freq = get_frequency(event_file, from_species, to_species)
-      if (freq > min_value):
+  for file in os.listdir(summaries):
+    if (file.endswith("_meanTransfers.tsv")):
+      transfer_file = os.path.join(summaries, file)
+      freq = get_frequency(transfer_file, src, dest)
+      if (freq > min_freq):
+        family = file.replace("_meanTransfers.tsv", "")
         res.append((freq, family))
   res.sort(reverse = True)
   total = 0.0
-  for item in res:
-    total += item[0]
+  for p in res:
+    total += p[0]
+  print(f"Writing families with more than {min_freq} T events from {src} to {dest} into {output_file}")
   with open(output_file, "w") as writer:
     writer.write(str(total) + "\n")
-    for item in res:
-      writer.write(str(item[0]) + " " + item[1] + "\n")
+    for p in res:
+      writer.write(str(p[0]) + " " + p[1] + "\n")
+  print(f"{len(res)} families written")
 
-if (__name__ == "__main__"): 
-  if (len(sys.argv) != 6): 
-     print("This script takes as input an AleRax output directory, two species,and a threshold value")
-     print("It will store in a file the list of families for which the frequency of the transfer between those two species  is above this threshold, as well as the frequencies")
-     print(" [Error] Invalid syntax")
-     print(" Usage: python " + os.path.basename(__file__) + " alerax_dir from to min_value output_file")
-     exit(1)
+# main
+if (__name__ == "__main__"):
+  if (len(sys.argv) != 6):
+    print("This script takes as input an AleRax output directory, two species names, and a threshold value")
+    print("It will store in the output file the list of families for which the frequency of transfers between those two species is above the threshold, as well as the frequencies")
+    print(" [Error] Invalid syntax")
+    print(" Usage: python3 " + os.path.basename(__file__) + " alerax_dir src dest threshold output_file")
+    exit(1)
   alerax_dir = sys.argv[1]
-  from_species = sys.argv[2]
-  to_species = sys.argv[3]
-  min_value = float(sys.argv[4])
+  src = sys.argv[2]
+  dest = sys.argv[3]
+  min_freq = float(sys.argv[4])
   output_file = sys.argv[5]
-  
-  extract(alerax_dir, from_species, to_species, min_value, output_file)
-
-
-
-
-
-
-
+  extract(alerax_dir, src, dest, min_freq, output_file)
